@@ -1,0 +1,266 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Choice {
+  A
+  B
+  C
+  D
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  role           Role      @default(USER)
+  createdAt      DateTime  @default(now())
+  fullName       String?
+  hospitalName   String?
+  residencyYear  Int?
+
+  accounts      Account[]
+  sessions      Session[]
+  attempts      Attempt[]
+  quizzes       Quiz[]
+  comments      Comment[]
+  reports       AnswerReport[] @relation("ReportAuthor")
+  resolved      AnswerReport[] @relation("ReportResolver")
+  questions     Question[]     @relation("QuestionAuthor")
+  bookmarks     Bookmark[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Chapter {
+  id                       Int            @id @default(autoincrement())
+  number                   Int            @unique
+  title                    String
+  description              String         @db.Text
+  ingestedAt               DateTime?
+  learningUsefulnessIndex  Int?
+  questions                Question[]
+  chunks                   ChapterChunk[]
+}
+
+model ChapterChunk {
+  id           Int                          @id @default(autoincrement())
+  chapterId    Int
+  ord          Int
+  text         String                       @db.Text
+  embedding    Unsupported("vector(1536)")?
+  // v2 ingestion metadata (nullable for back-compat with chunks ingested by the v1 pipeline)
+  sectionPath  String?
+  headingLevel Int?
+  pageStart    Int?
+  pageEnd      Int?
+  tokenCount   Int?
+  chapter      Chapter                      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId, ord])
+}
+
+model Question {
+  id                Int           @id @default(autoincrement())
+  chapterId         Int           // primary chapter (admin-overridable; derived from RAG evidence by default)
+  chapterIds        Int[]         @default([]) // all chapters whose evidence supports the answer (unranked set; includes primary)
+  chapterAutoTagged Boolean       @default(true)  // false once admin manually overrides classification
+  stem              String        @db.Text
+  stemEn            String?       @db.Text  // precomputed English mirror of the stem for cross-language retrieval
+  optionA           String        @db.Text
+  optionB           String        @db.Text
+  optionC           String        @db.Text
+  optionD           String        @db.Text
+  correctAnswer     Choice?
+  source            String?
+  createdById       String?
+  createdAt         DateTime      @default(now())
+
+  chapter       Chapter       @relation(fields: [chapterId], references: [id])
+  createdBy     User?         @relation("QuestionAuthor", fields: [createdById], references: [id])
+  geminiAnswer  GeminiAnswer?
+  attempts      Attempt[]
+  comments      Comment[]
+  reports       AnswerReport[]
+  bookmarks     Bookmark[]
+  ragRuns       RagRun[]
+
+  @@index([chapterId])
+  @@index([chapterIds], type: Gin)
+}
+
+model GeminiAnswer {
+  id                 Int      @id @default(autoincrement())
+  questionId         Int      @unique
+  rawMarkdown        String   @db.Text
+  correctAnswer      Choice
+  evidence           String   @db.Text
+  explanation        String   @db.Text
+  whyOthersWrong     String   @db.Text
+  model              String
+  sourceChapters     Int[]    @default([])
+  // v2 structured-output fields
+  evidenceCitations  Json?    // EvidenceCitation[] — { chapterNumber, chapterTitle, sectionPath?, quote }
+  confidence         Float?
+  escalated          Boolean  @default(false)
+  insufficientEvidence Boolean @default(false)
+  generatedAt        DateTime @default(now())
+
+  question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+/// Cache of RAG results keyed by a hash of the normalized stem+options.
+/// Board questions often repeat — a cache hit lets us clone the GeminiAnswer payload
+/// without re-embedding the query or re-calling the generation model.
+model QuestionQueryCache {
+  id           Int      @id @default(autoincrement())
+  questionHash String   @unique
+  payload      Json     // serialized v2 GeminiAnswer structured payload
+  createdAt    DateTime @default(now())
+  hits         Int      @default(0)
+}
+
+/// Observability log for every RAG generation invocation.
+model RagRun {
+  id              Int      @id @default(autoincrement())
+  questionId      Int
+  model           String   // final model that produced the persisted answer
+  kPrimary        Int      // candidates retrieved before reranking
+  kReranked       Int      // chunks fed to the generator
+  rerankerScores  Float[]
+  escalated       Boolean  @default(false)
+  cacheHit        Boolean  @default(false)
+  latencyMs       Int?
+  tokensIn        Int?
+  tokensOut       Int?
+  costCents       Float?
+  createdAt       DateTime @default(now())
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId, createdAt])
+}
+
+model Attempt {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  questionId Int
+  chosen     Choice
+  isCorrect  Boolean
+  quizId     Int?
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  quiz       Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([questionId])
+}
+
+model Quiz {
+  id         Int       @id @default(autoincrement())
+  userId     String
+  name       String
+  chapterIds Int[]
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts   Attempt[]
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  userId     String
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+  editedAt   DateTime?
+
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([questionId, createdAt])
+}
+
+model AnswerReport {
+  id           Int          @id @default(autoincrement())
+  questionId   Int
+  userId       String
+  explanation  String       @db.Text
+  status       ReportStatus @default(OPEN)
+  createdAt    DateTime     @default(now())
+  resolvedById String?
+
+  question     Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user         User         @relation("ReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  resolver     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model Bookmark {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  questionId Int
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId, createdAt])
+}
