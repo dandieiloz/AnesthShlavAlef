@@ -34,7 +34,7 @@ export default async function AdminQuestionsPage({
   } else if (sourceFilter) {
     where.source = { startsWith: sourceFilter };
   } else if (yearFilter) {
-    where.source = { endsWith: ` ${sp.year.trim()}` };
+    where.source = { endsWith: ` ${yearFilter}` };
   }
 
   if (sp.hasExplanation === "yes") {
