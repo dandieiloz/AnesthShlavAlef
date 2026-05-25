@@ -170,6 +170,12 @@ export type CostEstimateResult = BatchCostEstimate & {
   jobs: Array<{ jobId: number; usd: number; cached: boolean }>;
   /** Spending threshold (USD) above which the UI should ask for confirmation. */
   confirmThreshold: number;
+  /**
+   * Average latency (ms) per job from the last 50 real non-cached RagRun records.
+   * Used to pre-compute an estimated batch duration.
+   * Falls back to 30 000 ms on fresh deployments with no history yet.
+   */
+  avgLatencyMs: number;
 };
 
 /**
@@ -182,6 +188,18 @@ export async function estimateJobsCostAction(
 ): Promise<CostEstimateResult> {
   await requireAdmin();
 
+  // Average latency from last 50 non-cached runs — used for time estimation.
+  const recentRuns = await db.ragRun.findMany({
+    where: { cacheHit: false, latencyMs: { not: null } },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: { latencyMs: true },
+  });
+  const avgLatencyMs =
+    recentRuns.length > 0
+      ? recentRuns.reduce((sum, r) => sum + (r.latencyMs ?? 0), 0) / recentRuns.length
+      : 30_000; // 30 s fallback for fresh deployments with no history
+
   const empty: CostEstimateResult = {
     totalUsd: 0,
     cachedCount: 0,
@@ -190,6 +208,7 @@ export async function estimateJobsCostAction(
     byStage: { embedHe: 0, translate: 0, embedEn: 0, rerank: 0, flashGen: 0, escalation: 0 },
     jobs: [],
     confirmThreshold: COST_CONFIRM_THRESHOLD,
+    avgLatencyMs,
   };
 
   if (jobIds.length === 0) return empty;
@@ -252,5 +271,6 @@ export async function estimateJobsCostAction(
       cached: estimate.cached,
     })),
     confirmThreshold: COST_CONFIRM_THRESHOLD,
+    avgLatencyMs,
   };
 }

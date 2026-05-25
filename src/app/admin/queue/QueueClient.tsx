@@ -62,6 +62,14 @@ const KIND_LABEL: Record<JobKind, string> = {
   REGENERATE: "חילול מחדש",
 };
 
+/** Format a millisecond duration as a short human-readable Hebrew string. */
+function formatDuration(ms: number): string {
+  if (ms < 60_000) return `${Math.round(ms / 1000)} שנ'`;
+  const m = Math.floor(ms / 60_000);
+  const s = Math.round((ms % 60_000) / 1000);
+  return s > 0 ? `${m}:${String(s).padStart(2, "0")} דק'` : `${m} דק'`;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function QueueClient({
@@ -86,6 +94,11 @@ export function QueueClient({
   const [estimating, setEstimating] = useState(false);
   const [confirmPending, setConfirmPending] = useState(false);
   const estimateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Time tracking (in-progress countdown) ────────────────────────────────
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const jobStartedAtRef = useRef<number | null>(null);  // timestamp before each job
+  const jobTimingsRef = useRef<number[]>([]);           // ms per completed job (rolling)
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
@@ -125,6 +138,28 @@ export function QueueClient({
       if (estimateTimerRef.current) clearTimeout(estimateTimerRef.current);
     };
   }, [runnableKey]);
+
+  // ── Live countdown ticker ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!running) {
+      setTimeRemaining(null);
+      return;
+    }
+    const id = setInterval(() => {
+      if (!progress) return;
+      const remaining = progress.total - progress.current;
+      if (remaining <= 0) { setTimeRemaining(null); return; }
+      // Prefer rolling average of actual timings; fall back to server estimate.
+      const avgMs =
+        jobTimingsRef.current.length > 0
+          ? jobTimingsRef.current.reduce((a, b) => a + b, 0) / jobTimingsRef.current.length
+          : (estimate?.avgLatencyMs ?? 30_000);
+      setTimeRemaining(formatDuration(remaining * avgMs));
+    }, 1_000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
+
   const retryable = rows.filter(
     (r) => selected.has(r.id) && (r.status === "FAILED" || r.status === "CANCELLED")
   );
@@ -164,6 +199,7 @@ export function QueueClient({
     stopRef.current = false;
     setRunning(true);
     setStatusMsg(null);
+    jobTimingsRef.current = [];
 
     const queue = runnable.map((r) => r.id);
     let doneCount = 0;
@@ -177,21 +213,25 @@ export function QueueClient({
       const jobId = queue[i];
       setProgress({ current: i + 1, total: queue.length });
       updateRow(jobId, { status: "PROCESSING" });
+      jobStartedAtRef.current = Date.now();
 
       const result: RunJobResult = await runJobAction(jobId);
+      const elapsed = Date.now() - (jobStartedAtRef.current ?? Date.now());
 
       if (result.ok) {
         doneCount++;
+        jobTimingsRef.current.push(elapsed);
         updateRow(jobId, { status: "DONE", finishedAt: new Date().toISOString() });
       } else if (result.status === "FAILED") {
         failCount++;
+        jobTimingsRef.current.push(elapsed);
         updateRow(jobId, {
           status: "FAILED",
           lastError: result.error ?? "שגיאה לא ידועה",
           finishedAt: new Date().toISOString(),
         });
       } else {
-        // NOT_CLAIMABLE — already claimed by another admin
+        // NOT_CLAIMABLE — already claimed by another admin (no timing recorded)
         updateRow(jobId, { status: "PROCESSING" });
         setStatusMsg(`משימה ${jobId} כבר בעיבוד על-ידי מישהו אחר`);
       }
@@ -367,6 +407,18 @@ export function QueueClient({
                   עלות מוערכת:{" "}
                   <span className="font-mono">${estimate.totalUsd.toFixed(4)}</span>
                 </span>
+                <span className="text-blue-700 dark:text-blue-400">
+                  · זמן מוערך:{" "}
+                  <span className="font-medium">
+                    ~{formatDuration(
+                      estimate.avgLatencyMs *
+                        Math.max(1, estimate.jobCount - estimate.cachedCount),
+                    )}
+                  </span>
+                  {estimate.avgLatencyMs === 30_000 && (
+                    <span className="opacity-60"> (אין היסטוריה)</span>
+                  )}
+                </span>
                 {estimate.cachedCount > 0 && (
                   <span className="text-xs text-muted-foreground">
                     ({estimate.cachedCount} מתוך {estimate.jobCount} ממטמון — חינם)
@@ -479,10 +531,15 @@ export function QueueClient({
       {/* Progress indicator */}
       {progress && (
         <div className="rounded border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-300">
-          מעבד {progress.current} / {progress.total} משימות…
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>מעבד {progress.current} / {progress.total} משימות…</span>
+            {timeRemaining && (
+              <span className="text-xs opacity-80">זמן משוער שנותר: ~{timeRemaining}</span>
+            )}
+          </div>
           <div className="mt-1 h-1.5 rounded bg-yellow-200 dark:bg-yellow-800">
             <div
-              className="h-1.5 rounded bg-yellow-600"
+              className="h-1.5 rounded bg-yellow-600 transition-all duration-500"
               style={{ width: `${(progress.current / progress.total) * 100}%` }}
             />
           </div>
