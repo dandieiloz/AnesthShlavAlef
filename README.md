@@ -44,3 +44,22 @@ Admin → Chapter → New question (paste stem + 4 options) → "חולל הסב
 - Embedding the full textbook (~5k chunks): one-time ≈ $1–2.
 - Per question generation: ~8 chunks × ~500 tokens + question + completion ≈ ~$0.01.
 - pgvector storage on Neon free tier: comfortably fits all chapters.
+
+## Deploy to Firebase Hosting (Next.js SSR)
+1. Install dependencies: `npm install`
+2. Login to Firebase: `npm run firebase:login`
+3. Enable framework support once on your machine:
+   - `npx firebase-tools experiments:enable webframeworks`
+4. Initialize Firebase project binding (choose existing/new Firebase project):
+   - `npx firebase-tools use --add`
+5. Set production env vars in your local shell before deploy (or in CI):
+   - `DATABASE_URL`, `DIRECT_URL`
+   - `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_URL`
+   - `GEMINI_API_KEY`, `GEMINI_GENERATION_MODEL`, `GEMINI_EMBEDDING_MODEL`
+6. Apply DB migrations against production DB:
+   - `npx prisma migrate deploy`
+7. Deploy:
+   - `npm run firebase:deploy`
+
+After deploy, update Google OAuth redirect URI to:
+- `https://<your-firebase-domain>/api/auth/callback/google`
