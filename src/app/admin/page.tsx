@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, TONE_LABEL } from "@/lib/usefulness";
-import { Plus, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 export default async function AdminHome() {
   await requireAdmin();
@@ -43,12 +43,6 @@ export default async function AdminHome() {
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">ניהול פרקים</h1>
         <div className="flex items-center gap-3">
-          <Button asChild>
-            <Link href="/admin/new-question" className="gap-2">
-              <Plus className="h-4 w-4" />
-              שאלה חדשה
-            </Link>
-          </Button>
           <Button asChild variant="outline" className="relative">
             <Link href="/admin/queue">
               מרכז התור
