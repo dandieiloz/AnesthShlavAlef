@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 
 type Chapter = { number: number; title: string };
+const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
 
 export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
   const router = useRouter();
@@ -51,6 +52,7 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
           className="rounded border p-2 text-sm bg-background text-foreground"
         >
           <option value="">הכל</option>
+          <option value={NULL_SOURCE_FILTER}>ללא מוסד</option>
           {QUESTION_SOURCES.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}

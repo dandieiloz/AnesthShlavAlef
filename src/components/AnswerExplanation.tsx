@@ -121,14 +121,28 @@ export function AnswerExplanation({
                     aria-hidden
                   />
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-xs italic leading-relaxed text-foreground/80">
+                    <p
+                      dir="auto"
+                      className="text-xs italic leading-relaxed text-foreground/80 text-start [unicode-bidi:plaintext]"
+                    >
                       &ldquo;{e.quote}&rdquo;
                     </p>
-                    <p className="text-[11px] font-medium text-muted-foreground">
-                      פרק {e.chapterNumber}
-                      <span className="text-muted-foreground/70"> — {e.chapterTitle}</span>
+                    <p dir="ltr" className="text-[11px] font-medium text-muted-foreground text-left">
+                      <span dir="rtl" className="[unicode-bidi:isolate]">
+                        פרק {e.chapterNumber}
+                      </span>
+                      <span dir="auto" className="text-muted-foreground/70 [unicode-bidi:plaintext]">
+                        {" "}
+                        — {e.chapterTitle}
+                      </span>
                       {e.sectionPath && (
-                        <span className="text-muted-foreground/50"> › {e.sectionPath}</span>
+                        <span
+                          dir="auto"
+                          className="text-muted-foreground/50 [unicode-bidi:plaintext]"
+                        >
+                          {" "}
+                          › {e.sectionPath}
+                        </span>
                       )}
                     </p>
                   </div>

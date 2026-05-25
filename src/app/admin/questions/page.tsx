@@ -6,6 +6,7 @@ import { QuestionsTable, type QuestionRow } from "./QuestionsTable";
 import { Suspense } from "react";
 
 const LIMIT = 100;
+const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
 
 export default async function AdminQuestionsPage({
   searchParams,
@@ -23,11 +24,16 @@ export default async function AdminQuestionsPage({
     where.stem = { contains: sp.q.trim(), mode: "insensitive" };
   }
 
-  if (sp.source?.trim() && sp.year?.trim()) {
-    where.source = { equals: `${sp.source.trim()} ${sp.year.trim()}` };
-  } else if (sp.source?.trim()) {
-    where.source = { startsWith: sp.source.trim() };
-  } else if (sp.year?.trim()) {
+  const sourceFilter = sp.source?.trim();
+  const yearFilter = sp.year?.trim();
+
+  if (sourceFilter === NULL_SOURCE_FILTER) {
+    where.source = null;
+  } else if (sourceFilter && yearFilter) {
+    where.source = { equals: `${sourceFilter} ${yearFilter}` };
+  } else if (sourceFilter) {
+    where.source = { startsWith: sourceFilter };
+  } else if (yearFilter) {
     where.source = { endsWith: ` ${sp.year.trim()}` };
   }
 
