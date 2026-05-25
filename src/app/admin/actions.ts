@@ -1,7 +1,6 @@
 "use server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { generateExplanationForQuestion } from "@/lib/rag";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { redirect } from "next/navigation";
@@ -68,30 +67,41 @@ export async function saveQuestionAction(formData: FormData) {
         createdById: me.id,
       },
     });
+    // Auto-enqueue an INITIAL generation job (consistent with the wizard flow)
+    await db.answerGenerationJob.create({
+      data: { questionId: created.id, kind: "INITIAL", createdById: me.id },
+    });
     revalidatePath(`/admin/chapters/${chapter.number}/questions`);
+    revalidatePath(`/admin/queue`);
     redirect(`/admin/questions/${created.id}`);
   }
 }
 
 export async function generateExplanationAction(questionId: number) {
   await requireAdmin();
-  try {
-    await generateExplanationForQuestion(questionId);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("no ingested content")) {
-      redirect(`/admin/questions/${questionId}?error=chapter-not-ingested`);
-    }
-    throw e;
+  // Guard: don't enqueue if an open job already exists
+  const existing = await db.answerGenerationJob.findFirst({
+    where: { questionId, status: { in: ["PENDING", "PROCESSING"] } },
+  });
+  if (!existing) {
+    await db.answerGenerationJob.create({
+      data: { questionId, kind: "INITIAL" },
+    });
   }
   revalidatePath(`/admin/questions/${questionId}`);
 }
 
 export async function regenerateExplanationAction(questionId: number) {
   await requireAdmin();
-  // v2 RAG retrieves across ALL ingested chapters — no per-chapter ingest gate.
-  await db.geminiAnswer.deleteMany({ where: { questionId } });
-  await generateExplanationForQuestion(questionId);
+  // Guard: don't enqueue if an open job already exists
+  const existing = await db.answerGenerationJob.findFirst({
+    where: { questionId, status: { in: ["PENDING", "PROCESSING"] } },
+  });
+  if (!existing) {
+    await db.answerGenerationJob.create({
+      data: { questionId, kind: "REGENERATE" },
+    });
+  }
   revalidatePath(`/admin/questions/${questionId}`);
 }
 

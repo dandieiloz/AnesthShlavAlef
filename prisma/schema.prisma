@@ -28,6 +28,19 @@ enum ReportStatus {
   REJECTED
 }
 
+enum JobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+  CANCELLED
+}
+
+enum JobKind {
+  INITIAL
+  REGENERATE
+}
+
 model User {
   id             String    @id @default(cuid())
   name           String?
@@ -45,10 +58,11 @@ model User {
   attempts      Attempt[]
   quizzes       Quiz[]
   comments      Comment[]
-  reports       AnswerReport[] @relation("ReportAuthor")
-  resolved      AnswerReport[] @relation("ReportResolver")
-  questions     Question[]     @relation("QuestionAuthor")
-  bookmarks     Bookmark[]
+  reports           AnswerReport[]           @relation("ReportAuthor")
+  resolved          AnswerReport[]           @relation("ReportResolver")
+  questions         Question[]               @relation("QuestionAuthor")
+  bookmarks         Bookmark[]
+  generationJobs    AnswerGenerationJob[]    @relation("JobCreator")
 }
 
 model Account {
@@ -133,10 +147,11 @@ model Question {
   createdBy     User?         @relation("QuestionAuthor", fields: [createdById], references: [id])
   geminiAnswer  GeminiAnswer?
   attempts      Attempt[]
-  comments      Comment[]
-  reports       AnswerReport[]
-  bookmarks     Bookmark[]
-  ragRuns       RagRun[]
+  comments        Comment[]
+  reports         AnswerReport[]
+  bookmarks       Bookmark[]
+  ragRuns         RagRun[]
+  generationJobs  AnswerGenerationJob[]
 
   @@index([chapterId])
   @@index([chapterIds], type: Gin)
@@ -263,4 +278,23 @@ model Bookmark {
 
   @@unique([userId, questionId])
   @@index([userId, createdAt])
+}
+
+model AnswerGenerationJob {
+  id          Int        @id @default(autoincrement())
+  questionId  Int
+  status      JobStatus  @default(PENDING)
+  kind        JobKind    @default(INITIAL)
+  attempts    Int        @default(0)
+  lastError   String?    @db.Text
+  queuedAt    DateTime   @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdById String?
+
+  question    Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdBy   User?      @relation("JobCreator", fields: [createdById], references: [id])
+
+  @@index([status, queuedAt])
+  @@index([questionId])
 }

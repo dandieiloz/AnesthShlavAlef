@@ -21,6 +21,11 @@ export default async function AdminHome() {
     },
   });
 
+  // Pending generation job count for badge
+  const pendingJobCount = await db.answerGenerationJob.count({
+    where: { status: { in: ["PENDING", "FAILED"] } },
+  });
+
   // Count questions per chapter using chapterIds[] array (same logic as the detail page),
   // because a question can belong to multiple chapters via chapterIds[].
   // _count.questions only counts via the chapterId FK (primary chapter), which under-counts.
@@ -42,6 +47,16 @@ export default async function AdminHome() {
             <Link href="/admin/new-question" className="gap-2">
               <Plus className="h-4 w-4" />
               שאלה חדשה
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="relative">
+            <Link href="/admin/queue">
+              מרכז התור
+              {pendingJobCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {pendingJobCount > 99 ? "99+" : pendingJobCount}
+                </span>
+              )}
             </Link>
           </Button>
           <Button asChild variant="outline">

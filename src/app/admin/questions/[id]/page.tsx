@@ -4,13 +4,15 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import {
-  generateExplanationAction,
-  regenerateExplanationAction,
   saveQuestionAction,
   deleteQuestionAction,
   updateQuestionChaptersAction,
   resetChapterAutoTagAction,
 } from "@/app/admin/actions";
+import {
+  enqueueInitialJobAction,
+  enqueueRegenerationAction,
+} from "@/app/admin/queue/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 
@@ -29,6 +31,12 @@ export default async function AdminQuestionPage({
     include: { chapter: true, geminiAnswer: true },
   });
   if (!q) notFound();
+
+  // Check for an open generation job
+  const openJob = await db.answerGenerationJob.findFirst({
+    where: { questionId: q.id, status: { in: ["PENDING", "PROCESSING"] } },
+    select: { id: true, status: true, kind: true },
+  });
 
   // Load metadata for chapters this question is tagged with (so we can display titles)
   const taggedChapters = await db.chapter.findMany({
@@ -140,13 +148,17 @@ export default async function AdminQuestionPage({
                 insufficientEvidence={q.geminiAnswer.insufficientEvidence}
               />
             </div>
-            <form action={async () => { "use server"; await regenerateExplanationAction(q.id); }} className="mt-2">
-              <button className="rounded border px-3 py-1 text-sm hover:bg-muted">חולל מחדש (מוחק מטמון)</button>
+            <form action={async () => { "use server"; await enqueueRegenerationAction(q.id); }} className="mt-2">
+              <button className="rounded border px-3 py-1 text-sm hover:bg-muted">
+                {openJob ? "✓ ממתין בתור" : "חולל מחדש (+ לתור)"}
+              </button>
             </form>
           </>
         ) : (
-          <form action={async () => { "use server"; await generateExplanationAction(q.id); }} className="mt-2">
-            <button className="rounded bg-blue-600 px-4 py-2 text-white">חולל הסבר עם Gemini</button>
+          <form action={async () => { "use server"; await enqueueInitialJobAction(q.id); }} className="mt-2">
+            <button className="rounded bg-blue-600 px-4 py-2 text-white">
+              {openJob ? "✓ ממתין בתור לחילול" : "הוסף לתור לחילול"}
+            </button>
           </form>
         )}
       </section>

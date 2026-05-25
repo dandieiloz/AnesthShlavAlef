@@ -18,7 +18,6 @@ type Chapter = { number: number; title: string; ingested: boolean };
 type BatchEntry = ParsedQuestion & {
   uid: number;
   correctAnswer: "A" | "B" | "C" | "D" | "";
-  generate: boolean;
   isDupe: boolean;
   dupeId: number | null;
   dupeForce: boolean;
@@ -51,7 +50,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
       if (!r.ok) { setError(r.error); return; }
       const base = Date.now();
       const initial: BatchEntry[] = r.parsed.map((q, i) => ({
-        ...q, uid: base + i, correctAnswer: "", generate: true,
+        ...q, uid: base + i, correctAnswer: "",
         isDupe: false, dupeId: null, dupeForce: false,
       }));
       setBatch(initial);
@@ -91,7 +90,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
         entry.correctAnswer === "C" || entry.correctAnswer === "D"
           ? entry.correctAnswer : null;
       toAdd.push({ stem: entry.stem, optionA: entry.optionA, optionB: entry.optionB,
-        optionC: entry.optionC, optionD: entry.optionD, generate: entry.generate,
+        optionC: entry.optionC, optionD: entry.optionD,
         correctAnswer: ca, source });
     }
     if (toAdd.length > 0) { setQueue((q) => [...q, ...toAdd]); setBatch(null); setRawText(""); setError(null); }
@@ -121,20 +120,13 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
           <h2 className="text-lg font-semibold">תוצאות שמירה</h2>
           {saveResult.saved.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-green-700 dark:text-green-400">{saveResult.saved.length} שאלות נשמרו בהצלחה:</p>
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">{saveResult.saved.length} שאלות נשמרו בהצלחה — נוספו לתור לחילול הסבר:</p>
               <ul className="mt-2 space-y-1">
                 {saveResult.saved.map((q) => (
                   <li key={q.id}>
                     <Link href={`/admin/questions/${q.id}`} className="text-sm text-primary hover:underline">
                       {q.stem.length > 70 ? q.stem.slice(0, 70) + "..." : q.stem}
                     </Link>
-                    {q.warnings.length > 0 && (
-                      <ul className="mt-0.5 ml-4">
-                        {q.warnings.map((w, i) => (
-                          <li key={i} className="text-xs text-yellow-700 dark:text-yellow-400">⚠ {w}</li>
-                        ))}
-                      </ul>
-                    )}
                   </li>
                 ))}
               </ul>
@@ -169,9 +161,15 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
           )}
         </div>
         <div className="flex gap-2">
+          <Link
+            href="/admin/queue"
+            className="flex items-center rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+          >
+            מעבר למרכז התור →
+          </Link>
           <button
             onClick={() => setSaveResult(null)}
-            className="rounded bg-blue-600 px-4 py-2 text-white"
+            className="rounded border px-4 py-2 text-sm hover:bg-muted"
           >
             הוסף עוד שאלות
           </button>
@@ -267,23 +265,11 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
                   <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{dupeCount} כפולות זוהו — מסומנות למטה</p>
                 )}
               </div>
-              <div className="flex gap-2">
-                <button type="button"
-                  onClick={() => setBatch((p) => p?.map((e) => ({ ...e, generate: true })) ?? null)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-muted">
-                  חולל לכולן ✔
-                </button>
-                <button type="button"
-                  onClick={() => setBatch((p) => p?.map((e) => ({ ...e, generate: false })) ?? null)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-muted">
-                  בטל חולל ✕
-                </button>
-              </div>
             </div>
 
             {!anyIngested && (
-              <p className="rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-300">
-                ⚠ אין פרקים שנטענו עדיין — חילול הסבר לא יפעל
+              <p className="rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                ⚠ אין פרקים שנטענו עדיין — חילול ההסברים לא יפעל עד שיטען לפחות פרק אחד
               </p>
             )}
 
@@ -349,12 +335,6 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
                       <option value="D">ד</option>
                     </select>
                   </div>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input type="checkbox" checked={entry.generate}
-                      onChange={(e) => updateBatch(entry.uid, { generate: e.target.checked })} />
-                    <span>חולל הסבר</span>
-                    {entry.generate && anyIngested && <span className="text-muted-foreground">(~$0.01–0.04)</span>}
-                  </label>
                 </div>
               </div>
             ))}
@@ -397,9 +377,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
                     {item.source && (
                       <span className="mr-2">· מקור: {item.source}</span>
                     )}
-                    {item.generate && (
-                      <span className="mr-2 inline-block rounded bg-primary/15 dark:bg-primary/20 px-1 text-primary">+ הסבר</span>
-                    )}
+                    <span className="mr-2 inline-block rounded bg-primary/15 dark:bg-primary/20 px-1 text-primary">+ לתור הסברים</span>
                   </p>
                 </div>
                 <button

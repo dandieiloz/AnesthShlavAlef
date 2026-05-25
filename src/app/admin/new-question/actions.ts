@@ -1,7 +1,6 @@
 "use server";
 import { requireAdmin } from "@/lib/auth";
 import { parseQuestion, parseMultipleQuestions, type ParsedQuestion } from "@/lib/wizard";
-import { generateExplanationForQuestion } from "@/lib/rag";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 
@@ -14,13 +13,12 @@ export type WizardMultiParseResult =
   | { ok: false; error: string };
 
 export type QueueItem = ParsedQuestion & {
-  generate: boolean;
   correctAnswer: "A" | "B" | "C" | "D" | null;
   source: string | null;
 };
 
 export type SaveMultipleResult = {
-  saved: Array<{ id: number; stem: string; warnings: string[] }>;
+  saved: Array<{ id: number; stem: string }>;
   skipped: Array<{ stem: string; existingId: number }>;
   errors: string[];
 };
@@ -32,7 +30,7 @@ function normalize(s: string): string {
 
 export async function saveMultipleQuestionsAction(items: QueueItem[]): Promise<SaveMultipleResult> {
   const me = await requireAdmin();
-  const saved: Array<{ id: number; stem: string; warnings: string[] }> = [];
+  const saved: Array<{ id: number; stem: string }> = [];
   const skipped: Array<{ stem: string; existingId: number }> = [];
   const errors: string[] = [];
 
@@ -46,7 +44,7 @@ export async function saveMultipleQuestionsAction(items: QueueItem[]): Promise<S
 
   for (const item of items) {
     try {
-      const { stem, optionA, optionB, optionC, optionD, generate, correctAnswer, source } = item;
+      const { stem, optionA, optionB, optionC, optionD, correctAnswer, source } = item;
       if (!stem || !optionA || !optionB || !optionC || !optionD) {
         errors.push(`שאלה "${stem.slice(0, 40)}" — חסרים שדות`);
         continue;
@@ -73,17 +71,11 @@ export async function saveMultipleQuestionsAction(items: QueueItem[]): Promise<S
           createdById: me.id,
         },
       });
-      const warnings: string[] = [];
-      if (generate) {
-        // v2 RAG retrieves across ALL ingested chapters; no per-chapter gate needed.
-        try {
-          await generateExplanationForQuestion(created.id);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          warnings.push(`שגיאה בחילול הסבר: ${msg}`);
-        }
-      }
-      saved.push({ id: created.id, stem, warnings });
+      // Enqueue a generation job — admin runs them from the Queue Center.
+      await db.answerGenerationJob.create({
+        data: { questionId: created.id, kind: "INITIAL", createdById: me.id },
+      });
+      saved.push({ id: created.id, stem });
       // Add to in-memory list so later items in the same batch are also checked
       existingNormed.push({ id: created.id, stem, norm: normalize(stem) });
     } catch (e) {
@@ -173,7 +165,6 @@ export async function saveWizardQuestionAction(formData: FormData) {
     rawCorrectAnswer === "A" || rawCorrectAnswer === "B" || rawCorrectAnswer === "C" || rawCorrectAnswer === "D"
       ? rawCorrectAnswer
       : null;
-  const generate = formData.get("generateExplanation") === "on";
 
   if (!stem || !optionA || !optionB || !optionC || !optionD) {
     throw new Error("All fields required");
@@ -197,15 +188,10 @@ export async function saveWizardQuestionAction(formData: FormData) {
     },
   });
 
-  if (generate) {
-    // v2 RAG retrieves across ALL ingested chapters; no per-chapter gate needed.
-    try {
-      await generateExplanationForQuestion(created.id);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      redirect(`/admin/questions/${created.id}?error=${encodeURIComponent(msg)}`);
-    }
-  }
+  // Enqueue a generation job — admin runs it from the Queue Center.
+  await db.answerGenerationJob.create({
+    data: { questionId: created.id, kind: "INITIAL", createdById: me.id },
+  });
 
   redirect(`/admin/questions/${created.id}`);
 }

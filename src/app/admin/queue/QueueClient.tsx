@@ -1,0 +1,647 @@
+"use client";
+import { useState, useEffect, useTransition, useRef, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { JobStatus, JobKind } from "@prisma/client";
+import {
+  runJobAction,
+  cancelJobsAction,
+  retryJobsAction,
+  cleanupDoneJobsAction,
+  enqueueInitialJobAction,
+  estimateJobsCostAction,
+  type RunJobResult,
+  type CostEstimateResult,
+} from "./actions";
+
+export type QueueJobRow = {
+  id: number;
+  questionId: number;
+  stem: string;
+  source: string | null;
+  chapterNumber: number;
+  chapterTitle: string;
+  hasAnswer: boolean;
+  status: JobStatus;
+  kind: JobKind;
+  attempts: number;
+  lastError: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type UnansweredQuestion = {
+  id: number;
+  stem: string;
+  source: string | null;
+  chapterNumber: number;
+  chapterTitle: string;
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const STATUS_LABEL: Record<JobStatus, string> = {
+  PENDING: "ממתין",
+  PROCESSING: "בעיבוד...",
+  DONE: "הושלם ✓",
+  FAILED: "נכשל ✗",
+  CANCELLED: "בוטל",
+};
+
+const STATUS_CLASS: Record<JobStatus, string> = {
+  PENDING: "bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300",
+  PROCESSING: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 animate-pulse",
+  DONE: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300",
+  FAILED: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300",
+  CANCELLED: "bg-muted text-muted-foreground",
+};
+
+const KIND_LABEL: Record<JobKind, string> = {
+  INITIAL: "ראשוני",
+  REGENERATE: "חילול מחדש",
+};
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export function QueueClient({
+  rows: initialRows,
+  unansweredQuestions: initialUnanswered = [],
+}: {
+  rows: QueueJobRow[];
+  unansweredQuestions?: UnansweredQuestion[];
+}) {
+  const router = useRouter();
+  const [rows, setRows] = useState<QueueJobRow[]>(initialRows);
+  const [unanswered, setUnanswered] = useState<UnansweredQuestion[]>(initialUnanswered);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const stopRef = useRef(false);
+  const [, startTransition] = useTransition();
+
+  // ── Cost estimation ───────────────────────────────────────────────────────
+  const [estimate, setEstimate] = useState<CostEstimateResult | null>(null);
+  const [estimating, setEstimating] = useState(false);
+  const [confirmPending, setConfirmPending] = useState(false);
+  const estimateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Derived ──────────────────────────────────────────────────────────────
+
+  const runnable = rows.filter(
+    (r) => selected.has(r.id) && (r.status === "PENDING" || r.status === "FAILED")
+  );
+
+  // Stable string key used as the useEffect dependency for the cost estimator.
+  const runnableKey = useMemo(
+    () => runnable.map((r) => r.id).sort().join(","),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, rows],
+  );
+
+  // ── Debounced cost estimation on selection change ─────────────────────────
+  useEffect(() => {
+    if (estimateTimerRef.current) clearTimeout(estimateTimerRef.current);
+    if (runnableKey === "") {
+      setEstimate(null);
+      setEstimating(false);
+      setConfirmPending(false);
+      return;
+    }
+    setEstimating(true);
+    estimateTimerRef.current = setTimeout(async () => {
+      try {
+        const ids = runnableKey.split(",").map(Number);
+        const result = await estimateJobsCostAction(ids);
+        setEstimate(result);
+      } catch {
+        setEstimate(null);
+      } finally {
+        setEstimating(false);
+      }
+    }, 400);
+    return () => {
+      if (estimateTimerRef.current) clearTimeout(estimateTimerRef.current);
+    };
+  }, [runnableKey]);
+  const retryable = rows.filter(
+    (r) => selected.has(r.id) && (r.status === "FAILED" || r.status === "CANCELLED")
+  );
+  const cancellable = rows.filter(
+    (r) => selected.has(r.id) && (r.status === "PENDING" || r.status === "FAILED")
+  );
+
+  // ── Row update helper ──────────────────────────────────────────────────────
+
+  function updateRow(jobId: number, patch: Partial<QueueJobRow>) {
+    setRows((prev) => prev.map((r) => (r.id === jobId ? { ...r, ...patch } : r)));
+  }
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+
+  function toggleAll() {
+    const runnableIds = rows
+      .filter((r) => r.status === "PENDING" || r.status === "FAILED")
+      .map((r) => r.id);
+    const allSelected = runnableIds.every((id) => selected.has(id));
+    setSelected(allSelected ? new Set() : new Set(runnableIds));
+  }
+
+  function toggleOne(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // ── Run loop ─────────────────────────────────────────────────────────────
+
+  const handleStart = useCallback(async () => {
+    if (runnable.length === 0) return;
+    setConfirmPending(false);
+    stopRef.current = false;
+    setRunning(true);
+    setStatusMsg(null);
+
+    const queue = runnable.map((r) => r.id);
+    let doneCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < queue.length; i++) {
+      if (stopRef.current) {
+        setStatusMsg(`עצר לאחר ${i} / ${queue.length} משימות`);
+        break;
+      }
+      const jobId = queue[i];
+      setProgress({ current: i + 1, total: queue.length });
+      updateRow(jobId, { status: "PROCESSING" });
+
+      const result: RunJobResult = await runJobAction(jobId);
+
+      if (result.ok) {
+        doneCount++;
+        updateRow(jobId, { status: "DONE", finishedAt: new Date().toISOString() });
+      } else if (result.status === "FAILED") {
+        failCount++;
+        updateRow(jobId, {
+          status: "FAILED",
+          lastError: result.error ?? "שגיאה לא ידועה",
+          finishedAt: new Date().toISOString(),
+        });
+      } else {
+        // NOT_CLAIMABLE — already claimed by another admin
+        updateRow(jobId, { status: "PROCESSING" });
+        setStatusMsg(`משימה ${jobId} כבר בעיבוד על-ידי מישהו אחר`);
+      }
+    }
+
+    setRunning(false);
+    setProgress(null);
+    if (!stopRef.current) {
+      setStatusMsg(
+        `סיים: ${doneCount} הושלמו${failCount > 0 ? `, ${failCount} נכשלו` : ""}`
+      );
+    }
+    // Refresh server data so stats bar / filter counts update
+    router.refresh();
+  }, [runnable, router]);
+
+  const handleStop = useCallback(() => {
+    stopRef.current = true;
+  }, []);
+
+  // ── Start-with-confirmation gate ──────────────────────────────────────────
+  const handleStartRequest = useCallback(() => {
+    if (
+      estimate &&
+      estimate.totalUsd > estimate.confirmThreshold &&
+      !confirmPending
+    ) {
+      setConfirmPending(true);
+    } else {
+      handleStart();
+    }
+  }, [estimate, confirmPending, handleStart]);
+
+  // ── Cancel selected ────────────────────────────────────────────────────────
+
+  const handleCancel = useCallback(() => {
+    const ids = cancellable.map((r) => r.id);
+    startTransition(async () => {
+      await cancelJobsAction(ids);
+      ids.forEach((id) => updateRow(id, { status: "CANCELLED" }));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      router.refresh();
+    });
+  }, [cancellable, router]);
+
+  // ── Retry selected ────────────────────────────────────────────────────────
+
+  const handleRetry = useCallback(() => {
+    const ids = retryable.map((r) => r.id);
+    startTransition(async () => {
+      await retryJobsAction(ids);
+      ids.forEach((id) =>
+        updateRow(id, { status: "PENDING", lastError: null, startedAt: null, finishedAt: null })
+      );
+      router.refresh();
+    });
+  }, [retryable, router]);
+
+  // ── Cleanup ───────────────────────────────────────────────────────────────
+
+  const handleCleanup = useCallback(() => {
+    startTransition(async () => {
+      const deleted = await cleanupDoneJobsAction(7);
+      setStatusMsg(`נמחקו ${deleted} משימות ישנות (הושלמו/בוטלו לפני 7+ ימים)`);
+      router.refresh();
+    });
+  }, [router]);
+
+  // ── Enqueue a single unanswered question ────────────────────────────────────
+
+  const handleEnqueueOne = useCallback(
+    (questionId: number) => {
+      startTransition(async () => {
+        const result = await enqueueInitialJobAction(questionId);
+        if (result.ok) {
+          // Remove from unanswered list immediately; server refresh will add it to jobs
+          setUnanswered((prev) => prev.filter((q) => q.id !== questionId));
+          router.refresh();
+        }
+      });
+    },
+    [router]
+  );
+
+  // ── Enqueue all unanswered questions ─────────────────────────────────────────
+
+  const handleEnqueueAll = useCallback(() => {
+    startTransition(async () => {
+      const ids = unanswered.map((q) => q.id);
+      // Sequential to avoid constraint violations; fast enough for typical counts
+      for (const questionId of ids) {
+        await enqueueInitialJobAction(questionId);
+      }
+      setUnanswered([]);
+      router.refresh();
+    });
+  }, [unanswered, router]);
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-4">
+      {/* Unanswered questions without a queued job */}
+      {unanswered.length > 0 && (
+        <div className="rounded border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30 p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+              {unanswered.length} שאלות ללא הסבר וללא משימה פתוחה
+            </p>
+            <button
+              onClick={handleEnqueueAll}
+              className="rounded bg-orange-600 px-3 py-1.5 text-sm text-white hover:bg-orange-700"
+            >
+              הוסף הכל לתור ({unanswered.length})
+            </button>
+          </div>
+          <div className="rounded border overflow-x-auto bg-white dark:bg-background">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-3 py-2 text-right font-medium">שאלה</th>
+                  <th className="w-20 px-3 py-2 text-center font-medium">פרק</th>
+                  <th className="w-28 px-3 py-2 text-center font-medium">פעולה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unanswered.map((q) => (
+                  <tr key={q.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-3 py-2 max-w-xs">
+                      <Link
+                        href={`/admin/questions/${q.id}`}
+                        className="text-primary hover:underline font-medium line-clamp-2"
+                        title={q.stem}
+                      >
+                        {q.stem.length > 90 ? q.stem.slice(0, 90) + "…" : q.stem}
+                      </Link>
+                      {q.source && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{q.source}</p>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-center text-xs text-muted-foreground">
+                      {q.chapterNumber}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => handleEnqueueOne(q.id)}
+                        className="rounded border px-2 py-1 text-xs hover:bg-muted"
+                      >
+                        + לתור
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Cost estimate */}
+      {runnable.length > 0 && !running && (
+        <div className="rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-2 text-sm">
+          {estimating ? (
+            <span className="text-muted-foreground animate-pulse">מחשב עלות…</span>
+          ) : estimate ? (
+            <details>
+              <summary className="cursor-pointer select-none list-none flex flex-wrap items-center gap-2">
+                <span className="font-medium text-blue-800 dark:text-blue-300">
+                  עלות מוערכת:{" "}
+                  <span className="font-mono">${estimate.totalUsd.toFixed(4)}</span>
+                </span>
+                {estimate.cachedCount > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    ({estimate.cachedCount} מתוך {estimate.jobCount} ממטמון — חינם)
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground mr-auto opacity-70">▼ פירוט שלבים</span>
+              </summary>
+              <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs text-muted-foreground max-w-xs">
+                <span>הטמעה (עברית):</span>
+                <span className="font-mono">${estimate.byStage.embedHe.toFixed(5)}</span>
+                <span>תרגום לאנגלית:</span>
+                <span className="font-mono">${estimate.byStage.translate.toFixed(5)}</span>
+                <span>הטמעה (אנגלית):</span>
+                <span className="font-mono">${estimate.byStage.embedEn.toFixed(5)}</span>
+                <span>דירוג מחדש (Flash):</span>
+                <span className="font-mono">${estimate.byStage.rerank.toFixed(5)}</span>
+                <span>חילול ראשוני (Flash):</span>
+                <span className="font-mono">${estimate.byStage.flashGen.toFixed(5)}</span>
+                <span>הסלמה (~{estimate.escalationPct}% Pro):</span>
+                <span className="font-mono">${estimate.byStage.escalation.toFixed(5)}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground opacity-70">
+                * הערכה גסה ±25% — מחירון Gemini רשמי
+              </p>
+            </details>
+          ) : null}
+        </div>
+      )}
+
+      {/* Confirm gate banner */}
+      {confirmPending && (
+        <div className="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm flex flex-wrap items-center gap-3">
+          <span className="font-medium text-amber-800 dark:text-amber-300">
+            עלות גבוהה מ-${estimate?.confirmThreshold.toFixed(2)} — האם להמשיך?
+            {estimate && (
+              <span className="font-mono ml-1">(~${estimate.totalUsd.toFixed(4)})</span>
+            )}
+          </span>
+          <button
+            onClick={handleStart}
+            className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white hover:bg-amber-700"
+          >
+            ✓ כן, הפעל
+          </button>
+          <button
+            onClick={() => setConfirmPending(false)}
+            className="rounded border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            ✕ ביטול
+          </button>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {!running ? (
+          <button
+            onClick={handleStartRequest}
+            disabled={runnable.length === 0}
+            className="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            ▶ הפעל {runnable.length} משימות נבחרות
+          </button>
+        ) : (
+          <button
+            onClick={handleStop}
+            className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+          >
+            ■ עצור לאחר המשימה הנוכחית
+          </button>
+        )}
+
+        {retryable.length > 0 && (
+          <button
+            onClick={handleRetry}
+            disabled={running}
+            className="rounded border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+          >
+            ↺ נסה שוב ({retryable.length})
+          </button>
+        )}
+
+        {cancellable.length > 0 && (
+          <button
+            onClick={handleCancel}
+            disabled={running}
+            className="rounded border px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+          >
+            ✕ בטל ({cancellable.length})
+          </button>
+        )}
+
+        <button
+          onClick={handleCleanup}
+          disabled={running}
+          className="mr-auto rounded border px-3 py-2 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
+        >
+          מחק משימות ישנות (7+ ימים)
+        </button>
+
+        <button
+          onClick={() => router.refresh()}
+          disabled={running}
+          className="rounded border px-3 py-2 text-xs hover:bg-muted disabled:opacity-50"
+        >
+          ↻ רענן
+        </button>
+      </div>
+
+      {/* Progress indicator */}
+      {progress && (
+        <div className="rounded border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-300">
+          מעבד {progress.current} / {progress.total} משימות…
+          <div className="mt-1 h-1.5 rounded bg-yellow-200 dark:bg-yellow-800">
+            <div
+              className="h-1.5 rounded bg-yellow-600"
+              style={{ width: `${(progress.current / progress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Status message */}
+      {statusMsg && !progress && (
+        <div className="rounded border bg-muted px-4 py-2 text-sm text-muted-foreground">
+          {statusMsg}
+        </div>
+      )}
+
+      {/* Table */}
+      {rows.length === 0 ? (
+        <div className="rounded border bg-card p-8 text-center text-muted-foreground">
+          אין משימות להצגה בסינון הנוכחי
+        </div>
+      ) : (
+        <div className="rounded border overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="w-10 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    title="בחר הכל"
+                    onChange={toggleAll}
+                    checked={
+                      rows
+                        .filter((r) => r.status === "PENDING" || r.status === "FAILED")
+                        .every((r) => selected.has(r.id)) &&
+                      rows.some((r) => r.status === "PENDING" || r.status === "FAILED")
+                    }
+                  />
+                </th>
+                <th className="px-3 py-2 text-right font-medium">שאלה</th>
+                <th className="w-20 px-3 py-2 text-center font-medium">פרק</th>
+                <th className="w-24 px-3 py-2 text-center font-medium">סוג</th>
+                <th className="w-28 px-3 py-2 text-center font-medium">סטטוס</th>
+                <th className="w-16 px-3 py-2 text-center font-medium">ניסיונות</th>
+                <th className="w-28 px-3 py-2 text-center font-medium">הוסף לתור</th>
+                <th className="w-20 px-3 py-2 text-center font-medium">פעולות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className={`border-b last:border-0 ${
+                    selected.has(row.id) ? "bg-primary/5" : "hover:bg-muted/30"
+                  }`}
+                >
+                  <td className="px-3 py-2 text-center">
+                    {(row.status === "PENDING" || row.status === "FAILED") && (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleOne(row.id)}
+                      />
+                    )}
+                  </td>
+
+                  <td className="px-3 py-2 max-w-xs">
+                    <Link
+                      href={`/admin/questions/${row.questionId}`}
+                      className="text-primary hover:underline font-medium line-clamp-2"
+                      title={row.stem}
+                    >
+                      {row.stem.length > 90 ? row.stem.slice(0, 90) + "…" : row.stem}
+                    </Link>
+                    {row.source && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{row.source}</p>
+                    )}
+                    {row.lastError && (
+                      <p
+                        className="mt-0.5 text-xs text-red-700 dark:text-red-400 line-clamp-2"
+                        title={row.lastError}
+                      >
+                        ✗ {row.lastError}
+                      </p>
+                    )}
+                  </td>
+
+                  <td className="px-3 py-2 text-center text-muted-foreground text-xs">
+                    {row.chapterNumber}
+                  </td>
+
+                  <td className="px-3 py-2 text-center">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs ${
+                        row.kind === "REGENERATE"
+                          ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {KIND_LABEL[row.kind]}
+                    </span>
+                  </td>
+
+                  <td className="px-3 py-2 text-center">
+                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[row.status]}`}>
+                      {STATUS_LABEL[row.status]}
+                    </span>
+                  </td>
+
+                  <td className="px-3 py-2 text-center text-muted-foreground">
+                    {row.attempts}
+                  </td>
+
+                  <td className="px-3 py-2 text-center text-xs text-muted-foreground">
+                    {row.queuedAt ? new Date(row.queuedAt).toLocaleString("he-IL") : "—"}
+                  </td>
+
+                  <td className="px-3 py-2 text-center">
+                    <div className="flex justify-center gap-1">
+                      {(row.status === "FAILED" || row.status === "CANCELLED") && (
+                        <button
+                          title="נסה שוב"
+                          disabled={running}
+                          onClick={() => {
+                            startTransition(async () => {
+                              await retryJobsAction([row.id]);
+                              updateRow(row.id, {
+                                status: "PENDING",
+                                lastError: null,
+                                startedAt: null,
+                                finishedAt: null,
+                              });
+                            });
+                          }}
+                          className="rounded border px-1.5 py-0.5 text-xs hover:bg-muted disabled:opacity-50"
+                        >
+                          ↺
+                        </button>
+                      )}
+                      {(row.status === "PENDING" || row.status === "FAILED") && (
+                        <button
+                          title="בטל"
+                          disabled={running}
+                          onClick={() => {
+                            startTransition(async () => {
+                              await cancelJobsAction([row.id]);
+                              updateRow(row.id, { status: "CANCELLED" });
+                            });
+                          }}
+                          className="rounded border px-1.5 py-0.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
