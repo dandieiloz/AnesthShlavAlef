@@ -29,11 +29,14 @@ interface SiteHeaderClientProps {
   signOutAction: () => Promise<void>;
 }
 
+import { Info } from "lucide-react";
+
 const NAV_LINKS = [
   { href: "/study",     label: "לימוד",          icon: BookOpen },
   { href: "/quizzes",   label: "המבחנים שלי",     icon: ListChecks },
   { href: "/bookmarks", label: "סימניות",          icon: Bookmark },
   { href: "/dashboard", label: "סטטיסטיקה",       icon: LayoutDashboard },
+  { href: "/about",     label: "עלינו",           icon: Info },
 ];
 
 function NavLink({ href, label }: { href: string; label: string }) {

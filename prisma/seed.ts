@@ -92,6 +92,23 @@ const CHAPTERS: Array<{ number: number; title: string; description: string }> = 
   { number: 87, title: "Interpreting the Medical Literature", description: "Critical evaluation of published medical literature for evidence-based decisions." },
 ];
 
+const SITE_CONTENT: Array<{ key: string; value: string }> = [
+  {
+    key: "about_pearl",
+    value: `לאחר שנשללו ממנה כל המכשור הרפואי וחומרי ההרדמה, ד"ר פרל סיכנה את חייה כדי לבצע ניתוחים בחשאי כשהיא נעזרת בלחישות, באחיזת ידיים ובחמלה עמוקה בלבד כדי ללוות את מטופלותיה מבעד לכאבים מייסרים.
+
+קראנו לפלטפורמה זו על שמה כדי לזכור שאלחוש והרדמה הם הרבה מעבר לפרמקולוגיה ופיזיולוגיה.`,
+  },
+  {
+    key: "about_yoni",
+    value: `ד"ר יוני חלטניק הוא רופא מרדים ומפתח פלטפורמת Perl.`,
+  },
+  {
+    key: "about_daniel",
+    value: `ד"ר דניאל רון אילוז הוא רופא מרדים ומפתח פלטפורמת Perl.`,
+  },
+];
+
 async function main() {
   for (const c of CHAPTERS) {
     await prisma.chapter.upsert({
@@ -101,6 +118,15 @@ async function main() {
     });
   }
   console.log(`Seeded ${CHAPTERS.length} chapters.`);
+
+  for (const sc of SITE_CONTENT) {
+    await prisma.siteContent.upsert({
+      where: { key: sc.key },
+      update: {},
+      create: sc,
+    });
+  }
+  console.log(`Seeded ${SITE_CONTENT.length} site content entries.`);
 }
 
 main()

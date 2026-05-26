@@ -188,6 +188,14 @@ model QuestionQueryCache {
   hits         Int      @default(0)
 }
 
+/// Editable site content managed by admins (key→value store for pages like /about)
+model SiteContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
 /// Observability log for every RAG generation invocation.
 model RagRun {
   id              Int      @id @default(autoincrement())
