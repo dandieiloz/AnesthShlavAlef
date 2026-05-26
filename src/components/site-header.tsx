@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Stethoscope, LogOut, User, LayoutDashboard, BookOpen, Settings, ListChecks, Bookmark } from "lucide-react";
+import { LogOut, User, LayoutDashboard, BookOpen, Settings, ListChecks, Bookmark } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,8 +59,8 @@ export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHead
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground">
-          <Stethoscope className="h-5 w-5 text-primary" />
-          <span>אנסתזיה <span className="text-primary">שלב א׳</span></span>
+          <Image src="/icon.png" alt="Perl" width={32} height={32} className="rounded-lg" />
+          <span>Perl</span>
         </Link>
 
         {/* Nav + actions */}

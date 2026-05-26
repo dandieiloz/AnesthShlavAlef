@@ -3,6 +3,7 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { submitAttemptAction, postCommentAction, reportAnswerAction, toggleBookmarkAction } from "@/app/(user)/actions";
+import { CommentItem } from "@/components/CommentItem";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,23 +29,27 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
     })
   ).map((a) => a.questionId);
 
+  // New quizzes have a fixed questionIds set; old quizzes fall back to chapterIds.
+  const useFixedSet = quiz.questionIds.length > 0;
+  const questionFilter = useFixedSet
+    ? { id: { in: quiz.questionIds, notIn: answeredIds }, geminiAnswer: { isNot: null } }
+    : { chapterIds: { hasSome: quiz.chapterIds }, id: { notIn: answeredIds }, geminiAnswer: { isNot: null } };
+
   const next = await db.question.findFirst({
-    where: {
-      chapterIds: { hasSome: quiz.chapterIds },
-      id: { notIn: answeredIds },
-      geminiAnswer: { isNot: null },
-    },
+    where: questionFilter,
     orderBy: { id: "asc" },
     include: {
       chapter: true,
       geminiAnswer: true,
-      comments: { include: { user: { select: { name: true, image: true } } }, orderBy: { createdAt: "asc" } },
+      comments: { include: { user: { select: { name: true, image: true, hospitalName: true } } }, orderBy: { createdAt: "asc" } },
     },
   });
 
-  const totalQ = await db.question.count({
-    where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null } },
-  });
+  const totalQ = useFixedSet
+    ? quiz.questionIds.length
+    : await db.question.count({
+        where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null } },
+      });
   const correct = await db.attempt.count({ where: { quizId: quiz.id, userId: me.id, isCorrect: true } });
   const progressPct = totalQ > 0 ? Math.round((answeredIds.length / totalQ) * 100) : 0;
 
@@ -140,6 +145,9 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         <Card>
           <CardContent className="pt-6 space-y-5">
             <p className="font-display text-lg leading-relaxed">{next.stem}</p>
+            {next.source && (
+              <p className="text-xs text-muted-foreground">מקור: {next.source}</p>
+            )}
 
             <form action={submitAttemptAction} className="space-y-3">
               <input type="hidden" name="quizId" value={quiz.id} />
@@ -269,21 +277,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
           <ul className="space-y-2">
             {next.comments.map((c) => (
               <li key={c.id}>
-                <Card>
-                  <CardContent className="p-3 space-y-1">
-                    <div className="flex items-center gap-2">
-                      {c.user.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.user.image} alt="" className="h-5 w-5 rounded-full object-cover" />
-                      ) : null}
-                      <span className="text-xs font-medium">{c.user.name}</span>
-                      <span className="text-xs text-muted-foreground ms-auto">
-                        {c.createdAt.toLocaleDateString("he-IL")}
-                      </span>
-                    </div>
-                    <p className="text-sm whitespace-pre-wrap leading-snug">{c.body}</p>
-                  </CardContent>
-                </Card>
+                <CommentItem comment={c} meId={me.id} meRole={me.role} />
               </li>
             ))}
           </ul>

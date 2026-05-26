@@ -34,7 +34,7 @@ export default async function QuizzesPage() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in" dir="rtl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">המבחנים שלי</h1>

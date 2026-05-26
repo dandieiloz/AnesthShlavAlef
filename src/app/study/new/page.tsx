@@ -3,9 +3,7 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { createQuizAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ChapterPicker } from "./ChapterPicker";
+import { QuizConfigSection } from "./QuizConfigSection";
 import { PlusCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -62,17 +60,8 @@ export default async function NewQuizPage({
       <Card>
         <CardContent className="pt-6">
           <form action={createQuizAction} className="space-y-6">
-            {/* Quiz name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="quiz-name">שם המבחן</Label>
-              <Input id="quiz-name" name="name" defaultValue="מבחן שלי" />
-            </div>
-
-            {/* Chapter picker */}
-            <div className="space-y-2">
-              <Label>בחרו פרקים</Label>
-              <ChapterPicker chapters={rows} preselected={preselected} />
-            </div>
+            {/* Chapter picker, question limit, and auto-named quiz name */}
+            <QuizConfigSection chapters={rows} preselected={preselected} />
 
             <Button type="submit" className="w-full gap-2" size="lg">
               <PlusCircle className="h-4 w-4" />

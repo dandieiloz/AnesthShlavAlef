@@ -1,11 +1,11 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, TONE_LABEL } from "@/lib/usefulness";
 import { AlertTriangle } from "lucide-react";
+import { AdminTabsNav } from "./AdminTabsNav";
 
 export default async function AdminHome() {
   await requireAdmin();
@@ -19,11 +19,6 @@ export default async function AdminHome() {
       learningUsefulnessIndex: true,
       _count: { select: { chunks: true } }
     },
-  });
-
-  // Pending generation job count for badge
-  const pendingJobCount = await db.answerGenerationJob.count({
-    where: { status: { in: ["PENDING", "FAILED"] } },
   });
 
   // Count questions per chapter using chapterIds[] array (same logic as the detail page),
@@ -40,27 +35,8 @@ export default async function AdminHome() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-bold">ניהול פרקים</h1>
-        <div className="flex items-center gap-3">
-          <Button asChild variant="outline" className="relative">
-            <Link href="/admin/queue">
-              מרכז התור
-              {pendingJobCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  {pendingJobCount > 99 ? "99+" : pendingJobCount}
-                </span>
-              )}
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/admin/questions">שאלות</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/admin/reports">דיווחים</Link>
-          </Button>
-        </div>
-      </div>
+      <AdminTabsNav />
+      <h1 className="font-display text-2xl font-bold">ניהול פרקים</h1>
 
       <Table>
         <TableHeader>

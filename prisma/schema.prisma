@@ -227,14 +227,15 @@ model Attempt {
 }
 
 model Quiz {
-  id         Int       @id @default(autoincrement())
-  userId     String
-  name       String
-  chapterIds Int[]
-  createdAt  DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  userId      String
+  name        String
+  chapterIds  Int[]
+  questionIds Int[]     @default([])
+  createdAt   DateTime  @default(now())
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempts   Attempt[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts    Attempt[]
 }
 
 model Comment {

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { signIn } from "@/lib/auth";
@@ -40,8 +41,18 @@ export default async function Home() {
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10 mx-auto h-full max-w-lg rounded-full bg-primary/5 blur-3xl"
         />
+        <div className="mb-6 flex justify-center">
+          <Image
+            src="/icon.png"
+            alt="Perl"
+            width={120}
+            height={120}
+            className="rounded-2xl shadow-2xl ring-1 ring-white/10"
+            priority
+          />
+        </div>
         <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-primary">
-          Miller&apos;s Anesthesia · שלב א׳
+          Perl · שלב א׳
         </p>
         <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
           תרגלו אנסתזיה{" "}

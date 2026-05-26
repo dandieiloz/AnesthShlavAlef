@@ -80,7 +80,7 @@ function QuizCard({ q }: { q: QuizRow }) {
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm line-clamp-1">{q.name}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 justify-end">
               <Clock className="h-3 w-3" />
               {relativeDate(q.createdAt)}
               {" · "}
@@ -106,7 +106,7 @@ function QuizCard({ q }: { q: QuizRow }) {
         </div>
 
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground" dir="rtl">
             <span>{q.answered}/{q.total} שאלות</span>
             {q.answered > 0 && (
               <span className={`font-medium ${q.accuracyPct >= 70 ? "text-success" : q.accuracyPct >= 50 ? "text-amber-500" : "text-destructive"}`}>
@@ -159,7 +159,7 @@ export function QuizzesClient({ quizzes }: { quizzes: QuizRow[] }) {
   }
 
   return (
-    <Tabs defaultValue="all">
+    <Tabs defaultValue="all" dir="rtl">
       <TabsList>
         <TabsTrigger value="all">הכל ({all.length})</TabsTrigger>
         <TabsTrigger value="in-progress">בתהליך ({inProgress.length})</TabsTrigger>

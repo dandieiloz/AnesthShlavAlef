@@ -13,10 +13,13 @@ export interface QuizProgress {
 /** Compute progress for a single quiz.  Counts only questions that have a
  *  geminiAnswer (same filter used by the quiz page). */
 export async function getQuizProgress(quiz: Quiz): Promise<QuizProgress> {
+  const useFixedSet = quiz.questionIds.length > 0;
   const [total, answeredRows] = await Promise.all([
-    db.question.count({
-      where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null } },
-    }),
+    useFixedSet
+      ? Promise.resolve(quiz.questionIds.length)
+      : db.question.count({
+          where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null } },
+        }),
     db.attempt.findMany({
       where: { quizId: quiz.id },
       select: { isCorrect: true, createdAt: true },
@@ -68,10 +71,9 @@ export async function getQuizProgressMany(
 
   const result = new Map<number, QuizProgress>();
   for (const quiz of quizzes) {
-    const total = quiz.chapterIds.reduce(
-      (sum, cid) => sum + (qPerChapter.get(cid) ?? 0),
-      0
-    );
+    const total = quiz.questionIds.length > 0
+      ? quiz.questionIds.length
+      : quiz.chapterIds.reduce((sum, cid) => sum + (qPerChapter.get(cid) ?? 0), 0);
     const quizAttempts = attempts.filter((a) => a.quizId === quiz.id);
     const answered = quizAttempts.length;
     const correct = quizAttempts.filter((a) => a.isCorrect).length;

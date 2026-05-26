@@ -15,8 +15,17 @@ const frankRuhl = Frank_Ruhl_Libre({
 });
 
 export const metadata: Metadata = {
-  title: "אנסתזיה - שלב א׳",
+  title: "Perl – אנסתזיה שלב א׳",
   description: "מבחני אנסתזיה מבוססי ספר Miller's Anesthesia",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
+  openGraph: {
+    title: "Perl – אנסתזיה שלב א׳",
+    description: "פלטפורמת שאלות אמריקאיות מבוססת ספר, עם הסברים מפורטים",
+    images: [{ url: "/icon.png" }],
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

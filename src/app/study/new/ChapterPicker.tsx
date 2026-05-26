@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,13 +28,21 @@ const TONE_CHIP_CLASS: Record<UsefulnessTone, string> = {
 export function ChapterPicker({
   chapters,
   preselected = [],
+  onSelectedChaptersChange,
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
+  onSelectedChaptersChange?: (chapters: ChapterRow[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [toneFilter, setToneFilter] = useState<Set<UsefulnessTone>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set(preselected));
+
+  useEffect(() => {
+    if (!onSelectedChaptersChange) return;
+    onSelectedChaptersChange(chapters.filter((c) => selected.has(c.id)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();

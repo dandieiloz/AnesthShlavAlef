@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { batchUpdateSourceAction, batchDeleteQuestionsAction } from "./actions";
@@ -9,12 +9,40 @@ export type QuestionRow = {
   id: number;
   stem: string;
   source: string | null;
+  createdAt: string;
   chapterNumber: number;
   hasExplanation: boolean;
 };
 
-export function QuestionsTable({ questions }: { questions: QuestionRow[] }) {
+type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "createdAt";
+type SortOrder = "asc" | "desc";
+
+const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
+
+const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
+  id: "desc",
+  stem: "asc",
+  source: "asc",
+  chapter: "asc",
+  hasExplanation: "desc",
+  createdAt: "desc",
+};
+
+export function QuestionsTable({
+  questions,
+  sort,
+  order,
+}: {
+  questions: QuestionRow[];
+  sort: SortField;
+  order: SortOrder;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [panel, setPanel] = useState<"source" | "delete" | null>(null);
 
@@ -66,6 +94,49 @@ export function QuestionsTable({ questions }: { questions: QuestionRow[] }) {
       setPanel(null);
       router.refresh();
     });
+  }
+
+  function sortHref(field: SortField) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextOrder =
+      sort === field
+        ? order === "asc"
+          ? "desc"
+          : "asc"
+        : DEFAULT_SORT_ORDER[field];
+
+    nextParams.set("sort", field);
+    nextParams.set("order", nextOrder);
+
+    return `${pathname}?${nextParams.toString()}`;
+  }
+
+  function sortIndicator(field: SortField) {
+    if (sort !== field) return "";
+    return order === "asc" ? " ▲" : " ▼";
+  }
+
+  function SortHeader({
+    field,
+    label,
+    align = "start",
+    className = "",
+  }: {
+    field: SortField;
+    label: string;
+    align?: "start" | "center";
+    className?: string;
+  }) {
+    const alignClass = align === "center" ? "text-center" : "text-start";
+
+    return (
+      <th className={`p-2 ${alignClass} text-muted-foreground whitespace-nowrap ${className}`.trim()}>
+        <Link href={sortHref(field)} className="inline-flex items-center gap-1 hover:text-foreground">
+          <span>{label}</span>
+          <span aria-hidden="true">{sortIndicator(field)}</span>
+        </Link>
+      </th>
+    );
   }
 
   return (
@@ -182,11 +253,12 @@ export function QuestionsTable({ questions }: { questions: QuestionRow[] }) {
                   className="cursor-pointer"
                 />
               </th>
-              <th className="p-2 text-start w-10 text-muted-foreground">#</th>
-              <th className="p-2 text-start text-muted-foreground">גוף השאלה</th>
-              <th className="p-2 text-start text-muted-foreground whitespace-nowrap">מקור</th>
-              <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרק</th>
-              <th className="p-2 text-center text-muted-foreground whitespace-nowrap">הסבר</th>
+              <SortHeader field="id" label="#" className="w-10" />
+              <SortHeader field="stem" label="גוף השאלה" />
+              <SortHeader field="source" label="מקור" />
+              <SortHeader field="chapter" label="פרק" align="center" />
+              <SortHeader field="hasExplanation" label="הסבר" align="center" />
+              <SortHeader field="createdAt" label="תאריך הוספה" />
             </tr>
           </thead>
           <tbody>
@@ -226,6 +298,9 @@ export function QuestionsTable({ questions }: { questions: QuestionRow[] }) {
                   >
                     {q.hasExplanation ? "יש" : "אין"}
                   </span>
+                </td>
+                <td className="p-2 text-muted-foreground whitespace-nowrap">
+                  {DATE_FORMATTER.format(new Date(q.createdAt))}
                 </td>
               </tr>
             ))}
