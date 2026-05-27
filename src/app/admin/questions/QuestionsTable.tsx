@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
-import { batchUpdateSourceAction, batchDeleteQuestionsAction } from "./actions";
+import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction } from "./actions";
 
 export type QuestionRow = {
   id: number;
@@ -12,9 +12,11 @@ export type QuestionRow = {
   createdAt: string;
   chapterNumber: number;
   hasExplanation: boolean;
+  /** Number of EN translation fields already cached (question + answer combined) */
+  translationCount: number;
 };
 
-type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "createdAt";
+type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "translationCount" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
@@ -28,6 +30,7 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   source: "asc",
   chapter: "asc",
   hasExplanation: "desc",
+  translationCount: "desc",
   createdAt: "desc",
 };
 
@@ -44,7 +47,8 @@ export function QuestionsTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [panel, setPanel] = useState<"source" | "delete" | null>(null);
+  const [panel, setPanel] = useState<"source" | "delete" | "translate" | null>(null);
+  const [translateDone, setTranslateDone] = useState<number | null>(null);
 
   // Source edit form state
   const [institution, setInstitution] = useState("");
@@ -96,6 +100,23 @@ export function QuestionsTable({
     });
   }
 
+  function handleTranslateMissing() {
+    startTransition(async () => {
+      const count = await batchTranslateMissingAction([...selected]);
+      setTranslateDone(count);
+      setPanel(null);
+      router.refresh();
+    });
+  }
+
+  /** Select all questions that are not yet fully translated */
+  function selectPartial() {
+    const partialIds = questions
+      .filter((q) => q.translationCount < (q.hasExplanation ? 7 : 5))
+      .map((q) => q.id);
+    setSelected(new Set(partialIds));
+  }
+
   function sortHref(field: SortField) {
     const nextParams = new URLSearchParams(searchParams.toString());
     const nextOrder =
@@ -141,6 +162,21 @@ export function QuestionsTable({
 
   return (
     <div className="relative">
+      {/* Quick-select helpers row */}
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <button
+          onClick={selectPartial}
+          className="rounded border px-3 py-1.5 text-xs hover:bg-muted"
+        >
+          בחר כל החלקיים / חסרים
+        </button>
+        {translateDone !== null && (
+          <span className="text-xs text-green-700 dark:text-green-400">
+            ✓ תורגמו {translateDone} שאלות
+          </span>
+        )}
+      </div>
+
       {/* Batch action bar */}
       {selected.size > 0 && (
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded border bg-card shadow-md px-4 py-3 mb-3">
@@ -151,6 +187,13 @@ export function QuestionsTable({
             disabled={pending}
           >
             עדכן מקור / שנה
+          </button>
+          <button
+            onClick={() => setPanel("translate")}
+            className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+            disabled={pending}
+          >
+            תרגם חסר (EN)
           </button>
           <button
             onClick={() => setPanel("delete")}
@@ -214,6 +257,31 @@ export function QuestionsTable({
         </div>
       )}
 
+      {/* Translate missing confirmation panel */}
+      {panel === "translate" && (
+        <div className="mb-3 rounded border border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 space-y-3">
+          <p className="text-sm text-indigo-800 dark:text-indigo-300">
+            תתורגמנה שדות EN חסרים עבור <strong>{selected.size}</strong> שאלות.
+            שדות שכבר תורגמו לא ייגעו. פעולה זו עשויה לקחת מספר שניות.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleTranslateMissing}
+              disabled={pending}
+              className="rounded bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {pending ? "מתרגם..." : "המשך"}
+            </button>
+            <button
+              onClick={() => setPanel(null)}
+              className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Delete confirmation panel */}
       {panel === "delete" && (
         <div className="mb-3 rounded border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 space-y-3">
@@ -258,6 +326,7 @@ export function QuestionsTable({
               <SortHeader field="source" label="מקור" />
               <SortHeader field="chapter" label="פרק" align="center" />
               <SortHeader field="hasExplanation" label="הסבר" align="center" />
+              <SortHeader field="translationCount" label="תרגום EN" align="center" />
               <SortHeader field="createdAt" label="תאריך הוספה" />
             </tr>
           </thead>
@@ -298,6 +367,26 @@ export function QuestionsTable({
                   >
                     {q.hasExplanation ? "יש" : "אין"}
                   </span>
+                </td>
+                <td className="p-2 text-center">
+                  {(() => {
+                    const maxFields = q.hasExplanation ? 7 : 5;
+                    const full = q.translationCount >= maxFields;
+                    return (
+                      <span
+                        className={`text-xs rounded px-2 py-0.5 ${
+                          full
+                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                            : q.translationCount > 0
+                              ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                        title={`${q.translationCount}/${maxFields} שדות מתורגמים`}
+                      >
+                        {full ? "✓ מלא" : q.translationCount > 0 ? `חלקי (${q.translationCount}/${maxFields})` : "—"}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="p-2 text-muted-foreground whitespace-nowrap">
                   {DATE_FORMATTER.format(new Date(q.createdAt))}

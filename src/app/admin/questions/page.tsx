@@ -7,7 +7,7 @@ import { AdminTabsNav } from "../AdminTabsNav";
 
 const LIMIT = 100;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
-const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "createdAt"] as const;
+const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "translationCount", "createdAt"] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
@@ -85,7 +85,7 @@ export default async function AdminQuestionsPage({
             ? [{ chapter: { number: order } }, { id: "desc" as const }]
             : sort === "hasExplanation"
               ? [{ geminiAnswer: { id: order } }, { id: "desc" as const }]
-              : [{ createdAt: order }, { id: "desc" as const }];
+              : /* translationCount, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
 
   const [questions, total, chapters] = await Promise.all([
     db.question.findMany({
@@ -108,6 +108,39 @@ export default async function AdminQuestionsPage({
     }),
   ]);
 
+  // Count cached EN translation fields per question (stem + 4 options = 5 fields for Question;
+  // explanation + whyOthersWrong = 2 fields for GeminiAnswer). Max = 7.
+  const questionIds = questions.map((q) => q.id);
+  const translationRows = await db.translation.groupBy({
+    by: ["entityId"],
+    where: {
+      locale: "en",
+      entityType: { in: ["Question", "GeminiAnswer"] },
+      entityId: {
+        in: [
+          ...questionIds.map(String),
+          ...questions.filter((q) => q.geminiAnswer).map((q) => String(q.geminiAnswer!.id)),
+        ],
+      },
+    },
+    _count: { field: true },
+  });
+
+  // Build a map: questionId → total cached field count (combining Question + GeminiAnswer rows)
+  const questionIdSet = new Set(questionIds.map(String));
+  // geminiAnswerId → questionId
+  const answerToQuestion = new Map(
+    questions.filter((q) => q.geminiAnswer).map((q) => [String(q.geminiAnswer!.id), q.id]),
+  );
+  const translationCountMap = new Map<number, number>();
+  for (const row of translationRows) {
+    const qId = questionIdSet.has(row.entityId)
+      ? Number(row.entityId)
+      : answerToQuestion.get(row.entityId);
+    if (qId === undefined) continue;
+    translationCountMap.set(qId, (translationCountMap.get(qId) ?? 0) + row._count.field);
+  }
+
   const rows: QuestionRow[] = questions.map((q) => ({
     id: q.id,
     stem: q.stem,
@@ -115,6 +148,7 @@ export default async function AdminQuestionsPage({
     createdAt: q.createdAt.toISOString(),
     chapterNumber: q.chapter.number,
     hasExplanation: q.geminiAnswer !== null,
+    translationCount: translationCountMap.get(q.id) ?? 0,
   }));
 
   return (
