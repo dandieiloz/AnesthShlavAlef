@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Choice } from "@prisma/client";
 import { ProfileSchema } from "@/app/onboarding/schema";
-import { getLocale } from "@/lib/locale";
+import { getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 
 export async function updateProfileAction(formData: FormData) {
@@ -113,7 +113,7 @@ export async function submitAttemptAction(formData: FormData) {
  */
 export async function prefetchQuestionTranslationAction(questionId: number): Promise<void> {
   await requireUser();
-  const locale = await getLocale();
+  const locale = await getContentLocale();
   if (locale === "he") return;
 
   const q = await db.question.findUnique({

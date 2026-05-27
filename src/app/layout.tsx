@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale} dir={locale === "en" ? "ltr" : "rtl"} className={`${heebo.variable} ${frankRuhl.variable}`} suppressHydrationWarning>
       <body className="min-h-screen font-sans flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <SiteHeaderClient user={user} signInAction={handleSignIn} signOutAction={handleSignOut} locale={locale} nav={dict.nav} />
+          <SiteHeaderClient user={user} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <SiteFooter t={dict.footer} />
           <Toaster />

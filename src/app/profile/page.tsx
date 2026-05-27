@@ -9,14 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCircle } from "lucide-react";
-import { getLocale } from "@/lib/locale";
+import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
+import { LanguageSettingsCard } from "@/components/LanguageSettingsCard";
 
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/");
 
-  const locale = await getLocale();
+  const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const t = getDictionary(locale).profile;
 
   const user = await db.user.findUnique({
@@ -98,6 +99,22 @@ export default async function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+
+      <LanguageSettingsCard
+        uiLocale={locale}
+        contentLocale={contentLocale}
+        isAdmin={user.role === "ADMIN"}
+        t={{
+          languageTitle: t.languageTitle,
+          uiLanguageLabel: t.uiLanguageLabel,
+          uiLanguageDesc: t.uiLanguageDesc,
+          contentLanguageLabel: t.contentLanguageLabel,
+          contentLanguageDesc: t.contentLanguageDesc,
+          langHebrew: t.langHebrew,
+          langEnglish: t.langEnglish,
+          adminOnlyNotice: t.adminOnlyNotice,
+        }}
+      />
     </div>
   );
 }

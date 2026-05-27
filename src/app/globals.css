@@ -271,4 +271,19 @@
   .row-medium    { @apply bg-emerald-200   dark:bg-emerald-900; }
   .row-high      { @apply bg-amber-200     dark:bg-amber-900; }
   .row-very-high { @apply bg-rose-200      dark:bg-rose-900; }
+
+  /* ─── Highlightable sentence containers ─────────────────────
+     Each sentence is rendered inside its own MathMarkdown block.
+     Strip the redundant paragraph/heading/list spacing so the
+     wrapping highlight color hugs the sentence text. */
+  .answer-highlightable .answer-content {
+    line-height: 1.7;
+  }
+  .answer-highlightable .answer-content :where(p, h2, h3, h4, ul, ol, blockquote) {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .answer-highlightable .answer-content :where(ul, ol) {
+    padding-inline-start: 1.25rem;
+  }
 }

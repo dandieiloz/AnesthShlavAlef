@@ -1,4 +1,5 @@
 import { MathMarkdown } from "@/components/MathMarkdown";
+import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { Lightbulb, BookMarked, XCircle, AlertTriangle } from "lucide-react";
 
 const HEBREW_LETTERS: Record<string, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
@@ -20,6 +21,23 @@ type Props = {
   options: { key: Choice; text: string }[];
   insufficientEvidence?: boolean;
   locale?: "he" | "en";
+  questionId?: number;
+  highlights?: HighlightRecord[];
+  highlightT?: {
+    pickColor: string;
+    removeHighlight: string;
+    addNote: string;
+    editNote: string;
+    noteTitle: string;
+    notePlaceholder: string;
+    saveNote: string;
+    clearNote: string;
+    staleHighlight: string;
+    colorYellow: string;
+    colorGreen: string;
+    colorPink: string;
+    colorBlue: string;
+  };
 };
 
 const UI = {
@@ -57,6 +75,9 @@ export function AnswerExplanation({
   options,
   insufficientEvidence,
   locale = "he",
+  questionId,
+  highlights = [],
+  highlightT,
 }: Props) {
   const wrongReasons = parseWhyOthersWrong(whyOthersWrong);
   const wrongOptions = options.filter((o) => o.key !== correctAnswer);
@@ -85,7 +106,18 @@ export function AnswerExplanation({
           </span>
         </div>
         <div className="px-4 py-3.5">
-          <MathMarkdown>{explanation}</MathMarkdown>
+          {questionId !== undefined && highlightT ? (
+            <HighlightableMarkdown
+              text={explanation}
+              section="EXPLANATION"
+              questionId={questionId}
+              locale={locale}
+              highlights={highlights}
+              t={highlightT}
+            />
+          ) : (
+            <MathMarkdown>{explanation}</MathMarkdown>
+          )}
         </div>
       </div>
 
@@ -112,9 +144,20 @@ export function AnswerExplanation({
                       {text}
                     </p>
                     {/* Why wrong */}
-                    <p className="text-xs leading-relaxed text-foreground/85">
-                      {wrongReasons[key]}
-                    </p>
+                    <div className="text-xs leading-relaxed text-foreground/85">
+                      {questionId !== undefined && highlightT ? (
+                        <HighlightableMarkdown
+                          text={wrongReasons[key]!}
+                          section={`WHY_WRONG_${key}`}
+                          questionId={questionId}
+                          locale={locale}
+                          highlights={highlights}
+                          t={highlightT}
+                        />
+                      ) : (
+                        <MathMarkdown>{wrongReasons[key]!}</MathMarkdown>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : null
@@ -142,12 +185,22 @@ export function AnswerExplanation({
                     aria-hidden
                   />
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p
-                      dir="auto"
-                      className="text-xs italic leading-relaxed text-foreground/80 text-start [unicode-bidi:plaintext]"
-                    >
-                      &ldquo;{e.quote}&rdquo;
-                    </p>
+                    <div className="text-xs italic leading-relaxed text-foreground/80">
+                      {questionId !== undefined && highlightT ? (
+                        <HighlightableMarkdown
+                          text={e.quote}
+                          section={`EVIDENCE_${i}`}
+                          questionId={questionId}
+                          locale={locale}
+                          highlights={highlights}
+                          t={highlightT}
+                        />
+                      ) : (
+                        <p dir="auto" className="text-start [unicode-bidi:plaintext]">
+                          &ldquo;{e.quote}&rdquo;
+                        </p>
+                      )}
+                    </div>
                     <p dir="ltr" className="text-[11px] font-medium text-muted-foreground text-left">
                       <span className="[unicode-bidi:isolate]">
                         {ui.chapter} {e.chapterNumber}

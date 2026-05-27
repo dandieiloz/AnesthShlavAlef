@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, XCircle, ArrowRight, BarChart2, MessageSquare, Flag, Bookmark, BookmarkCheck, ClipboardList } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { getLocale } from "@/lib/locale";
+import { getLocale, getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { getDictionary } from "@/lib/i18n";
 import { PrefetchNextTranslation } from "./PrefetchNextTranslation";
@@ -26,8 +26,8 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   const quiz = await db.quiz.findFirst({ where: { id: Number(id), userId: me.id } });
   if (!quiz) notFound();
 
-  const locale = await getLocale();
-  const t = getDictionary(locale).quiz;
+  const [uiLocale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
+  const t = getDictionary(uiLocale).quiz;
 
   const answeredIds = (
     await db.attempt.findMany({
@@ -111,7 +111,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  const [lastAttempt, bookmark] = await Promise.all([
+  const [lastAttempt, bookmark, highlights] = await Promise.all([
     db.attempt.findFirst({
       where: { userId: me.id, quizId: quiz.id },
       orderBy: { createdAt: "desc" },
@@ -119,6 +119,10 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
     db.bookmark.findUnique({
       where: { userId_questionId: { userId: me.id, questionId: next.id } },
       select: { id: true },
+    }),
+    db.sentenceHighlight.findMany({
+      where: { userId: me.id, questionId: next.id, locale: contentLocale },
+      select: { id: true, section: true, sentenceIndex: true, colorId: true, sentenceHash: true, note: true },
     }),
   ]);
   const justAnswered = lastAttempt && lastAttempt.questionId === next.id;
@@ -132,14 +136,14 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       "Question",
       qId,
       { stem: next.stem, optionA: next.optionA, optionB: next.optionB, optionC: next.optionC, optionD: next.optionD },
-      locale,
+      contentLocale,
     ),
     next.geminiAnswer
       ? getTranslatedFields(
           "GeminiAnswer",
           String(next.geminiAnswer.id),
           { explanation: next.geminiAnswer.explanation, whyOthersWrong: next.geminiAnswer.whyOthersWrong },
-          locale,
+          contentLocale,
         )
       : Promise.resolve({ explanation: "", whyOthersWrong: "" }),
   ]);
@@ -159,8 +163,8 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="grid gap-6 md:grid-cols-3">
       {/* Background-warm the next question's translation cache so the next page
-          render is instant. Renders nothing; only runs when locale !== "he". */}
-      {locale !== "he" && lookahead && (
+          render is instant. Renders nothing; only runs when contentLocale !== "he". */}
+      {contentLocale !== "he" && lookahead && (
         <PrefetchNextTranslation questionId={lookahead.id} />
       )}
       <div className="md:col-span-2 space-y-5">
@@ -176,7 +180,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         {/* Chapter pill + bookmark */}
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
-            {getDictionary(locale).common.chapter} {next.chapter.number}
+            {getDictionary(uiLocale).common.chapter} {next.chapter.number}
           </Badge>
           <span className="text-xs text-muted-foreground flex-1">{next.chapter.title}</span>
           <form action={toggleBookmarkAction}>
@@ -292,7 +296,10 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
                   { key: "D", text: display.optionD },
                 ]}
                 insufficientEvidence={next.geminiAnswer.insufficientEvidence}
-                locale={locale}
+                locale={contentLocale}
+                questionId={next.id}
+                highlights={highlights}
+                highlightT={getDictionary(uiLocale).highlights}
               />
 
               <Separator className="opacity-50" />
@@ -337,7 +344,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
           <ul className="space-y-2">
             {next.comments.map((c) => (
               <li key={c.id}>
-                <CommentItem comment={c} meId={me.id} meRole={me.role} locale={locale} />
+                <CommentItem comment={c} meId={me.id} meRole={me.role} locale={uiLocale} />
               </li>
             ))}
           </ul>

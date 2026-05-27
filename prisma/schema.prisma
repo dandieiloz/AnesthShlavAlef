@@ -64,6 +64,7 @@ model User {
   questions         Question[]               @relation("QuestionAuthor")
   bookmarks         Bookmark[]
   generationJobs    AnswerGenerationJob[]    @relation("JobCreator")
+  sentenceHighlights SentenceHighlight[]
 }
 
 model Account {
@@ -153,6 +154,7 @@ model Question {
   bookmarks       Bookmark[]
   ragRuns         RagRun[]
   generationJobs  AnswerGenerationJob[]
+  sentenceHighlights SentenceHighlight[]
 
   @@index([chapterId])
   @@index([chapterIds], type: Gin)
@@ -288,6 +290,32 @@ model Bookmark {
 
   @@unique([userId, questionId])
   @@index([userId, createdAt])
+}
+
+/// Per-user sentence-level highlights inside the AnswerExplanation card.
+/// Anchored to (questionId, section, sentenceIndex) within the rendered markdown,
+/// scoped per content-locale. sentenceHash detects admin edits → render as "stale".
+/// sentenceText is denormalized so /bookmarks can render without re-fetching the source.
+model SentenceHighlight {
+  id            Int      @id @default(autoincrement())
+  userId        String
+  questionId    Int
+  locale        String   // "he" | "en"
+  section       String   // "EXPLANATION" | "WHY_WRONG_A".."WHY_WRONG_D"
+  sentenceIndex Int      // 0-based within the section's split
+  colorId       Int      // 1..4
+  sentenceHash  String   // sha1 (first 16 hex chars) of normalized sentence text
+  sentenceText  String   @db.Text
+  note          String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId, locale, section, sentenceIndex])
+  @@index([userId, createdAt])
+  @@index([userId, questionId, locale])
 }
 
 /// Persistent translation cache. Source of truth is always Hebrew; English is machine-translated on demand.

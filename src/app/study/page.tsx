@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getQuizProgressMany } from "@/lib/quiz-progress";
 import { usefulnessTone, TONE_DOT_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/lib/usefulness";
-import { getLocale } from "@/lib/locale";
+import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import {
@@ -36,7 +36,7 @@ function residencyLabel(year: number | null, t: { yearLabels: Record<number, str
 
 export default async function StudyPage() {
   const me = await requireCompletedProfile();
-  const locale = await getLocale();
+  const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const t = getDictionary(locale).study;
 
   const [allQuizzes, dbUser, topChapters] = await Promise.all([
@@ -64,7 +64,7 @@ export default async function StudyPage() {
 
   const topChapterTitles = await Promise.all(
     topChapters.map((c) =>
-      getTranslatedFields("Chapter", String(c.id), { title: c.title }, locale),
+      getTranslatedFields("Chapter", String(c.id), { title: c.title }, contentLocale),
     ),
   );
 

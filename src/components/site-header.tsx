@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { LocaleToggle } from "@/components/LocaleToggle";
 
 interface NavUser {
   name?: string | null;
@@ -28,7 +27,6 @@ interface SiteHeaderClientProps {
   user?: NavUser;
   signInAction: () => Promise<void>;
   signOutAction: () => Promise<void>;
-  locale: "he" | "en";
   nav: {
     study: string;
     myQuizzes: string;
@@ -72,7 +70,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function SiteHeaderClient({ user, signInAction, signOutAction, locale, nav }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ user, signInAction, signOutAction, nav }: SiteHeaderClientProps) {
   const NAV_LINKS = buildNavLinks(nav);
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card/80 backdrop-blur-md">
@@ -97,7 +95,6 @@ export function SiteHeaderClient({ user, signInAction, signOutAction, locale, na
           )}
 
           <ThemeToggle />
-          <LocaleToggle current={locale} />
 
           {user ? (
             <DropdownMenu>

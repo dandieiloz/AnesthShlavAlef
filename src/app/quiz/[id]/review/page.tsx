@@ -19,7 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { getLocale } from "@/lib/locale";
+import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 
@@ -37,10 +37,10 @@ export default async function QuizReviewPage({
   const { wrong } = await searchParams;
   const showWrongOnly = wrong === "1";
 
-  const locale = await getLocale();
-  const dict = getDictionary(locale);
+  const [uiLocale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
+  const dict = getDictionary(uiLocale);
   const t = dict.review;
-  const LETTERS = t.labels[locale] ?? ["A", "B", "C", "D"];
+  const LETTERS = t.labels[contentLocale] ?? ["A", "B", "C", "D"];
 
   const quiz = await db.quiz.findFirst({ where: { id: Number(id), userId: me.id } });
   if (!quiz) notFound();
@@ -73,6 +73,21 @@ export default async function QuizReviewPage({
     orderBy: { id: "asc" },
   });
 
+  const highlightRows = await db.sentenceHighlight.findMany({
+    where: {
+      userId: me.id,
+      locale: contentLocale,
+      questionId: { in: [...attemptMap.keys()] },
+    },
+    select: { id: true, questionId: true, section: true, sentenceIndex: true, colorId: true, sentenceHash: true, note: true },
+  });
+  const highlightsByQ = new Map<number, typeof highlightRows>();
+  for (const h of highlightRows) {
+    const arr = highlightsByQ.get(h.questionId) ?? [];
+    arr.push(h);
+    highlightsByQ.set(h.questionId, arr);
+  }
+
   if (questions.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground">
@@ -98,7 +113,7 @@ export default async function QuizReviewPage({
           optionD: q.optionD,
           chapterTitle: q.chapter.title,
         },
-        locale
+        contentLocale
       )
     )
   );
@@ -113,8 +128,8 @@ export default async function QuizReviewPage({
     ? questions.filter((q) => !attemptMap.get(q.id)?.isCorrect)
     : questions;
 
-  const ChevronIcon = locale === "he" ? ChevronLeft : ChevronRight;
-  const ArrowIcon = locale === "he" ? ArrowRight : ArrowLeft;
+  const ChevronIcon = uiLocale === "he" ? ChevronLeft : ChevronRight;
+  const ArrowIcon = uiLocale === "he" ? ArrowRight : ArrowLeft;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -325,7 +340,10 @@ export default async function QuizReviewPage({
                               { key: "D", text: q.optionD },
                             ]}
                             insufficientEvidence={q.geminiAnswer.insufficientEvidence}
-                            locale={locale}
+                            locale={contentLocale}
+                            questionId={q.id}
+                            highlights={highlightsByQ.get(q.id) ?? []}
+                            highlightT={dict.highlights}
                           />
                         </div>
                       </details>
