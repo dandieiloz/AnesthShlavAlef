@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Choice } from "@prisma/client";
 import { ProfileSchema } from "@/app/onboarding/schema";
+import { getLocale } from "@/lib/locale";
+import { getTranslatedFields } from "@/lib/translate";
 
 export async function updateProfileAction(formData: FormData) {
   const me = await requireUser();
@@ -100,6 +102,42 @@ export async function submitAttemptAction(formData: FormData) {
     },
   });
   revalidatePath(`/quiz/${data.quizId}`);
+}
+
+/**
+ * Background prefetch of a question's translation (stem + 4 options + answer fields)
+ * for the user's current locale. Called from the client while the user is reading
+ * the current question so the NEXT question's render is instant.
+ *
+ * Idempotent: hits the translation cache if already populated.
+ */
+export async function prefetchQuestionTranslationAction(questionId: number): Promise<void> {
+  await requireUser();
+  const locale = await getLocale();
+  if (locale === "he") return;
+
+  const q = await db.question.findUnique({
+    where: { id: questionId },
+    include: { geminiAnswer: true },
+  });
+  if (!q) return;
+
+  await Promise.all([
+    getTranslatedFields(
+      "Question",
+      String(q.id),
+      { stem: q.stem, optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD },
+      locale,
+    ),
+    q.geminiAnswer
+      ? getTranslatedFields(
+          "GeminiAnswer",
+          String(q.geminiAnswer.id),
+          { explanation: q.geminiAnswer.explanation, whyOthersWrong: q.geminiAnswer.whyOthersWrong },
+          locale,
+        )
+      : Promise.resolve(),
+  ]);
 }
 
 const CommentSchema = z.object({

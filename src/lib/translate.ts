@@ -8,8 +8,9 @@
  * called at most once per (entity, field, locale) unless the source changes.
  */
 import { createHash } from "crypto";
+import { Type, type Schema } from "@google/genai";
 import { db } from "@/lib/db";
-import { generateText, FLASH_MODEL } from "@/lib/gemini";
+import { generateText, generateJson, FLASH_MODEL } from "@/lib/gemini";
 
 // Medical terminology glossary injected into every translation prompt so that
 // Gemini uses the correct English anesthesia terms consistently.
@@ -121,8 +122,18 @@ export async function getTranslated(
 }
 
 /**
- * Translate multiple fields of the same entity in parallel.
- * Returns a record of field → translated text.
+ * Translate multiple fields of the same entity in a SINGLE Gemini call.
+ *
+ * This is the preferred entry point for translating an entity (question, answer,
+ * etc.) because it collapses what would otherwise be N parallel API calls into
+ * one batched request — dramatically reducing user-perceived latency.
+ *
+ * Behaviour:
+ *  - Hebrew source → returned as-is.
+ *  - Cached fields whose source hash matches are reused (no API call).
+ *  - Only uncached / stale fields are sent to Gemini, in one structured call.
+ *  - On Gemini failure the Hebrew source is returned for the failed fields and
+ *    nothing is written to the cache (so the next render will retry).
  */
 export async function getTranslatedFields<T extends string>(
   entityType: string,
@@ -132,14 +143,92 @@ export async function getTranslatedFields<T extends string>(
 ): Promise<Record<T, string>> {
   if (locale === "he") return fields;
 
-  const entries = await Promise.all(
-    (Object.entries(fields) as [T, string][]).map(async ([field, text]) => {
-      const translated = await getTranslated(entityType, entityId, field, text, locale);
-      return [field, translated] as [T, string];
+  const fieldNames = Object.keys(fields) as T[];
+  if (fieldNames.length === 0) return fields;
+
+  const result = { ...fields };
+  const hashes: Partial<Record<T, string>> = {};
+  const toTranslate: T[] = [];
+
+  // Bulk-load any existing cache rows for these fields in one query.
+  const cached = await db.translation.findMany({
+    where: {
+      entityType,
+      entityId,
+      locale,
+      field: { in: fieldNames as string[] },
+    },
+    select: { field: true, text: true, sourceHash: true },
+  });
+  const cacheMap = new Map(cached.map((c) => [c.field, c]));
+
+  for (const f of fieldNames) {
+    const src = fields[f];
+    if (!src) continue; // empty source → keep empty
+    const h = sha256(src);
+    hashes[f] = h;
+    const c = cacheMap.get(f);
+    if (c && c.sourceHash === h) {
+      result[f] = c.text;
+    } else {
+      toTranslate.push(f);
+    }
+  }
+
+  if (toTranslate.length === 0) return result;
+
+  // Build a JSON-schema response with one string property per field.
+  const schema: Schema = {
+    type: Type.OBJECT,
+    properties: Object.fromEntries(
+      toTranslate.map((f) => [f, { type: Type.STRING }]),
+    ) as Record<string, Schema>,
+    required: toTranslate as string[],
+  };
+
+  const inputObj: Record<string, string> = {};
+  for (const f of toTranslate) inputObj[f] = fields[f];
+
+  let translated: Record<string, string>;
+  try {
+    translated = await generateJson<Record<string, string>>(
+      FLASH_MODEL,
+      SYSTEM_PROMPT,
+      `Translate each value of the following JSON object from Hebrew to English. ` +
+        `Return a JSON object with the EXACT same keys, where each value is the English translation of the corresponding Hebrew value. ` +
+        `Apply all translation rules to each value independently.\n\n` +
+        JSON.stringify(inputObj, null, 2),
+      schema,
+      0.1,
+    );
+  } catch (err) {
+    console.error(
+      `[translate] Batched translation failed for ${entityType} ${entityId} (${toTranslate.length} fields) to ${locale}:`,
+      err instanceof Error ? err.message : err,
+    );
+    // Leave result[f] = source for failed fields; do NOT cache.
+    return result;
+  }
+
+  // Persist each translated field. Fall back to source for any that came back empty.
+  await Promise.all(
+    toTranslate.map((f) => {
+      const text = (translated[f] ?? "").trim();
+      const hash = hashes[f];
+      if (!text || !hash) {
+        // Bad response for this field — keep source, skip cache.
+        return Promise.resolve();
+      }
+      result[f] = text;
+      return db.translation.upsert({
+        where: { entityType_entityId_field_locale: { entityType, entityId, field: f, locale } },
+        create: { entityType, entityId, field: f, locale, sourceHash: hash, text, provider: "gemini" },
+        update: { sourceHash: hash, text, provider: "gemini", reviewed: false, createdAt: new Date() },
+      });
     }),
   );
 
-  return Object.fromEntries(entries) as Record<T, string>;
+  return result;
 }
 
 /**

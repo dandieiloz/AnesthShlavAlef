@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { getLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { getDictionary } from "@/lib/i18n";
+import { PrefetchNextTranslation } from "./PrefetchNextTranslation";
 
 const HEBREW_LETTERS = ["א", "ב", "ג", "ד"];
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
@@ -50,6 +51,25 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       comments: { include: { user: { select: { name: true, image: true, hospitalName: true } } }, orderBy: { createdAt: "asc" } },
     },
   });
+
+  // Look one question ahead so we can warm the translation cache in the
+  // background while the user reads the current one. Only the id is needed.
+  const lookahead = next
+    ? await db.question.findFirst({
+        where: useFixedSet
+          ? {
+              id: { in: quiz.questionIds, notIn: [...answeredIds, next.id] },
+              geminiAnswer: { isNot: null },
+            }
+          : {
+              chapterIds: { hasSome: quiz.chapterIds },
+              id: { notIn: [...answeredIds, next.id] },
+              geminiAnswer: { isNot: null },
+            },
+        orderBy: { id: "asc" },
+        select: { id: true },
+      })
+    : null;
 
   const totalQ = useFixedSet
     ? quiz.questionIds.length
@@ -138,6 +158,11 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="grid gap-6 md:grid-cols-3">
+      {/* Background-warm the next question's translation cache so the next page
+          render is instant. Renders nothing; only runs when locale !== "he". */}
+      {locale !== "he" && lookahead && (
+        <PrefetchNextTranslation questionId={lookahead.id} />
+      )}
       <div className="md:col-span-2 space-y-5">
         {/* Progress bar */}
         <div className="space-y-1.5">
