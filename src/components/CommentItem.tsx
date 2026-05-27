@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Pencil, Trash2, X, Check } from "lucide-react";
 import { editCommentAction, deleteCommentAction } from "@/app/(user)/actions";
+import type { Dictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/locale";
 
 type CommentUser = {
   name: string | null;
@@ -26,9 +28,11 @@ type Props = {
   comment: CommentData;
   meId: string;
   meRole: "USER" | "ADMIN";
+  locale: Locale;
+  t: Dictionary["quiz"];
 };
 
-export function CommentItem({ comment: c, meId, meRole }: Props) {
+export function CommentItem({ comment: c, meId, meRole, locale, t }: Props) {
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -59,14 +63,14 @@ export function CommentItem({ comment: c, meId, meRole }: Props) {
             )}
           </div>
           <span className="text-xs text-muted-foreground ms-auto">
-            {c.createdAt.toLocaleDateString("he-IL")}
-            {c.editedAt && <span className="ms-1 italic">(עודכן)</span>}
+            {c.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
+            {c.editedAt && <span className="ms-1 italic">({t.commentEdited})</span>}
           </span>
           {canEdit && !editing && (
             <button
               onClick={() => setEditing(true)}
               className="text-muted-foreground hover:text-foreground transition-colors"
-              title="ערוך הערה"
+              title={t.editComment}
             >
               <Pencil className="h-3 w-3" />
             </button>
@@ -77,7 +81,7 @@ export function CommentItem({ comment: c, meId, meRole }: Props) {
               <button
                 type="submit"
                 className="text-muted-foreground hover:text-destructive transition-colors"
-                title="מחק הערה"
+                title={t.deleteComment}
               >
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -99,7 +103,7 @@ export function CommentItem({ comment: c, meId, meRole }: Props) {
             <div className="flex gap-2">
               <Button type="submit" size="sm" className="gap-1" disabled={isPending}>
                 <Check className="h-3 w-3" />
-                שמור
+                {t.commentSave}
               </Button>
               <Button
                 type="button"
@@ -110,7 +114,7 @@ export function CommentItem({ comment: c, meId, meRole }: Props) {
                 className="gap-1"
               >
                 <X className="h-3 w-3" />
-                ביטול
+                {t.commentCancel}
               </Button>
             </div>
           </form>

@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getQuizProgressMany } from "@/lib/quiz-progress";
-import { usefulnessTone, TONE_DOT_CLASS, TONE_LABEL, TONE_BADGE_CLASS } from "@/lib/usefulness";
+import { usefulnessTone, TONE_DOT_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/lib/usefulness";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
+import { getTranslatedFields } from "@/lib/translate";
 import {
   PlusCircle,
   ArrowLeft,
@@ -17,25 +20,24 @@ import {
   Play,
 } from "lucide-react";
 
-const HEBREW_DAY: Record<number, string> = { 0: "היום", 1: "אתמול" };
-
-function relativeDate(date: Date): string {
+function relativeDate(date: Date, locale: "he" | "en", t: { today: string; yesterday: string }): string {
   const diffDays = Math.floor(
     (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
   );
-  return HEBREW_DAY[diffDays] ?? date.toLocaleDateString("he-IL");
+  if (diffDays === 0) return t.today;
+  if (diffDays === 1) return t.yesterday;
+  return date.toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
 }
 
-function residencyLabel(year: number | null): string {
+function residencyLabel(year: number | null, t: { yearLabels: Record<number, string>; yearLabel: (n: number) => string }): string {
   if (!year) return "";
-  const labels: Record<number, string> = {
-    1: "שנה א׳", 2: "שנה ב׳", 3: "שנה ג׳", 4: "שנה ד׳", 5: "שנה ה׳",
-  };
-  return labels[year] ?? `שנה ${year}`;
+  return t.yearLabels[year] ?? t.yearLabel(year);
 }
 
 export default async function StudyPage() {
   const me = await requireCompletedProfile();
+  const locale = await getLocale();
+  const t = getDictionary(locale).study;
 
   const [allQuizzes, dbUser, topChapters] = await Promise.all([
     db.quiz.findMany({
@@ -60,6 +62,12 @@ export default async function StudyPage() {
 
   const progressMap = await getQuizProgressMany(allQuizzes);
 
+  const topChapterTitles = await Promise.all(
+    topChapters.map((c) =>
+      getTranslatedFields("Chapter", String(c.id), { title: c.title }, locale),
+    ),
+  );
+
   const inProgress = allQuizzes.filter((q) => {
     const p = progressMap.get(q.id);
     return p && !p.isComplete && p.answered > 0;
@@ -75,13 +83,13 @@ export default async function StudyPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">
-            {me.name ? `שלום, ${me.name.split(" ")[0]} 👋` : "שלום 👋"}
+            {me.name ? t.greeting(me.name.split(" ")[0]) : t.greetingAnon}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">ממשיכים ללמוד אנסתזיולוגיה</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t.tagline}</p>
         </div>
         {dbUser?.residencyYear && (
           <Badge variant="secondary" className="text-sm px-3 py-1">
-            {residencyLabel(dbUser.residencyYear)}
+            {residencyLabel(dbUser.residencyYear, t)}
           </Badge>
         )}
       </div>
@@ -91,7 +99,7 @@ export default async function StudyPage() {
         <section className="space-y-3">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <Play className="h-4 w-4 text-primary" />
-            המשך מבחן
+            {t.continueQuiz}
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {inProgress.map((q) => {
@@ -112,9 +120,9 @@ export default async function StudyPage() {
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {p.lastActivityAt ? relativeDate(p.lastActivityAt) : ""}
+                          {p.lastActivityAt ? relativeDate(p.lastActivityAt, locale, t) : ""}
                         </span>
-                        <span className="text-primary font-medium">המשך ←</span>
+                        <span className="text-primary font-medium">{t.continue}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -129,7 +137,7 @@ export default async function StudyPage() {
       <section className="space-y-4">
         <h2 className="font-display text-lg font-semibold flex items-center gap-2">
           <PlusCircle className="h-4 w-4 text-primary" />
-          מבחן חדש
+          {t.newQuiz}
         </h2>
         <div className="grid gap-4 sm:grid-cols-5">
           <Link href="/study/new" className="sm:col-span-2">
@@ -139,27 +147,27 @@ export default async function StudyPage() {
                   <Layers className="h-7 w-7 text-primary" />
                 </div>
                 <div>
-                  <p className="font-display font-bold text-base">בנה מבחן מותאם</p>
-                  <p className="text-xs text-muted-foreground mt-1">בחר פרקים, מסנן לפי מועילות, וצא לדרך</p>
+                  <p className="font-display font-bold text-base">{t.buildCustom}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t.buildCustomHint}</p>
                 </div>
                 <Button size="sm" className="mt-1 gap-1.5">
                   <PlusCircle className="h-3.5 w-3.5" />
-                  התחל
+                  {t.start}
                 </Button>
               </CardContent>
             </Card>
           </Link>
           <div className="sm:col-span-3 grid gap-2">
-            {topChapters.map((c) => {
+            {topChapters.map((c, i) => {
               const tone = usefulnessTone(c.learningUsefulnessIndex);
               return (
                 <Link key={c.id} href={`/study/new?chapter=${c.number}`}>
                   <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm transition-all hover:shadow-sm hover:border-primary/30 hover:-translate-y-0.5">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT_CLASS[tone]}`} />
                     <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">{c.number}</span>
-                    <span className="flex-1 font-medium line-clamp-1">{c.title}</span>
+                    <span className="flex-1 font-medium line-clamp-1">{topChapterTitles[i].title}</span>
                     <Badge variant="secondary" className="shrink-0 text-xs">{c._count.questions}</Badge>
-                    <Badge className={`shrink-0 text-xs ${TONE_BADGE_CLASS[tone]}`}>{TONE_LABEL[tone]}</Badge>
+                    <Badge className={`shrink-0 text-xs ${TONE_BADGE_CLASS[tone]}`}>{toneLabel(tone, locale)}</Badge>
                   </div>
                 </Link>
               );
@@ -173,10 +181,10 @@ export default async function StudyPage() {
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-primary" />
-            מבחנים אחרונים
+            {t.recentQuizzes}
           </h2>
           <Link href="/quizzes" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            כל המבחנים
+            {t.allQuizzes}
             <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -185,9 +193,9 @@ export default async function StudyPage() {
           <Card>
             <CardContent className="pt-6 text-center text-sm text-muted-foreground space-y-3">
               <CheckCircle2 className="mx-auto h-8 w-8 text-muted-foreground/40" />
-              <p>עדיין אין מבחנים. בנה את הראשון שלך!</p>
+              <p>{t.noQuizzes}</p>
               <Button asChild size="sm">
-                <Link href="/study/new">בנה מבחן</Link>
+                <Link href="/study/new">{t.createFirst}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -205,7 +213,7 @@ export default async function StudyPage() {
                           <CheckCircle2 className="h-3 w-3 text-success" />
                           {p.accuracyPct}%
                         </span>
-                        <span>{q.createdAt.toLocaleDateString("he-IL")}</span>
+                        <span>{q.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}</span>
                       </div>
                     </CardContent>
                   </Card>

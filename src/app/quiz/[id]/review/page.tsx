@@ -13,12 +13,16 @@ import {
   XCircle,
   BookOpen,
   ArrowRight,
+  ArrowLeft,
   Bookmark,
   BookmarkCheck,
   ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
+import { getTranslatedFields } from "@/lib/translate";
 
-const HEBREW_LETTERS = ["א", "ב", "ג", "ד"];
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
 export default async function QuizReviewPage({
@@ -32,6 +36,11 @@ export default async function QuizReviewPage({
   const { id } = await params;
   const { wrong } = await searchParams;
   const showWrongOnly = wrong === "1";
+
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const t = dict.review;
+  const LETTERS = t.labels[locale] ?? ["A", "B", "C", "D"];
 
   const quiz = await db.quiz.findFirst({ where: { id: Number(id), userId: me.id } });
   if (!quiz) notFound();
@@ -67,13 +76,33 @@ export default async function QuizReviewPage({
   if (questions.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground">
-        המבחן טרם הושלם.{" "}
+        {t.notCompleted}{" "}
         <Link href={`/quiz/${id}`} className="text-primary hover:underline">
-          חזרה למבחן
+          {t.backToQuiz}
         </Link>
       </div>
     );
   }
+
+  // Translate question content for non-Hebrew locales
+  const questionTranslations = await Promise.all(
+    questions.map((q) =>
+      getTranslatedFields(
+        "Question",
+        String(q.id),
+        {
+          stem: q.stem,
+          optionA: q.optionA,
+          optionB: q.optionB,
+          optionC: q.optionC,
+          optionD: q.optionD,
+          chapterTitle: q.chapter.title,
+        },
+        locale
+      )
+    )
+  );
+  const tQuestion = new Map(questions.map((q, i) => [q.id, questionTranslations[i]]));
 
   const total = questions.length;
   const correct = [...attemptMap.values()].filter((a) => a.isCorrect).length;
@@ -84,6 +113,9 @@ export default async function QuizReviewPage({
     ? questions.filter((q) => !attemptMap.get(q.id)?.isCorrect)
     : questions;
 
+  const ChevronIcon = locale === "he" ? ChevronLeft : ChevronRight;
+  const ArrowIcon = locale === "he" ? ArrowRight : ArrowLeft;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -91,22 +123,22 @@ export default async function QuizReviewPage({
         <div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
             <Link href="/quizzes" className="hover:text-foreground transition-colors">
-              המבחנים שלי
+              {t.myQuizzes}
             </Link>
-            <ChevronLeft className="h-3.5 w-3.5" />
+            <ChevronIcon className="h-3.5 w-3.5" />
             <span className="text-foreground font-medium truncate max-w-[180px] sm:max-w-none">
               {quiz.name}
             </span>
           </div>
-          <h1 className="font-display text-2xl font-bold">סקירת תשובות</h1>
+          <h1 className="font-display text-2xl font-bold">{t.title}</h1>
           <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
             <span className="flex items-center gap-1 text-success font-medium">
               <CheckCircle2 className="h-4 w-4" />
-              {correct} נכונות
+              {t.correct(correct)}
             </span>
             <span className="flex items-center gap-1 text-destructive font-medium">
               <XCircle className="h-4 w-4" />
-              {wrongCount} שגויות
+              {t.wrong(wrongCount)}
             </span>
             <span>·</span>
             <span
@@ -118,7 +150,7 @@ export default async function QuizReviewPage({
                   : "text-destructive"
               }`}
             >
-              {accuracy}% דיוק
+              {t.accuracyPct(accuracy)}
             </span>
           </div>
         </div>
@@ -127,7 +159,7 @@ export default async function QuizReviewPage({
         <div className="flex items-center gap-2 self-start">
           {showWrongOnly ? (
             <Button asChild variant="ghost" size="sm" className="text-xs">
-              <Link href={`/quiz/${id}/review`}>הצג הכל ({total})</Link>
+              <Link href={`/quiz/${id}/review`}>{t.showAll(total)}</Link>
             </Button>
           ) : null}
           <Button
@@ -137,7 +169,7 @@ export default async function QuizReviewPage({
             className="text-xs"
           >
             <Link href={`/quiz/${id}/review${showWrongOnly ? "" : "?wrong=1"}`}>
-              {showWrongOnly ? "מסנן: שגיאות בלבד" : `שגיאות בלבד (${wrongCount})`}
+              {showWrongOnly ? t.filterWrongOnly : t.wrongOnlyToggle(wrongCount)}
             </Link>
           </Button>
         </div>
@@ -155,7 +187,7 @@ export default async function QuizReviewPage({
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            🎉 ענית נכון על כל השאלות!
+            {t.allCorrect}
           </CardContent>
         </Card>
       ) : (
@@ -164,7 +196,8 @@ export default async function QuizReviewPage({
             const attempt = attemptMap.get(q.id)!;
             const isBookmarked = bookmarkedIds.has(q.id);
             const displayIndex = showWrongOnly ? questions.indexOf(q) + 1 : i + 1;
-            const optionTexts = [q.optionA, q.optionB, q.optionC, q.optionD];
+            const qT = tQuestion.get(q.id)!;
+            const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
 
             return (
               <Card
@@ -178,32 +211,32 @@ export default async function QuizReviewPage({
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-mono text-muted-foreground shrink-0">
-                        שאלה {displayIndex}
+                        {t.questionN(displayIndex)}
                       </span>
                       <Badge variant="secondary" className="text-xs shrink-0">
-                        פרק {q.chapter.number}
+                        {t.chapterPrefix(q.chapter.number)}
                       </Badge>
                       <span className="text-xs text-muted-foreground hidden sm:block truncate">
-                        {q.chapter.title}
+                        {qT.chapterTitle}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {attempt.isCorrect ? (
                         <span className="flex items-center gap-1 text-xs font-semibold text-success">
                           <CheckCircle2 className="h-4 w-4" />
-                          נכון
+                          {t.correctBadge}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 text-xs font-semibold text-destructive">
                           <XCircle className="h-4 w-4" />
-                          שגוי
+                          {t.wrongBadge}
                         </span>
                       )}
                       <form action={toggleBookmarkAction}>
                         <input type="hidden" name="questionId" value={q.id} />
                         <button
                           type="submit"
-                          title={isBookmarked ? "הסר סימנייה" : "הוסף סימנייה"}
+                          title={isBookmarked ? t.removeBookmark : t.addBookmark}
                           className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors ${
                             isBookmarked
                               ? "text-amber-500 hover:text-amber-600"
@@ -215,7 +248,7 @@ export default async function QuizReviewPage({
                           ) : (
                             <Bookmark className="h-3.5 w-3.5" />
                           )}
-                          {isBookmarked ? "מסומן" : "סמן"}
+                          {isBookmarked ? t.bookmarked : t.bookmark}
                         </button>
                       </form>
                     </div>
@@ -224,7 +257,7 @@ export default async function QuizReviewPage({
 
                 <CardContent className="px-5 pb-5 space-y-4">
                   {/* Question stem */}
-                  <p className="font-display text-base leading-relaxed">{q.stem}</p>
+                  <p className="font-display text-base leading-relaxed">{qT.stem}</p>
 
                   {/* Answer options */}
                   <div className="space-y-2">
@@ -251,7 +284,7 @@ export default async function QuizReviewPage({
 
                       return (
                         <div key={k} className={rowClass}>
-                          <span className={letterClass}>{HEBREW_LETTERS[idx]}</span>
+                          <span className={letterClass}>{LETTERS[idx]}</span>
                           <span className="flex-1 leading-snug">{optionText}</span>
                           {isCorrectAnswer && (
                             <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
@@ -271,12 +304,12 @@ export default async function QuizReviewPage({
                       <details open={!attempt.isCorrect} className="group">
                         <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
                           <BookOpen className="h-3.5 w-3.5 shrink-0" />
-                          הסבר מפורט
+                          {t.detailedExplanation}
                           <span className="ms-auto text-muted-foreground font-normal group-open:hidden">
-                            ▼ פתח
+                            {t.openDetails}
                           </span>
                           <span className="ms-auto text-muted-foreground font-normal hidden group-open:block">
-                            ▲ סגור
+                            {t.closeDetails}
                           </span>
                         </summary>
                         <div className="mt-3">
@@ -292,6 +325,7 @@ export default async function QuizReviewPage({
                               { key: "D", text: q.optionD },
                             ]}
                             insufficientEvidence={q.geminiAnswer.insufficientEvidence}
+                            locale={locale}
                           />
                         </div>
                       </details>
@@ -308,12 +342,12 @@ export default async function QuizReviewPage({
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button asChild variant="outline" size="sm">
           <Link href="/quizzes" className="gap-2">
-            <ArrowRight className="h-3.5 w-3.5" />
-            כל המבחנים
+            <ArrowIcon className="h-3.5 w-3.5" />
+            {t.allQuizzes}
           </Link>
         </Button>
         <Button asChild size="sm">
-          <Link href="/study/new">מבחן חדש</Link>
+          <Link href="/study/new">{t.newQuiz}</Link>
         </Button>
       </div>
     </div>

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Stethoscope } from "lucide-react";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
 
 export default async function OnboardingPage() {
   const session = await auth();
@@ -19,6 +21,9 @@ export default async function OnboardingPage() {
   });
   if (dbUser?.residencyYear) redirect("/study");
 
+  const locale = await getLocale();
+  const t = getDictionary(locale).onboarding;
+
   return (
     <div className="mx-auto max-w-lg py-12 animate-fade-in">
       <div className="mb-6 flex items-center gap-3">
@@ -26,32 +31,32 @@ export default async function OnboardingPage() {
           <Stethoscope className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="font-display text-2xl font-bold">השלמת פרופיל</h1>
-          <p className="text-sm text-muted-foreground">נשמח להכיר! אנא מלאו את הפרטים כדי להתחיל.</p>
+          <h1 className="font-display text-2xl font-bold">{t.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>פרטים אישיים</CardTitle>
-          <CardDescription>פרטים אלו ישמשו לסטטיסטיקות ולהתאמת חוויית הלמידה.</CardDescription>
+          <CardTitle>{t.personalDetails}</CardTitle>
+          <CardDescription>{t.personalDetailsDesc}</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={saveProfileAction} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="fullName">שם מלא</Label>
+              <Label htmlFor="fullName">{t.fullName}</Label>
               <Input
                 id="fullName"
                 name="fullName"
                 type="text"
                 required
                 minLength={2}
-                placeholder="למשל: ישראל ישראלי"
+                placeholder={t.fullNamePlaceholder}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="hospitalName">שם בית החולים</Label>
+              <Label htmlFor="hospitalName">{t.hospitalName}</Label>
               <select
                 id="hospitalName"
                 name="hospitalName"
@@ -59,7 +64,7 @@ export default async function OnboardingPage() {
                 defaultValue=""
                 className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="" disabled>בחרו בית חולים</option>
+                <option value="" disabled>{t.hospitalPlaceholder}</option>
                 {HOSPITALS.map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
@@ -67,7 +72,7 @@ export default async function OnboardingPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="residencyYear">שנת רזידנסי</Label>
+              <Label htmlFor="residencyYear">{t.residencyYear}</Label>
               <select
                 id="residencyYear"
                 name="residencyYear"
@@ -75,16 +80,14 @@ export default async function OnboardingPage() {
                 defaultValue=""
                 className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="" disabled>בחרו שנה</option>
-                <option value="1">שנה א׳</option>
-                <option value="2">שנה ב׳</option>
-                <option value="3">שנה ג׳</option>
-                <option value="4">שנה ד׳</option>
-                <option value="5">שנה ה׳</option>
+                <option value="" disabled>{t.yearPlaceholder}</option>
+                {[1, 2, 3, 4, 5].map((y) => (
+                  <option key={y} value={y}>{t.yearLabels[y]}</option>
+                ))}
               </select>
             </div>
 
-            <Button type="submit" className="w-full">שמירה והמשך</Button>
+            <Button type="submit" className="w-full">{t.continue}</Button>
           </form>
         </CardContent>
       </Card>

@@ -5,28 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { signIn } from "@/lib/auth";
 import { BookOpen, BrainCircuit, TrendingUp } from "lucide-react";
-
-const FEATURES = [
-  {
-    icon: BookOpen,
-    title: "מבחנים מותאמים אישית",
-    description: "בחרו פרקים מתוך Miller's Anesthesia ובנו מבחן ממוקד לפי הצורך שלכם.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "הסברים מבוססי מקור",
-    description: "כל שאלה מגיעה עם הסבר מפורט המבוסס ישירות על תוכן הספר.",
-  },
-  {
-    icon: TrendingUp,
-    title: "מדד מועילות למידה",
-    description: "פרקים מדורגים לפי תועלת לימודית כדי שתוכלו להתמקד במה שחשוב.",
-  },
-];
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
 
 export default async function Home() {
   const session = await auth();
   if (session?.user) redirect("/study");
+
+  const locale = await getLocale();
+  const t = getDictionary(locale).home;
+
+  const FEATURES = [
+    { icon: BookOpen, title: t.feature1Title, description: t.feature1Desc },
+    { icon: BrainCircuit, title: t.feature2Title, description: t.feature2Desc },
+    { icon: TrendingUp, title: t.feature3Title, description: t.feature3Desc },
+  ];
 
   async function handleSignIn() {
     "use server";
@@ -44,7 +37,7 @@ export default async function Home() {
         <div className="mb-6 flex justify-center">
           <Image
             src="/icon.png"
-            alt="Perl"
+            alt={t.iconAlt}
             width={120}
             height={120}
             className="rounded-2xl shadow-2xl ring-1 ring-white/10"
@@ -52,20 +45,19 @@ export default async function Home() {
           />
         </div>
         <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-primary">
-          Perl · שלב א׳
+          {t.brandLine}
         </p>
         <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-          תרגלו אנסתזיה{" "}
-          <span className="text-primary">בחכמה</span>
+          {t.heroTitle}{" "}
+          <span className="text-primary">{t.heroTitleHighlight}</span>
         </h1>
         <p className="mt-5 text-lg text-muted-foreground">
-          פלטפורמת שאלות אמריקאיות מבוססת ספר, עם הסברים מפורטים ומדד מועילות
-          למידה — בנויה לרזידנטים בדרך לשלב א׳.
+          {t.heroSubtitle}
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <form action={handleSignIn}>
             <Button size="lg" className="gap-2 px-8 shadow-md" type="submit">
-              התחילו עכשיו — כניסה עם Google
+              {t.ctaSignIn}
             </Button>
           </form>
         </div>

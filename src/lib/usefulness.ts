@@ -40,3 +40,15 @@ export const TONE_LABEL: Record<UsefulnessTone, string> = {
   high:      "גבוה",
   "very-high": "גבוה מאוד",
 };
+
+export const TONE_LABEL_EN: Record<UsefulnessTone, string> = {
+  unrated:   "—",
+  low:       "Low",
+  medium:    "Medium",
+  high:      "High",
+  "very-high": "Very high",
+};
+
+export function toneLabel(tone: UsefulnessTone, locale: "he" | "en"): string {
+  return locale === "en" ? TONE_LABEL_EN[tone] : TONE_LABEL[tone];
+}

@@ -12,6 +12,7 @@ import {
   type BatchCostEstimate,
 } from "@/lib/pricing";
 import { hashQuestion } from "@/lib/rag/hash";
+import { invalidateTranslations } from "@/lib/translate";
 
 // ─── Types returned to the client ───────────────────────────────────────────
 
@@ -43,6 +44,15 @@ export async function runJobAction(jobId: number): Promise<RunJobResult> {
 
   // For REGENERATE jobs: delete the existing GeminiAnswer so generation runs fresh
   if (job.kind === "REGENERATE") {
+    // Invalidate translations of the old answer (their entityId becomes orphaned
+    // when a new GeminiAnswer row is inserted with a different autoincrement id).
+    const old = await db.geminiAnswer.findUnique({
+      where: { questionId: job.questionId },
+      select: { id: true },
+    });
+    if (old) {
+      await invalidateTranslations("GeminiAnswer", String(old.id));
+    }
     await db.geminiAnswer.deleteMany({ where: { questionId: job.questionId } });
   }
 

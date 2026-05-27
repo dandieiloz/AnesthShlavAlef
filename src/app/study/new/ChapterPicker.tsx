@@ -2,10 +2,13 @@
 import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { usefulnessTone, TONE_ROW_CLASS, TONE_DOT_CLASS, TONE_LABEL, TONE_BADGE_CLASS } from "@/lib/usefulness";
+import { usefulnessTone, TONE_ROW_CLASS, TONE_DOT_CLASS, toneLabel } from "@/lib/usefulness";
 import type { UsefulnessTone } from "@/lib/usefulness";
 import { Search, CheckSquare, Square } from "lucide-react";
+import type { Dictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/locale";
+
+type StudyNewT = Dictionary["studyNew"];
 
 interface ChapterRow {
   id: number;
@@ -29,10 +32,14 @@ export function ChapterPicker({
   chapters,
   preselected = [],
   onSelectedChaptersChange,
+  locale,
+  t,
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
   onSelectedChaptersChange?: (chapters: ChapterRow[]) => void;
+  locale: Locale;
+  t: StudyNewT;
 }) {
   const [query, setQuery] = useState("");
   const [toneFilter, setToneFilter] = useState<Set<UsefulnessTone>>(new Set());
@@ -97,11 +104,11 @@ export function ChapterPicker({
       <div className="relative">
         <Search className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
-          placeholder="חיפוש לפי מספר או כותרת…"
+          placeholder={t.searchPlaceholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="pe-9"
-          dir="rtl"
+          dir={locale === "he" ? "rtl" : "ltr"}
         />
       </div>
 
@@ -116,7 +123,7 @@ export function ChapterPicker({
               toneFilter.size > 0 && !toneFilter.has(tone) ? "opacity-35" : "opacity-100"
             }`}
           >
-            {TONE_LABEL[tone]}
+            {toneLabel(tone, locale)}
           </button>
         ))}
       </div>
@@ -126,28 +133,28 @@ export function ChapterPicker({
         <div className="flex gap-2">
           <button type="button" onClick={selectAllVisible} className="flex items-center gap-1 hover:text-foreground transition-colors">
             <CheckSquare className="h-3.5 w-3.5" />
-            בחר הכל
+            {t.selectAll}
           </button>
           <span>·</span>
           <button type="button" onClick={clearVisible} className="flex items-center gap-1 hover:text-foreground transition-colors">
             <Square className="h-3.5 w-3.5" />
-            נקה
+            {t.clear}
           </button>
         </div>
         <span>
           {selectedCount > 0 ? (
-            <span className="text-primary font-semibold">{selectedCount} נבחרו</span>
+            <span className="text-primary font-semibold">{t.selectedSuffix(selectedCount)}</span>
           ) : (
-            "לא נבחרו"
+            t.noneSelected
           )}
-          {" "}&middot; {visible.length} פרקים מוצגים
+          {" "}&middot; {t.shownChaptersSuffix(visible.length)}
         </span>
       </div>
 
       {/* Chapter list */}
       <div className="max-h-96 overflow-y-auto rounded-lg border divide-y divide-border">
         {visible.length === 0 ? (
-          <p className="p-4 text-center text-sm text-muted-foreground">לא נמצאו פרקים</p>
+          <p className="p-4 text-center text-sm text-muted-foreground">{t.noChaptersFound}</p>
         ) : (
           visible.map((c) => {
             const tone = usefulnessTone(c.learningUsefulnessIndex);

@@ -3,14 +3,18 @@
 import { useState, useTransition } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import { updateSiteContentAction } from "./actions";
+import type { Locale } from "@/lib/locale";
+import type { Dictionary } from "@/lib/i18n";
 
 interface EditableSectionProps {
   contentKey: string;
   value: string;
   isAdmin: boolean;
+  locale: Locale;
+  t: Dictionary["about"];
 }
 
-export function EditableSection({ contentKey, value, isAdmin }: EditableSectionProps) {
+export function EditableSection({ contentKey, value, isAdmin, locale, t }: EditableSectionProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [current, setCurrent] = useState(value);
@@ -35,8 +39,8 @@ export function EditableSection({ contentKey, value, isAdmin }: EditableSectionP
         <button
           onClick={() => setEditing(true)}
           className="absolute top-0 end-0 p-1.5 text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100 rounded"
-          title="ערוך קטע"
-          aria-label="ערוך קטע"
+          title={t.editTitle}
+          aria-label={t.editTitle}
         >
           <Pencil className="h-4 w-4" />
         </button>
@@ -49,7 +53,7 @@ export function EditableSection({ contentKey, value, isAdmin }: EditableSectionP
             onChange={(e) => setDraft(e.target.value)}
             rows={8}
             className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed resize-y min-h-[120px] focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
-            dir="rtl"
+            dir={locale === "he" ? "rtl" : "ltr"}
           />
           <div className="flex gap-2">
             <button
@@ -58,7 +62,7 @@ export function EditableSection({ contentKey, value, isAdmin }: EditableSectionP
               className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
               <Check className="h-3.5 w-3.5" />
-              {isPending ? "שומר..." : "שמור"}
+              {isPending ? t.saving : t.save}
             </button>
             <button
               onClick={handleCancel}
@@ -66,7 +70,7 @@ export function EditableSection({ contentKey, value, isAdmin }: EditableSectionP
               className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
             >
               <X className="h-3.5 w-3.5" />
-              ביטול
+              {t.cancel}
             </button>
           </div>
         </div>

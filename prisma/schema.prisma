@@ -52,6 +52,7 @@ model User {
   fullName       String?
   hospitalName   String?
   residencyYear  Int?
+  locale         String    @default("he")
 
   accounts      Account[]
   sessions      Session[]
@@ -287,6 +288,23 @@ model Bookmark {
 
   @@unique([userId, questionId])
   @@index([userId, createdAt])
+}
+
+/// Persistent translation cache. Source of truth is always Hebrew; English is machine-translated on demand.
+model Translation {
+  id           String   @id @default(cuid())
+  entityType   String   // e.g. "Question" | "GeminiAnswer" | "Chapter" | "SiteContent"
+  entityId     String   // stringified pk
+  field        String   // e.g. "stem" | "optionA" | "explanation" | "whyOthersWrong" | "title"
+  locale       String   // target locale, e.g. "en"
+  sourceHash   String   // sha256 of the Hebrew source text — stale when source changes
+  text         String   @db.Text
+  provider     String   @default("gemini") // "gemini" | "manual"
+  reviewed     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([entityType, entityId, field, locale])
+  @@index([entityType, entityId, locale])
 }
 
 model AnswerGenerationJob {

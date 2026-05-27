@@ -2,11 +2,13 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { TriangleAlert } from "lucide-react";
+import type { Dictionary } from "@/lib/i18n";
+
+type StudyNewT = Dictionary["studyNew"];
 
 const PRESETS = [10, 20, 50] as const;
 
-export function QuestionLimitPicker({ availableCount }: { availableCount?: number }) {
-  // null = "הכל" (unlimited)
+export function QuestionLimitPicker({ availableCount, t }: { availableCount?: number; t: StudyNewT }) {
   const [limit, setLimit] = useState<number | null>(10);
   const [custom, setCustom] = useState("");
 
@@ -36,7 +38,6 @@ export function QuestionLimitPicker({ availableCount }: { availableCount?: numbe
 
   const hasAvailable = availableCount !== undefined && availableCount > 0;
   const overLimit = !isAll && limit !== null && hasAvailable && limit > availableCount!;
-  // Effective value actually submitted — capped to what's available
   const effectiveLimit = overLimit ? availableCount! : limit;
 
   return (
@@ -65,27 +66,25 @@ export function QuestionLimitPicker({ availableCount }: { availableCount?: numbe
               : "border-border bg-background text-foreground hover:border-primary/60"
           }`}
         >
-          הכל
+          {t.allLimit}
         </button>
         <Input
           type="number"
           min={1}
-          placeholder="מספר מותאם"
+          placeholder={t.customLimit}
           value={custom}
           onChange={handleCustomChange}
           className={`w-32 text-sm ${isCustomActive ? "border-primary ring-1 ring-primary" : ""}`}
           dir="ltr"
         />
       </div>
-      {/* Warning when limit exceeds available questions */}
       {overLimit && (
         <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
           <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-          יש רק {availableCount} שאלות זמינות בפרקים שנבחרו. המבחן יכלול {availableCount} שאלות.
+          {t.overLimit(availableCount!)}
         </p>
       )}
 
-      {/* Hidden field submitted with the form — capped to available */}
       {effectiveLimit !== null && (
         <input type="hidden" name="questionLimit" value={effectiveLimit} />
       )}

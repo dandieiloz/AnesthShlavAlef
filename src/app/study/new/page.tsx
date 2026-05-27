@@ -4,8 +4,11 @@ import { createQuizAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QuizConfigSection } from "./QuizConfigSection";
-import { PlusCircle, ArrowRight } from "lucide-react";
+import { PlusCircle, ArrowRight, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
+import { getTranslatedFields } from "@/lib/translate";
 
 export default async function NewQuizPage({
   searchParams,
@@ -16,6 +19,10 @@ export default async function NewQuizPage({
   const { chapter } = await searchParams;
   const preselectedChapter = chapter ? Number(chapter) : null;
 
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const t = dict.studyNew;
+
   const chapters = await db.chapter.findMany({
     orderBy: { number: "asc" },
     include: {
@@ -23,10 +30,16 @@ export default async function NewQuizPage({
     },
   });
 
-  const rows = chapters.map((c) => ({
+  const titles = await Promise.all(
+    chapters.map((c) =>
+      getTranslatedFields("Chapter", String(c.id), { title: c.title }, locale)
+    )
+  );
+
+  const rows = chapters.map((c, i) => ({
     id: c.id,
     number: c.number,
-    title: c.title,
+    title: titles[i].title,
     learningUsefulnessIndex: c.learningUsefulnessIndex,
     questionCount: c._count.questions,
   }));
@@ -38,6 +51,8 @@ export default async function NewQuizPage({
     if (found) preselected.push(found.id);
   }
 
+  const BackIcon = locale === "he" ? ArrowRight : ArrowLeft;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
@@ -45,27 +60,25 @@ export default async function NewQuizPage({
           href="/study"
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowRight className="h-4 w-4" />
-          חזרה ללימוד
+          <BackIcon className="h-4 w-4" />
+          {t.backToStudy}
         </Link>
       </div>
 
       <div>
-        <h1 className="font-display text-2xl font-bold">בנו מבחן מותאם</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          בחרו פרקים, שמו למבחן, והתחילו.
-        </p>
+        <h1 className="font-display text-2xl font-bold">{t.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
 
       <Card>
         <CardContent className="pt-6">
           <form action={createQuizAction} className="space-y-6">
             {/* Chapter picker, question limit, and auto-named quiz name */}
-            <QuizConfigSection chapters={rows} preselected={preselected} />
+            <QuizConfigSection chapters={rows} preselected={preselected} locale={locale} t={t} />
 
             <Button type="submit" className="w-full gap-2" size="lg">
               <PlusCircle className="h-4 w-4" />
-              צרו מבחן
+              {t.createQuiz}
             </Button>
           </form>
         </CardContent>

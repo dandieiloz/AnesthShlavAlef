@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { LocaleToggle } from "@/components/LocaleToggle";
 
 interface NavUser {
   name?: string | null;
@@ -27,17 +28,32 @@ interface SiteHeaderClientProps {
   user?: NavUser;
   signInAction: () => Promise<void>;
   signOutAction: () => Promise<void>;
+  locale: "he" | "en";
+  nav: {
+    study: string;
+    myQuizzes: string;
+    bookmarks: string;
+    dashboard: string;
+    about: string;
+    admin: string;
+    profile: string;
+    signIn: string;
+    signOut: string;
+    adminBadge: string;
+  };
 }
 
 import { Info } from "lucide-react";
 
-const NAV_LINKS = [
-  { href: "/study",     label: "לימוד",          icon: BookOpen },
-  { href: "/quizzes",   label: "המבחנים שלי",     icon: ListChecks },
-  { href: "/bookmarks", label: "סימניות",          icon: Bookmark },
-  { href: "/dashboard", label: "סטטיסטיקה",       icon: LayoutDashboard },
-  { href: "/about",     label: "עלינו",           icon: Info },
-];
+function buildNavLinks(nav: SiteHeaderClientProps["nav"]) {
+  return [
+    { href: "/study",     label: nav.study,      icon: BookOpen },
+    { href: "/quizzes",   label: nav.myQuizzes,  icon: ListChecks },
+    { href: "/bookmarks", label: nav.bookmarks,  icon: Bookmark },
+    { href: "/dashboard", label: nav.dashboard,  icon: LayoutDashboard },
+    { href: "/about",     label: nav.about,      icon: Info },
+  ];
+}
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -56,7 +72,8 @@ function NavLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ user, signInAction, signOutAction, locale, nav }: SiteHeaderClientProps) {
+  const NAV_LINKS = buildNavLinks(nav);
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
@@ -74,12 +91,13 @@ export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHead
                 <NavLink key={l.href} href={l.href} label={l.label} />
               ))}
               {user.role === "ADMIN" && (
-                <NavLink href="/admin" label="ניהול" />
+                <NavLink href="/admin" label={nav.admin} />
               )}
             </nav>
           )}
 
           <ThemeToggle />
+          <LocaleToggle current={locale} />
 
           {user ? (
             <DropdownMenu>
@@ -99,7 +117,7 @@ export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHead
                   <div className="flex flex-col gap-1">
                     <p className="text-sm font-medium">{user.name}</p>
                     {user.role === "ADMIN" && (
-                      <Badge variant="secondary" className="w-fit text-xs">מנהל</Badge>
+                      <Badge variant="secondary" className="w-fit text-xs">{nav.adminBadge}</Badge>
                     )}
                   </div>
                 </DropdownMenuLabel>
@@ -117,14 +135,14 @@ export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHead
                     <DropdownMenuItem asChild>
                       <Link href="/admin" className="flex items-center gap-2 cursor-pointer">
                         <Settings className="h-4 w-4" />
-                        ניהול
+                        {nav.admin}
                       </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem asChild>
                     <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
                       <User className="h-4 w-4" />
-                      פרופיל
+                      {nav.profile}
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
@@ -133,7 +151,7 @@ export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHead
                   <form action={signOutAction} className="w-full">
                     <button type="submit" className="flex w-full items-center gap-2 text-destructive">
                       <LogOut className="h-4 w-4" />
-                      יציאה
+                      {nav.signOut}
                     </button>
                   </form>
                 </DropdownMenuItem>
@@ -142,7 +160,7 @@ export function SiteHeaderClient({ user, signInAction, signOutAction }: SiteHead
           ) : (
             <form action={signInAction}>
               <Button type="submit" size="sm" className="gap-2">
-                כניסה עם Google
+                {nav.signIn}
               </Button>
             </form>
           )}

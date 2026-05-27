@@ -5,14 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, TONE_LABEL } from "@/lib/usefulness";
+import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/lib/usefulness";
 import { getActivityHeatmap, getAccuracyOverTime, getCurrentStreak } from "@/lib/activity";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { AccuracyTrend } from "@/components/charts/AccuracyTrend";
 import { Target, CheckCircle2, TrendingUp, BookOpen, Flame, Bookmark, ArrowLeft } from "lucide-react";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
+import { getTranslatedFields } from "@/lib/translate";
 
 export default async function Dashboard() {
   const me = await requireCompletedProfile();
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const t = dict.dashboard;
 
   const [attempts, heatmapData, recentBookmarks] = await Promise.all([
     db.attempt.findMany({
@@ -62,6 +68,24 @@ export default async function Dashboard() {
   const streak = getCurrentStreak(heatmapData);
   const trendData = getAccuracyOverTime(heatmapData);
 
+  // translate per-chapter titles
+  const chapterEntries = [...byChapter.entries()].sort((a, b) => a[0] - b[0]);
+  const chapterTitleTranslations = await Promise.all(
+    chapterEntries.map(([num, r]) =>
+      getTranslatedFields("Chapter", `n:${num}`, { title: r.title }, locale),
+    ),
+  );
+  const bookmarkTranslations = await Promise.all(
+    recentBookmarks.map((b) =>
+      getTranslatedFields(
+        "Question",
+        String(b.question.id),
+        { stem: b.question.stem, chapterTitle: b.question.chapter.title },
+        locale,
+      ),
+    ),
+  );
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
@@ -92,14 +116,14 @@ export default async function Dashboard() {
         {/* Activity heatmap */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">פעילות 120 ימים אחרונים</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t.activity120}</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {heatmapData.some((d) => d.count > 0) ? (
               <ActivityHeatmap data={heatmapData} />
             ) : (
               <p className="text-xs text-muted-foreground py-4 text-center">
-                עדיין אין פעילות. <Link href="/study/new" className="text-primary hover:underline">התחל מבחן</Link>
+                {t.noActivity} <Link href="/study/new" className="text-primary hover:underline">{t.startQuiz}</Link>
               </p>
             )}
           </CardContent>
@@ -111,11 +135,11 @@ export default async function Dashboard() {
             <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Bookmark className="h-3.5 w-3.5" />
-                שאלות שסומנו
+                {t.bookmarksHeader}
               </span>
               {recentBookmarks.length > 0 && (
                 <Link href="/bookmarks" className="flex items-center gap-1 text-xs hover:text-foreground transition-colors">
-                  כל הסימניות
+                  {t.allBookmarks}
                   <ArrowLeft className="h-3 w-3" />
                 </Link>
               )}
@@ -124,16 +148,16 @@ export default async function Dashboard() {
           <CardContent>
             {recentBookmarks.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-4">
-                סמן שאלות במהלך מבחן כדי שיופיעו כאן
+                {t.bookmarksHint}
               </p>
             ) : (
               <ul className="space-y-2">
-                {recentBookmarks.map((b) => (
+                {recentBookmarks.map((b, i) => (
                   <li key={b.id}>
                     <Link href={`/quiz`} className="block rounded-md px-2 py-1.5 text-xs hover:bg-muted transition-colors">
-                      <p className="font-medium line-clamp-2">{b.question.stem}</p>
+                      <p className="font-medium line-clamp-2">{bookmarkTranslations[i].stem}</p>
                       <p className="text-muted-foreground mt-0.5">
-                        פרק {b.question.chapter.number} — {b.question.chapter.title}
+                        {dict.common.chapter} {b.question.chapter.number} — {bookmarkTranslations[i].chapterTitle}
                       </p>
                     </Link>
                   </li>
@@ -149,7 +173,7 @@ export default async function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              דיוק גלגולי (חלון 7 ימים)
+              {t.rollingAccuracy}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -157,7 +181,7 @@ export default async function Dashboard() {
             <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4 border-t border-dashed border-success/60" />
-                70% יעד
+                {t.target70}
               </span>
               <span className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4 border-t border-dashed border-warning/60" />
@@ -170,13 +194,13 @@ export default async function Dashboard() {
 
       {/* Per-chapter table */}
       <div className="space-y-3">
-        <h2 className="font-display text-lg font-semibold">פילוח לפי פרק</h2>
+        <h2 className="font-display text-lg font-semibold">{t.byChapter}</h2>
 
         {byChapter.size === 0 ? (
           <Card>
             <CardContent className="pt-6 text-center text-sm text-muted-foreground">
-              עדיין אין נתונים.{" "}
-              <Link href="/study/new" className="text-primary hover:underline">התחילו מבחן</Link>.
+              {t.noData}
+              <Link href="/study/new" className="text-primary hover:underline">{t.startQuiz}</Link>.
             </CardContent>
           </Card>
         ) : (
@@ -184,25 +208,24 @@ export default async function Dashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">פרק</TableHead>
-                  <TableHead>כותרת</TableHead>
-                  <TableHead className="w-20 text-center">ניסיונות</TableHead>
-                  <TableHead className="w-20 text-center">נכון</TableHead>
-                  <TableHead className="w-24 text-center">דיוק</TableHead>
-                  <TableHead className="w-32 text-center">מועילות</TableHead>
+                  <TableHead className="w-12 text-center">{t.chapterCol}</TableHead>
+                  <TableHead>{t.titleCol}</TableHead>
+                  <TableHead className="w-20 text-center">{t.attemptsCol}</TableHead>
+                  <TableHead className="w-20 text-center">{t.correctCol}</TableHead>
+                  <TableHead className="w-24 text-center">{t.accuracyCol}</TableHead>
+                  <TableHead className="w-32 text-center">{t.usefulnessCol}</TableHead>
                   <TableHead className="w-20 text-center" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...byChapter.entries()]
-                  .sort((a, b) => a[0] - b[0])
-                  .map(([num, r]) => {
+                {chapterEntries
+                  .map(([num, r], i) => {
                     const tone = usefulnessTone(r.learningUsefulnessIndex);
                     const pct = Math.round((r.correct / r.total) * 100);
                     return (
                       <TableRow key={num} className={TONE_ROW_CLASS[tone]}>
                         <TableCell className="text-center font-mono text-sm font-medium">{num}</TableCell>
-                        <TableCell className="font-medium">{r.title}</TableCell>
+                        <TableCell className="font-medium">{chapterTitleTranslations[i].title}</TableCell>
                         <TableCell className="text-center text-muted-foreground">{r.total}</TableCell>
                         <TableCell className="text-center text-muted-foreground">{r.correct}</TableCell>
                         <TableCell className="text-center">
@@ -220,7 +243,7 @@ export default async function Dashboard() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge className={`text-xs ${TONE_BADGE_CLASS[tone]}`}>
-                            {TONE_LABEL[tone]}
+                            {toneLabel(tone, locale)}
                             {r.learningUsefulnessIndex !== null && (
                               <span className="opacity-60 ms-1">({r.learningUsefulnessIndex})</span>
                             )}
@@ -228,7 +251,7 @@ export default async function Dashboard() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Button asChild variant="ghost" size="sm" className="h-6 text-xs text-primary">
-                            <Link href={`/study/new?chapter=${num}`}>תרגל</Link>
+                            <Link href={`/study/new?chapter=${num}`}>{dict.common.practice}</Link>
                           </Button>
                         </TableCell>
                       </TableRow>

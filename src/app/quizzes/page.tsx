@@ -6,9 +6,13 @@ import { PlusCircle } from "lucide-react";
 import { getQuizProgressMany } from "@/lib/quiz-progress";
 import { QuizzesClient } from "./QuizzesClient";
 import type { QuizRow } from "./QuizzesClient";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
 
 export default async function QuizzesPage() {
   const me = await requireCompletedProfile();
+  const locale = await getLocale();
+  const t = getDictionary(locale).quizzes;
 
   const quizzes = await db.quiz.findMany({
     where: { userId: me.id },
@@ -34,36 +38,34 @@ export default async function QuizzesPage() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in" dir="rtl">
+    <div className="space-y-6 animate-fade-in" dir={locale === "he" ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold">המבחנים שלי</h1>
+          <h1 className="font-display text-2xl font-bold">{t.title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {quizzes.length === 0
-              ? "עדיין אין מבחנים."
-              : `${quizzes.length} ${quizzes.length === 1 ? "מבחן" : "מבחנים"} בסך הכל`}
+            {quizzes.length === 0 ? t.empty : t.countSuffix(quizzes.length)}
           </p>
         </div>
         <Button asChild size="sm" className="gap-1.5">
           <Link href="/study/new">
             <PlusCircle className="h-3.5 w-3.5" />
-            מבחן חדש
+            {t.newQuiz}
           </Link>
         </Button>
       </div>
 
       {quizzes.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-16 text-center">
-          <p className="text-muted-foreground text-sm">עדיין לא יצרת מבחנים.</p>
+          <p className="text-muted-foreground text-sm">{t.emptyShort}</p>
           <Button asChild>
             <Link href="/study/new">
               <PlusCircle className="h-4 w-4 me-1.5" />
-              בנה מבחן ראשון
+              {t.createFirst}
             </Link>
           </Button>
         </div>
       ) : (
-        <QuizzesClient quizzes={rows} />
+        <QuizzesClient quizzes={rows} locale={locale} t={t} />
       )}
     </div>
   );

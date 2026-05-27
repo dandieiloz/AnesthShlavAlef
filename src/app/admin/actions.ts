@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { redirect } from "next/navigation";
+import { invalidateTranslations } from "@/lib/translate";
 
 const QuestionSchema = z.object({
   id: z.coerce.number().optional(),
@@ -39,6 +40,11 @@ export async function saveQuestionAction(formData: FormData) {
   if (!chapter) throw new Error("Chapter not found");
 
   if (data.id) {
+    // Fetch existing values so we only invalidate translations for fields that actually changed.
+    const existing = await db.question.findUnique({
+      where: { id: data.id },
+      select: { stem: true, optionA: true, optionB: true, optionC: true, optionD: true },
+    });
     await db.question.update({
       where: { id: data.id },
       data: {
@@ -51,6 +57,17 @@ export async function saveQuestionAction(formData: FormData) {
         source: data.source ?? null,
       },
     });
+    if (existing) {
+      const changed: string[] = [];
+      if (existing.stem !== data.stem) changed.push("stem");
+      if (existing.optionA !== data.optionA) changed.push("optionA");
+      if (existing.optionB !== data.optionB) changed.push("optionB");
+      if (existing.optionC !== data.optionC) changed.push("optionC");
+      if (existing.optionD !== data.optionD) changed.push("optionD");
+      if (changed.length > 0) {
+        await invalidateTranslations("Question", String(data.id), changed);
+      }
+    }
     revalidatePath(`/admin/questions/${data.id}`);
     redirect(`/admin/questions/${data.id}`);
   } else {
@@ -107,8 +124,16 @@ export async function regenerateExplanationAction(questionId: number) {
 
 export async function deleteQuestionAction(questionId: number) {
   await requireAdmin();
-  const q = await db.question.findUnique({ where: { id: questionId }, include: { chapter: true } });
+  const q = await db.question.findUnique({
+    where: { id: questionId },
+    include: { chapter: true, geminiAnswer: { select: { id: true } } },
+  });
   if (!q) return;
+  // Remove cached translations for the question and its answer (FK cascade only handles app data).
+  await invalidateTranslations("Question", String(questionId));
+  if (q.geminiAnswer) {
+    await invalidateTranslations("GeminiAnswer", String(q.geminiAnswer.id));
+  }
   await db.question.delete({ where: { id: questionId } });
   redirect(`/admin/chapters/${q.chapter.number}/questions`);
 }

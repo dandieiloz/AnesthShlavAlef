@@ -4,6 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ChapterPicker } from "./ChapterPicker";
 import { QuestionLimitPicker } from "./QuestionLimitPicker";
+import type { Dictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/locale";
+
+type StudyNewT = Dictionary["studyNew"];
 
 interface ChapterRow {
   id: number;
@@ -13,21 +17,25 @@ interface ChapterRow {
   questionCount: number;
 }
 
-function buildAutoName(chapters: ChapterRow[]): string {
-  if (chapters.length === 0) return "מבחן שלי";
+function buildAutoName(chapters: ChapterRow[], t: StudyNewT): string {
+  if (chapters.length === 0) return t.defaultName;
   const sorted = [...chapters].sort((a, b) => a.number - b.number);
   const nums = sorted.map((c) => c.number);
-  if (nums.length === 1) return `פרק ${nums[0]}`;
-  if (nums.length === 2) return `פרק ${nums[0]} + פרק ${nums[1]}`;
-  return `פרקים ${nums.join(", ")}`;
+  if (nums.length === 1) return t.singleChapter(nums[0]);
+  if (nums.length === 2) return t.twoChapters(nums[0], nums[1]);
+  return t.multipleChapters(nums);
 }
 
 export function QuizConfigSection({
   chapters,
   preselected = [],
+  locale,
+  t,
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
+  locale: Locale;
+  t: StudyNewT;
 }) {
   const initialSelected = chapters.filter((c) => preselected.includes(c.id));
   const [selectedChapters, setSelectedChapters] = useState<ChapterRow[]>(initialSelected);
@@ -35,41 +43,44 @@ export function QuizConfigSection({
   const [nameValue, setNameValue] = useState("");
 
   const availableCount = selectedChapters.reduce((sum, c) => sum + c.questionCount, 0);
-  const autoName = buildAutoName(selectedChapters);
+  const autoName = buildAutoName(selectedChapters, t);
   const displayName = nameTouched ? nameValue : autoName;
 
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setNameValue(val);
-    // Clear touch when user empties the field so auto-name resumes
     setNameTouched(val !== "");
   }
+
+  const dir = locale === "he" ? "rtl" : "ltr";
 
   return (
     <>
       <div className="space-y-2">
-        <Label>בחרו פרקים</Label>
+        <Label>{t.chooseChapters}</Label>
         <ChapterPicker
           chapters={chapters}
           preselected={preselected}
           onSelectedChaptersChange={setSelectedChapters}
+          locale={locale}
+          t={t}
         />
       </div>
 
       <div className="space-y-2">
-        <Label>מספר שאלות למבחן</Label>
-        <QuestionLimitPicker availableCount={availableCount} />
+        <Label>{t.questionCount}</Label>
+        <QuestionLimitPicker availableCount={availableCount} t={t} />
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="quiz-name">שם המבחן</Label>
+        <Label htmlFor="quiz-name">{t.quizName}</Label>
         <Input
           id="quiz-name"
           name="name"
           value={displayName}
           onChange={handleNameChange}
           maxLength={80}
-          dir="rtl"
+          dir={dir}
         />
       </div>
     </>

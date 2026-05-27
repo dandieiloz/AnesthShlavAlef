@@ -12,6 +12,9 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, XCircle, ArrowRight, BarChart2, MessageSquare, Flag, Bookmark, BookmarkCheck, ClipboardList } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { getLocale } from "@/lib/locale";
+import { getTranslatedFields } from "@/lib/translate";
+import { getDictionary } from "@/lib/i18n";
 
 const HEBREW_LETTERS = ["א", "ב", "ג", "ד"];
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
@@ -21,6 +24,9 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const quiz = await db.quiz.findFirst({ where: { id: Number(id), userId: me.id } });
   if (!quiz) notFound();
+
+  const locale = await getLocale();
+  const t = getDictionary(locale).quiz;
 
   const answeredIds = (
     await db.attempt.findMany({
@@ -60,29 +66,25 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
           <CheckCircle2 className="h-8 w-8 text-success" />
         </div>
-        <h1 className="font-display text-3xl font-bold">סיימת את המבחן!</h1>
+        <h1 className="font-display text-3xl font-bold">{t.finishedTitle}</h1>
         <p className="mt-3 text-muted-foreground">
-          ענית נכון על{" "}
-          <span className="font-semibold text-foreground">{correct}</span>{" "}
-          מתוך{" "}
-          <span className="font-semibold text-foreground">{answeredIds.length}</span>{" "}
-          שאלות ({accuracyPct}%).
+          {t.finishedSummary(correct, answeredIds.length, accuracyPct)}
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button asChild size="lg">
             <Link href={`/quiz/${id}/review`} className="gap-2">
               <ClipboardList className="h-4 w-4" />
-              סקירת תשובות
+              {t.reviewAnswers}
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
             <Link href="/dashboard" className="gap-2">
               <BarChart2 className="h-4 w-4" />
-              לסטטיסטיקה
+              {t.backToStats}
             </Link>
           </Button>
           <Button asChild variant="ghost" size="lg">
-            <Link href="/study/new">מבחן חדש</Link>
+            <Link href="/study/new">{t.newQuiz}</Link>
           </Button>
         </div>
       </div>
@@ -102,6 +104,38 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   const justAnswered = lastAttempt && lastAttempt.questionId === next.id;
   const isBookmarked = !!bookmark;
 
+  // ── Translation ───────────────────────────────────────────────────────────────
+  const qId = String(next.id);
+
+  const [qFields, ansFields] = await Promise.all([
+    getTranslatedFields(
+      "Question",
+      qId,
+      { stem: next.stem, optionA: next.optionA, optionB: next.optionB, optionC: next.optionC, optionD: next.optionD },
+      locale,
+    ),
+    next.geminiAnswer
+      ? getTranslatedFields(
+          "GeminiAnswer",
+          String(next.geminiAnswer.id),
+          { explanation: next.geminiAnswer.explanation, whyOthersWrong: next.geminiAnswer.whyOthersWrong },
+          locale,
+        )
+      : Promise.resolve({ explanation: "", whyOthersWrong: "" }),
+  ]);
+
+  // Merge translated text back — Hebrew remains the source of truth, we just shadow for rendering
+  const display = {
+    stem: qFields.stem,
+    optionA: qFields.optionA,
+    optionB: qFields.optionB,
+    optionC: qFields.optionC,
+    optionD: qFields.optionD,
+    explanation: ansFields.explanation || next.geminiAnswer?.explanation || "",
+    whyOthersWrong: ansFields.whyOthersWrong || next.geminiAnswer?.whyOthersWrong || "",
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="grid gap-6 md:grid-cols-3">
       <div className="md:col-span-2 space-y-5">
@@ -109,7 +143,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{quiz.name}</span>
-            <span>{answeredIds.length} / {totalQ} שאלות · {correct} נכונות</span>
+            <span>{t.progress(answeredIds.length, totalQ, correct)}</span>
           </div>
           <Progress value={progressPct} className="h-1.5" />
         </div>
@@ -117,14 +151,14 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         {/* Chapter pill + bookmark */}
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
-            פרק {next.chapter.number}
+            {getDictionary(locale).common.chapter} {next.chapter.number}
           </Badge>
           <span className="text-xs text-muted-foreground flex-1">{next.chapter.title}</span>
           <form action={toggleBookmarkAction}>
             <input type="hidden" name="questionId" value={next.id} />
             <button
               type="submit"
-              title={isBookmarked ? "הסר סימנייה" : "הוסף סימנייה"}
+              title={isBookmarked ? t.removeBookmark : t.addBookmark}
               className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors ${
                 isBookmarked
                   ? "text-amber-500 hover:text-amber-600"
@@ -136,7 +170,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
               ) : (
                 <Bookmark className="h-3.5 w-3.5" />
               )}
-              {isBookmarked ? "מסומן" : "סמן"}
+              {isBookmarked ? t.bookmarked : t.bookmark}
             </button>
           </form>
         </div>
@@ -144,9 +178,9 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         {/* Question card */}
         <Card>
           <CardContent className="pt-6 space-y-5">
-            <p className="font-display text-lg leading-relaxed">{next.stem}</p>
+            <p className="font-display text-lg leading-relaxed">{display.stem}</p>
             {next.source && (
-              <p className="text-xs text-muted-foreground">מקור: {next.source}</p>
+              <p className="text-xs text-muted-foreground">{t.source}: {next.source}</p>
             )}
 
             <form action={submitAttemptAction} className="space-y-3">
@@ -163,13 +197,13 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
                     {HEBREW_LETTERS[i]}
                   </span>
                   <span className="flex-1 leading-snug pt-0.5">
-                    {next[`option${k}` as const]}
+                    {display[`option${k}` as "optionA" | "optionB" | "optionC" | "optionD"]}
                   </span>
                 </label>
               ))}
 
               <Button type="submit" className="w-full mt-1" size="lg">
-                שלח תשובה
+                {t.submitAnswer}
               </Button>
             </form>
           </CardContent>
@@ -201,16 +235,16 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
               </div>
               <div className="flex-1 space-y-1.5">
                 <p className={`font-display text-lg font-bold leading-tight ${lastAttempt.isCorrect ? "text-success" : "text-destructive"}`}>
-                  {lastAttempt.isCorrect ? "תשובה נכונה!" : "תשובה שגויה"}
+                  {lastAttempt.isCorrect ? t.correct : t.incorrect}
                 </p>
                 <div className="flex items-start gap-2 flex-wrap">
-                  <span className="text-sm text-muted-foreground mt-0.5">התשובה הנכונה:</span>
+                  <span className="text-sm text-muted-foreground mt-0.5">{t.correctAnswerLabel}</span>
                   <span className="flex items-start gap-1.5">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-white text-[11px] font-bold mt-0.5">
                       {HEBREW_LETTERS[OPTION_KEYS.indexOf(next.geminiAnswer.correctAnswer as "A" | "B" | "C" | "D")]}
                     </span>
                     <span className="text-sm font-medium leading-snug">
-                      {next[`option${next.geminiAnswer.correctAnswer}` as "optionA" | "optionB" | "optionC" | "optionD"]}
+                      {display[`option${next.geminiAnswer.correctAnswer}` as "optionA" | "optionB" | "optionC" | "optionD"]}
                     </span>
                   </span>
                 </div>
@@ -222,17 +256,18 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
             {/* Explanation body */}
             <CardContent className="pt-5 pb-6 px-6 space-y-5">
               <AnswerExplanation
-                explanation={next.geminiAnswer.explanation}
+                explanation={display.explanation}
                 evidenceCitations={next.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
-                whyOthersWrong={next.geminiAnswer.whyOthersWrong}
+                whyOthersWrong={display.whyOthersWrong}
                 correctAnswer={next.geminiAnswer.correctAnswer}
                 options={[
-                  { key: "A", text: next.optionA },
-                  { key: "B", text: next.optionB },
-                  { key: "C", text: next.optionC },
-                  { key: "D", text: next.optionD },
+                  { key: "A", text: display.optionA },
+                  { key: "B", text: display.optionB },
+                  { key: "C", text: display.optionC },
+                  { key: "D", text: display.optionD },
                 ]}
                 insufficientEvidence={next.geminiAnswer.insufficientEvidence}
+                locale={locale}
               />
 
               <Separator className="opacity-50" />
@@ -241,7 +276,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
               <details className="group">
                 <summary className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors list-none">
                   <Flag className="h-3.5 w-3.5" />
-                  לדווח שהתשובה שגויה
+                  {t.reportButton}
                 </summary>
                 <form action={reportAnswerAction} className="mt-3 space-y-2">
                   <input type="hidden" name="questionId" value={next.id} />
@@ -250,12 +285,12 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
                     required
                     minLength={10}
                     rows={2}
-                    placeholder="הסבר/י מדוע התשובה שגויה"
+                    placeholder={t.reportPlaceholder}
                     className="text-sm"
                   />
                   <Button variant="outline" size="sm" type="submit" className="gap-2">
                     <Flag className="h-3.5 w-3.5" />
-                    שלח דיווח
+                    {t.sendReport}
                   </Button>
                 </form>
               </details>
@@ -268,16 +303,16 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       <aside className="space-y-3">
         <h2 className="font-display text-base font-semibold flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          הערות לשאלה
+          {t.comments}
         </h2>
 
         {next.comments.length === 0 ? (
-          <p className="text-xs text-muted-foreground">אין הערות עדיין.</p>
+          <p className="text-xs text-muted-foreground">{t.noComments}</p>
         ) : (
           <ul className="space-y-2">
             {next.comments.map((c) => (
               <li key={c.id}>
-                <CommentItem comment={c} meId={me.id} meRole={me.role} />
+                <CommentItem comment={c} meId={me.id} meRole={me.role} locale={locale} t={t} />
               </li>
             ))}
           </ul>
@@ -289,12 +324,12 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
             name="body"
             required
             rows={2}
-            placeholder="הוסיפו הערה לשאלה זו"
+            placeholder={t.writeComment}
             className="text-sm"
           />
           <Button variant="secondary" size="sm" type="submit" className="w-full gap-2">
             <ArrowRight className="h-3.5 w-3.5" />
-            פרסם הערה
+            {t.postComment}
           </Button>
         </form>
       </aside>

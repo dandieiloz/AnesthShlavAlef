@@ -2,6 +2,9 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { EditableSection } from "./AboutEditor";
 import { Pencil } from "lucide-react";
+import { getLocale } from "@/lib/locale";
+import { getDictionary } from "@/lib/i18n";
+import { getTranslated } from "@/lib/translate";
 
 const CONTENT_KEYS = ["about_pearl", "about_yoni", "about_daniel"] as const;
 
@@ -18,6 +21,10 @@ export default async function AboutPage() {
   const user = session?.user as { role?: string } | undefined;
   const isAdmin = user?.role === "ADMIN";
 
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const t = dict.about;
+
   const rows = await db.siteContent.findMany({
     where: { key: { in: [...CONTENT_KEYS] } },
   });
@@ -27,6 +34,13 @@ export default async function AboutPage() {
     return contentMap[key] ?? DEFAULTS[key] ?? "";
   }
 
+  // Translate each section's body for non-Hebrew locales
+  const translated: Record<string, string> = {};
+  for (const key of CONTENT_KEYS) {
+    const src = get(key);
+    translated[key] = await getTranslated("SiteContent", key, "value", src, locale);
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-14 py-4">
 
@@ -34,14 +48,14 @@ export default async function AboutPage() {
       {isAdmin && (
         <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs text-primary">
           <Pencil className="h-3.5 w-3.5 shrink-0" />
-          <span>מצב עריכה מנהל — העבר עכבר על כל קטע לחשיפת כפתור העריכה</span>
+          <span>{t.adminHint}</span>
         </div>
       )}
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <div className="text-center space-y-2">
-        <h1 className="font-display text-5xl font-bold text-foreground tracking-tight">עלינו</h1>
-        <p className="text-muted-foreground text-base">הסיפור מאחורי פלטפורמת Perl</p>
+        <h1 className="font-display text-5xl font-bold text-foreground tracking-tight">{t.heroTitle}</h1>
+        <p className="text-muted-foreground text-base">{t.heroSubtitle}</p>
       </div>
 
       {/* ── Dr. Gisela Pearl ─────────────────────────────────── */}
@@ -53,13 +67,13 @@ export default async function AboutPage() {
           {/* Section header */}
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-primary/70">
-              על שם
+              {t.namedAfter}
             </p>
             <h2 className="font-display text-3xl font-bold text-foreground">
-              ד&quot;ר גיזלה פרל
+              {t.pearlName}
             </h2>
             <p className="text-sm text-muted-foreground">
-              1907–1988 &nbsp;·&nbsp; גינקולוגית &nbsp;·&nbsp; שורדת אושוויץ
+              {t.pearlMeta}
             </p>
           </div>
 
@@ -69,14 +83,16 @@ export default async function AboutPage() {
           {/* Body — editable */}
           <EditableSection
             contentKey="about_pearl"
-            value={get("about_pearl")}
+            value={translated.about_pearl}
             isAdmin={isAdmin}
+            locale={locale}
+            t={t}
           />
 
           {/* Pearl / Perl note */}
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
             <p className="text-xs text-primary/80 leading-relaxed">
-              <span className="font-semibold">Perl</span> — השם נושא שתי משמעויות: פרל, שמה של הרופאה, ו-<span className="font-semibold">Pearl</span> באנגלית — פנינה. שניהם הולמים פלטפורמה שנבנתה מתוך יראת כבוד עמוקה למקצוע.
+              {t.pearlNote}
             </p>
           </div>
         </div>
@@ -86,10 +102,10 @@ export default async function AboutPage() {
       <section className="space-y-6">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary/70">
-            הצוות שלנו
+            {t.teamEyebrow}
           </p>
           <h2 className="font-display text-3xl font-bold text-foreground">
-            המפתחים
+            {t.teamTitle}
           </h2>
         </div>
 
@@ -99,17 +115,19 @@ export default async function AboutPage() {
           <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-sm">
             <div className="space-y-0.5">
               <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 mb-2">
-                <span className="text-xs font-medium text-primary">מרדים</span>
+                <span className="text-xs font-medium text-primary">{t.anesthesiologist}</span>
               </div>
               <h3 className="font-display text-xl font-bold text-foreground">
-                ד&quot;ר יוני חלטניק
+                {t.yoniName}
               </h3>
             </div>
             <div className="h-px bg-border" />
             <EditableSection
               contentKey="about_yoni"
-              value={get("about_yoni")}
+              value={translated.about_yoni}
               isAdmin={isAdmin}
+              locale={locale}
+              t={t}
             />
           </div>
 
@@ -117,17 +135,19 @@ export default async function AboutPage() {
           <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-sm">
             <div className="space-y-0.5">
               <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 mb-2">
-                <span className="text-xs font-medium text-primary">מרדים</span>
+                <span className="text-xs font-medium text-primary">{t.anesthesiologist}</span>
               </div>
               <h3 className="font-display text-xl font-bold text-foreground">
-                ד&quot;ר דניאל רון אילוז
+                {t.danielName}
               </h3>
             </div>
             <div className="h-px bg-border" />
             <EditableSection
               contentKey="about_daniel"
-              value={get("about_daniel")}
+              value={translated.about_daniel}
               isAdmin={isAdmin}
+              locale={locale}
+              t={t}
             />
           </div>
 
