@@ -65,7 +65,7 @@ export default async function QuizzesPage() {
           </Button>
         </div>
       ) : (
-        <QuizzesClient quizzes={rows} locale={locale} t={t} />
+        <QuizzesClient quizzes={rows} locale={locale} />
       )}
     </div>
   );

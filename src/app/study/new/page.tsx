@@ -74,7 +74,7 @@ export default async function NewQuizPage({
         <CardContent className="pt-6">
           <form action={createQuizAction} className="space-y-6">
             {/* Chapter picker, question limit, and auto-named quiz name */}
-            <QuizConfigSection chapters={rows} preselected={preselected} locale={locale} t={t} />
+            <QuizConfigSection chapters={rows} preselected={preselected} locale={locale} />
 
             <Button type="submit" className="w-full gap-2" size="lg">
               <PlusCircle className="h-4 w-4" />

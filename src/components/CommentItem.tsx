@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Pencil, Trash2, X, Check } from "lucide-react";
 import { editCommentAction, deleteCommentAction } from "@/app/(user)/actions";
-import type { Dictionary } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
 
 type CommentUser = {
@@ -29,10 +29,10 @@ type Props = {
   meId: string;
   meRole: "USER" | "ADMIN";
   locale: Locale;
-  t: Dictionary["quiz"];
 };
 
-export function CommentItem({ comment: c, meId, meRole, locale, t }: Props) {
+export function CommentItem({ comment: c, meId, meRole, locale }: Props) {
+  const t = getDictionary(locale).quiz;
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 

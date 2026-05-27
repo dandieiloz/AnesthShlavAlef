@@ -312,7 +312,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
           <ul className="space-y-2">
             {next.comments.map((c) => (
               <li key={c.id}>
-                <CommentItem comment={c} meId={me.id} meRole={me.role} locale={locale} t={t} />
+                <CommentItem comment={c} meId={me.id} meRole={me.role} locale={locale} />
               </li>
             ))}
           </ul>

@@ -5,10 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { usefulnessTone, TONE_ROW_CLASS, TONE_DOT_CLASS, toneLabel } from "@/lib/usefulness";
 import type { UsefulnessTone } from "@/lib/usefulness";
 import { Search, CheckSquare, Square } from "lucide-react";
-import type { Dictionary } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
-
-type StudyNewT = Dictionary["studyNew"];
 
 interface ChapterRow {
   id: number;
@@ -33,14 +31,13 @@ export function ChapterPicker({
   preselected = [],
   onSelectedChaptersChange,
   locale,
-  t,
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
   onSelectedChaptersChange?: (chapters: ChapterRow[]) => void;
   locale: Locale;
-  t: StudyNewT;
 }) {
+  const t = getDictionary(locale).studyNew;
   const [query, setQuery] = useState("");
   const [toneFilter, setToneFilter] = useState<Set<UsefulnessTone>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set(preselected));

@@ -2,13 +2,13 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { TriangleAlert } from "lucide-react";
-import type { Dictionary } from "@/lib/i18n";
-
-type StudyNewT = Dictionary["studyNew"];
+import { getDictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/locale";
 
 const PRESETS = [10, 20, 50] as const;
 
-export function QuestionLimitPicker({ availableCount, t }: { availableCount?: number; t: StudyNewT }) {
+export function QuestionLimitPicker({ availableCount, locale }: { availableCount?: number; locale: Locale }) {
+  const t = getDictionary(locale).studyNew;
   const [limit, setLimit] = useState<number | null>(10);
   const [custom, setCustom] = useState("");
 

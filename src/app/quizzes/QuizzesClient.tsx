@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { deleteQuizAction } from "@/app/(user)/actions";
 import { CheckCircle2, Clock, Trash2, Play, BookOpen } from "lucide-react";
+import { getDictionary, type Dictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/locale";
 
 export interface QuizRow {
   id: number;
@@ -31,29 +33,7 @@ export interface QuizRow {
   lastActivityAt: string | null;
 }
 
-export type QuizzesT = {
-  today: string;
-  yesterday: string;
-  chapter: string;
-  chapters: string;
-  completed: string;
-  inProgress: string;
-  notStarted: string;
-  empty_filter: string;
-  tabAll: string;
-  tabInProgress: string;
-  tabCompleted: string;
-  tabNotStarted: string;
-  accuracy: string;
-  review: string;
-  continue: string;
-  start: string;
-  questionsLabel: string;
-  deleteTitle: string;
-  deleteDesc: (name: string) => string;
-  cancel: string;
-  delete: string;
-};
+export type QuizzesT = Dictionary["quizzes"];
 
 function relativeDate(iso: string | null, locale: "he" | "en", t: QuizzesT): string {
   if (!iso) return "";
@@ -77,7 +57,7 @@ function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: strin
         <DialogHeader>
           <DialogTitle>{t.deleteTitle}</DialogTitle>
           <DialogDescription>
-            {t.deleteDesc(quizName)}
+            {t.deleteDesc.replace("{name}", quizName)}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -156,7 +136,8 @@ function QuizCard({ q, locale, t }: { q: QuizRow; locale: "he" | "en"; t: Quizze
   );
 }
 
-export function QuizzesClient({ quizzes, locale, t }: { quizzes: QuizRow[]; locale: "he" | "en"; t: QuizzesT }) {
+export function QuizzesClient({ quizzes, locale }: { quizzes: QuizRow[]; locale: Locale }) {
+  const t = getDictionary(locale).quizzes;
   const all = quizzes;
   const inProgress = quizzes.filter((q) => !q.isComplete && q.answered > 0);
   const completed = quizzes.filter((q) => q.isComplete);

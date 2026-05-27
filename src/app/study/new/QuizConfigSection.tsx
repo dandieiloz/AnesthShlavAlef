@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ChapterPicker } from "./ChapterPicker";
 import { QuestionLimitPicker } from "./QuestionLimitPicker";
-import type { Dictionary } from "@/lib/i18n";
+import { getDictionary, type Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
 
 type StudyNewT = Dictionary["studyNew"];
@@ -30,13 +30,12 @@ export function QuizConfigSection({
   chapters,
   preselected = [],
   locale,
-  t,
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
   locale: Locale;
-  t: StudyNewT;
 }) {
+  const t = getDictionary(locale).studyNew;
   const initialSelected = chapters.filter((c) => preselected.includes(c.id));
   const [selectedChapters, setSelectedChapters] = useState<ChapterRow[]>(initialSelected);
   const [nameTouched, setNameTouched] = useState(false);
@@ -63,13 +62,12 @@ export function QuizConfigSection({
           preselected={preselected}
           onSelectedChaptersChange={setSelectedChapters}
           locale={locale}
-          t={t}
         />
       </div>
 
       <div className="space-y-2">
         <Label>{t.questionCount}</Label>
-        <QuestionLimitPicker availableCount={availableCount} t={t} />
+        <QuestionLimitPicker availableCount={availableCount} locale={locale} />
       </div>
 
       <div className="space-y-1.5">
