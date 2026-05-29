@@ -49,10 +49,12 @@ model User {
   image          String?
   role           Role      @default(USER)
   createdAt      DateTime  @default(now())
-  fullName       String?
-  hospitalName   String?
-  residencyYear  Int?
-  locale         String    @default("he")
+  fullName         String?
+  hospitalName     String?
+  residencyYear    Int?
+  locale           String    @default("he")
+  examDate         DateTime?
+  questionsPerWeek Int?
 
   accounts      Account[]
   sessions      Session[]

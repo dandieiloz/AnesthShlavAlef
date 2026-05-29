@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, User, LayoutDashboard, BookOpen, Settings, ListChecks, Bookmark } from "lucide-react";
+import { LogOut, User, LayoutDashboard, BookOpen, Settings, ListChecks, Bookmark, CalendarClock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,7 @@ interface SiteHeaderClientProps {
     myQuizzes: string;
     bookmarks: string;
     dashboard: string;
+    schedule: string;
     about: string;
     admin: string;
     profile: string;
@@ -49,6 +50,7 @@ function buildNavLinks(nav: SiteHeaderClientProps["nav"]) {
     { href: "/quizzes",   label: nav.myQuizzes,  icon: ListChecks },
     { href: "/bookmarks", label: nav.bookmarks,  icon: Bookmark },
     { href: "/dashboard", label: nav.dashboard,  icon: LayoutDashboard },
+    { href: "/schedule",  label: nav.schedule,   icon: CalendarClock },
     { href: "/about",     label: nav.about,      icon: Info },
   ];
 }
