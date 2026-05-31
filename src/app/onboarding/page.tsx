@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Stethoscope } from "lucide-react";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
+import { InterestModal } from "@/components/InterestModal";
 
 export default async function OnboardingPage() {
   const session = await auth();
@@ -22,10 +23,12 @@ export default async function OnboardingPage() {
   if (dbUser?.residencyYear) redirect("/study");
 
   const locale = await getLocale();
-  const t = getDictionary(locale).onboarding;
+  const dict = getDictionary(locale);
+  const t = dict.onboarding;
 
   return (
     <div className="mx-auto max-w-lg py-12 animate-fade-in">
+      <InterestModal t={dict.interestModal} />
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
           <Stethoscope className="h-6 w-6 text-primary" />

@@ -58,10 +58,18 @@ export default async function Home() {
           {t.heroSubtitle}
         </p>
                 <div className="mx-auto my-3 w-full max-w-2xl">
-          <div className="relative aspect-video overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
+          <div
+            className="relative aspect-video overflow-hidden rounded-xl"
+            style={{
+              WebkitMaskImage:
+                "radial-gradient(ellipse at center, #000 55%, transparent 95%)",
+              maskImage:
+                "radial-gradient(ellipse at center, #000 55%, transparent 95%)",
+            }}
+          >
             <iframe
               src={`https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`}
-              title="איך לא חשבו על זה קודם"
+              title="איך לא חשבנו על זה קודם"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               className="absolute inset-0 h-full w-full"

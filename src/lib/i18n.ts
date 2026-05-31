@@ -54,7 +54,7 @@ export const DICTIONARIES = {
     },
     home: {
       brandLine: "Perl · שלב א׳ - הרדמה",
-      heroTitle: "איך לא חשבו על זה",
+      heroTitle: "איך לא חשבנו על זה",
       heroTitleHighlight: "קודם",
       heroSubtitle: "פלטפורמת שאלות אמריקאיות מבוססת מילר 10, עם הסברים מפורטים - בנויה למתמחים בדרך לשלב א׳.",
       ctaSignIn: "הירשמו לגרסת הדמו עם Google",
@@ -318,6 +318,14 @@ export const DICTIONARIES = {
       continue: "שמירה והמשך",
       yearOption: (n: number) => `שנה ${n}`,
       yearLabels: { 1: "שנה א׳", 2: "שנה ב׳", 3: "שנה ג׳", 4: "שנה ד׳", 5: "שנה ה׳" } as Record<number, string>,
+    },
+    interestModal: {
+      badge: "גרסת הדגמה",
+      title: "תודה שהצטרפת! זו גרסת הדגמה",
+      intro: "אנחנו עדיין בשלבי פיתוח ובוחנים את העניין במערכת לפני ההשקה הרשמית.",
+      body: "זו גרסת דמו ראשונית – חלק מהתכנים והפיצ׳רים עוד בעבודה. נשמח שתתנסה ותשאיר לנו את הפרטים שלך כדי שנוכל לעדכן אותך כשהגרסה המלאה תעלה לאוויר.",
+      notify: "השארת הפרטים בעמוד הבא תאפשר לנו ליצור איתך קשר ולעדכן אותך ברגע שהמערכת המלאה תהיה זמינה.",
+      acknowledge: "הבנתי, בוא נמשיך",
     },
     profile: {
       title: "פרופיל",
@@ -721,6 +729,14 @@ export const DICTIONARIES = {
       continue: "Save and continue",
       yearOption: (n: number) => `Year ${n}`,
       yearLabels: { 1: "Year 1", 2: "Year 2", 3: "Year 3", 4: "Year 4", 5: "Year 5" } as Record<number, string>,
+    },
+    interestModal: {
+      badge: "Demo version",
+      title: "Thanks for joining! This is a demo",
+      intro: "We're still in active development and gauging interest before the official launch.",
+      body: "This is an early demo build — some content and features are still a work in progress. We'd love for you to try it out and leave your details so we can let you know when the full version goes live.",
+      notify: "Filling in your details on the next page lets us reach out and notify you the moment the complete system is available.",
+      acknowledge: "Got it, let's continue",
     },
     profile: {
       title: "Profile",
