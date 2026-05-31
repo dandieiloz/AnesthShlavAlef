@@ -94,7 +94,9 @@ export function QuizConfigSection({
         <ChapterPicker
           chapters={displayedChapters}
           preselected={preselected}
-          onSelectedChaptersChange={setSelectedChapters}
+          onSelectedChaptersChange={(rows) =>
+            setSelectedChapters(chapters.filter((c) => rows.some((r) => r.id === c.id)))
+          }
           locale={locale}
         />
         <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground cursor-pointer">
