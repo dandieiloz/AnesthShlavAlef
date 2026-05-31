@@ -65,10 +65,29 @@ export async function generateJson<T>(
   });
   const raw = resp.text ?? "";
   if (!raw) throw new Error(`${model} returned empty response`);
+  const sanitized = sanitizeLatexBackslashes(raw);
   try {
-    return JSON.parse(sanitizeLatexBackslashes(raw)) as T;
+    return JSON.parse(sanitized) as T;
   } catch (e) {
-    throw new Error(`${model} returned non-JSON response: ${(e as Error).message}\n${raw.slice(0, 500)}`);
+    const msg = (e as Error).message;
+    const posMatch = msg.match(/position (\d+)/);
+    if (posMatch) {
+      const pos = Number(posMatch[1]);
+      const start = Math.max(0, pos - 80);
+      const end = Math.min(sanitized.length, pos + 80);
+      const sanWindow = sanitized.slice(start, end);
+      const rawWindow = raw.slice(start, end);
+      const hexAtPos = Array.from(sanitized.slice(Math.max(0, pos - 4), Math.min(sanitized.length, pos + 4)))
+        .map((c) => `${c}(${c.charCodeAt(0).toString(16)})`)
+        .join(" ");
+      console.error(
+        `[gemini-json] ${model} parse failed at pos ${pos} (sanitized len ${sanitized.length}, raw len ${raw.length}): ${msg}\n` +
+          `  hex around pos: ${hexAtPos}\n` +
+          `  sanitized[${start}..${end}]: ${JSON.stringify(sanWindow)}\n` +
+          `  raw[${start}..${end}]:       ${JSON.stringify(rawWindow)}`,
+      );
+    }
+    throw new Error(`${model} returned non-JSON response: ${msg}\n${raw.slice(0, 500)}`);
   }
 }
 

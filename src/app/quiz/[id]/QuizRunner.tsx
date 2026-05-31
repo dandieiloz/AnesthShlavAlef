@@ -7,23 +7,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
+  ArrowRight,
   BarChart2,
   Bookmark,
   BookmarkCheck,
   CheckCircle2,
   ClipboardList,
-  Flag,
   Loader2,
   XCircle,
 } from "lucide-react";
 import { AnswerExplanation } from "@/components/AnswerExplanation";
+import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import {
   loadQuizBatchAction,
   recordAttemptAction,
-  reportAnswerAction,
   toggleBookmarkValueAction,
 } from "@/app/(user)/actions";
 import { getDictionary } from "@/lib/i18n";
@@ -63,6 +62,11 @@ export function QuizRunner(props: Props) {
   const [revealed, setRevealed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<AnswerMode>("immediate");
+  // Stack of previously-answered questions plus what the user chose, so the
+  // "previous question" button can rewind through them in read-only mode.
+  const [past, setPast] = useState<{ question: QuestionPayload; chosen: Choice }[]>([]);
+  // -1 = viewing the live (current) question; otherwise index into `past`.
+  const [viewingIndex, setViewingIndex] = useState<number>(-1);
   const [, startTransition] = useTransition();
   const refillInFlight = useRef(false);
   // Synchronous guards: state-based `submitting` is read from a stale closure
@@ -192,6 +196,7 @@ export function QuizRunner(props: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (viewingIndex !== -1) return;
     if (!chosen || submittingRef.current) return;
     if (mode === "immediate" && revealed) return;
     const questionId = current!.id;
@@ -211,6 +216,7 @@ export function QuizRunner(props: Props) {
       setRevealed(true);
     } else {
       // Full-quiz mode: silently advance without revealing.
+      setPast((prev) => [...prev, { question: current!, chosen: chosen! }]);
       setQueue((prev) => prev.slice(1));
       setChosen(null);
       setRevealed(false);
@@ -228,6 +234,18 @@ export function QuizRunner(props: Props) {
   }
 
   function handleNext() {
+    // If we're reviewing a past question, step forward through past until we
+    // run out and then return to the live question.
+    if (viewingIndex !== -1) {
+      if (viewingIndex < past.length - 1) {
+        setViewingIndex(viewingIndex + 1);
+      } else {
+        setViewingIndex(-1);
+      }
+      return;
+    }
+    // Live immediate-mode advance after revealing the answer.
+    setPast((prev) => [...prev, { question: current!, chosen: chosen! }]);
     setQueue((prev) => prev.slice(1));
     setChosen(null);
     setRevealed(false);
@@ -235,10 +253,24 @@ export function QuizRunner(props: Props) {
     lastRecordedQuestionId.current = null;
   }
 
-  const display = current;
+  function handlePrev() {
+    if (past.length === 0) return;
+    if (viewingIndex === -1) {
+      setViewingIndex(past.length - 1);
+    } else if (viewingIndex > 0) {
+      setViewingIndex(viewingIndex - 1);
+    }
+  }
+
+  const isViewingPast = viewingIndex !== -1;
+  const pastEntry = isViewingPast ? past[viewingIndex] : null;
+  const display = pastEntry ? pastEntry.question : current;
+  const displayChosen: Choice | null = pastEntry ? pastEntry.chosen : chosen;
+  const displayRevealed = pastEntry ? true : revealed;
   const correctChoice = display.answer.correctAnswer;
-  const isCorrectChoice = revealed && chosen === correctChoice;
-  const showReveal = revealed && mode === "immediate";
+  const isCorrectChoice = displayRevealed && displayChosen === correctChoice;
+  const showReveal = isViewingPast || (revealed && mode === "immediate");
+  const canGoPrev = past.length > 0 && (viewingIndex === -1 || viewingIndex > 0);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -322,16 +354,16 @@ export function QuizRunner(props: Props) {
 
             <form onSubmit={handleSubmit} className="space-y-3">
               {OPTION_KEYS.map((k, i) => {
-                const isChosen = chosen === k;
-                const isCorrectOption = revealed && k === correctChoice;
-                const isWrongChosen = revealed && isChosen && k !== correctChoice;
+                const isChosen = displayChosen === k;
+                const isCorrectOption = displayRevealed && k === correctChoice;
+                const isWrongChosen = displayRevealed && isChosen && k !== correctChoice;
                 const optionText = display[`option${k}` as "optionA" | "optionB" | "optionC" | "optionD"];
                 return (
                   <label
                     key={k}
                     className={[
                       "flex items-start gap-3 rounded-lg border p-3.5 text-sm transition-colors",
-                      revealed ? "cursor-default" : "cursor-pointer hover:border-primary/40 hover:bg-primary/5",
+                      displayRevealed ? "cursor-default" : "cursor-pointer hover:border-primary/40 hover:bg-primary/5",
                       isCorrectOption
                         ? "border-success bg-success/10"
                         : isWrongChosen
@@ -346,8 +378,8 @@ export function QuizRunner(props: Props) {
                       name="chosen"
                       value={k}
                       checked={isChosen}
-                      onChange={() => !revealed && setChosen(k)}
-                      disabled={revealed}
+                      onChange={() => !displayRevealed && !isViewingPast && setChosen(k)}
+                      disabled={displayRevealed || isViewingPast}
                       required
                       className="sr-only"
                     />
@@ -368,14 +400,42 @@ export function QuizRunner(props: Props) {
                 );
               })}
 
-              {!revealed ? (
-                <Button type="submit" className="w-full mt-1" size="lg" disabled={!chosen || submitting}>
-                  {t.submitAnswer}
-                </Button>
+              {!displayRevealed ? (
+                <div className="mt-1 flex gap-2">
+                  {canGoPrev && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={handlePrev}
+                      className="gap-1.5"
+                    >
+                      <ArrowRight className="h-4 w-4 ltr:rotate-180" />
+                      {t.previousQuestion}
+                    </Button>
+                  )}
+                  <Button type="submit" className="flex-1" size="lg" disabled={!chosen || submitting}>
+                    {t.submitAnswer}
+                  </Button>
+                </div>
               ) : (
-                <Button type="button" className="w-full mt-1" size="lg" onClick={handleNext}>
-                  {t.nextQuestion}
-                </Button>
+                <div className="mt-1 flex gap-2">
+                  {canGoPrev && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={handlePrev}
+                      className="gap-1.5"
+                    >
+                      <ArrowRight className="h-4 w-4 ltr:rotate-180" />
+                      {t.previousQuestion}
+                    </Button>
+                  )}
+                  <Button type="button" className="flex-1" size="lg" onClick={handleNext}>
+                    {t.nextQuestion}
+                  </Button>
+                </div>
               )}
             </form>
           </CardContent>
@@ -445,27 +505,14 @@ export function QuizRunner(props: Props) {
 
               <Separator className="opacity-50" />
 
-              <details className="group">
-                <summary className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors list-none">
-                  <Flag className="h-3.5 w-3.5" />
-                  {t.reportButton}
-                </summary>
-                <form action={reportAnswerAction} className="mt-3 space-y-2">
-                  <input type="hidden" name="questionId" value={display.id} />
-                  <Textarea
-                    name="explanation"
-                    required
-                    minLength={10}
-                    rows={2}
-                    placeholder={t.reportPlaceholder}
-                    className="text-sm"
-                  />
-                  <Button variant="outline" size="sm" type="submit" className="gap-2">
-                    <Flag className="h-3.5 w-3.5" />
-                    {t.sendReport}
-                  </Button>
-                </form>
-              </details>
+              <ReportAnswerForm
+                questionId={display.id}
+                labels={{
+                  reportButton: t.reportButton,
+                  reportPlaceholder: t.reportPlaceholder,
+                  sendReport: t.sendReport,
+                }}
+              />
             </CardContent>
           </Card>
         )}

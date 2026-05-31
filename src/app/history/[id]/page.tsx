@@ -3,6 +3,7 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
+import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -158,6 +159,20 @@ export default async function HistoryQuestionPage({
             <p className="text-sm text-muted-foreground italic">
               עדיין אין הסבר זמין לשאלה זו.
             </p>
+          )}
+
+          {question.geminiAnswer && (
+            <ReportAnswerForm
+              questionId={question.id}
+              labels={{
+                reportButton: t.reportButton,
+                reportHint: t.reportHint,
+                reportFieldLabel: t.reportFieldLabel,
+                reportPlaceholder: t.reportPlaceholder,
+                reportMinHint: t.reportMinHint,
+                sendReport: t.sendReport,
+              }}
+            />
           )}
         </CardContent>
       </Card>
