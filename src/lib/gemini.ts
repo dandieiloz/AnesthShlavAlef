@@ -105,7 +105,9 @@ export async function generateJson<T>(
 export function sanitizeLatexBackslashes(raw: string): string {
   return raw
     // Pass 1: `\X` where X is a letter that begins a multi-letter run → LaTeX command.
-    .replace(/\\([a-zA-Z])(?=[a-zA-Z])/g, "\\\\$1")
+    // Lookbehind skips the second `\` of legitimate `\\` pairs (e.g. `\\lambda`),
+    // which would otherwise be over-doubled into `\\\lambda` and break JSON.parse.
+    .replace(/(?<!\\)\\([a-zA-Z])(?=[a-zA-Z])/g, "\\\\$1")
     // Pass 2: `\X` where X is any other char NOT a valid JSON escape (`"\/bfnrtu`).
     // Lookbehind skips the second `\` of pairs already doubled by pass 1.
     .replace(/(?<!\\)\\([^"\\/bfnrtu])/g, "\\\\$1");
