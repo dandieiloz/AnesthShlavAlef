@@ -54,6 +54,16 @@ export async function runJobAction(jobId: number): Promise<RunJobResult> {
       await invalidateTranslations("GeminiAnswer", String(old.id));
     }
     await db.geminiAnswer.deleteMany({ where: { questionId: job.questionId } });
+
+    // Also drop the cached structured payload — otherwise generateExplanationForQuestion
+    // short-circuits on the cache hit and re-persists the stale (possibly corrupted) answer.
+    const q = await db.question.findUnique({
+      where: { id: job.questionId },
+      select: { stem: true, optionA: true, optionB: true, optionC: true, optionD: true },
+    });
+    if (q) {
+      await db.questionQueryCache.deleteMany({ where: { questionHash: hashQuestion(q) } });
+    }
   }
 
   try {

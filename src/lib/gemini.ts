@@ -66,8 +66,18 @@ export async function generateJson<T>(
   const raw = resp.text ?? "";
   if (!raw) throw new Error(`${model} returned empty response`);
   try {
-    return JSON.parse(raw) as T;
+    return JSON.parse(sanitizeLatexBackslashes(raw)) as T;
   } catch (e) {
     throw new Error(`${model} returned non-JSON response: ${(e as Error).message}\n${raw.slice(0, 500)}`);
   }
+}
+
+// Gemini frequently emits LaTeX (e.g. \text, \times, \Delta, \frac) with a single
+// backslash inside JSON string values. JSON.parse would then interpret \t / \b /
+// \f / \n / \r as control characters and silently drop the backslash, corrupting
+// downstream KaTeX rendering. A backslash followed by a letter that is part of a
+// letter run can only be a LaTeX command — never a real JSON escape — so we
+// double the backslash. Leaves legitimate escapes like \n", \t", \" untouched.
+export function sanitizeLatexBackslashes(raw: string): string {
+  return raw.replace(/\\([a-zA-Z])(?=[a-zA-Z])/g, "\\\\$1");
 }

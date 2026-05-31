@@ -1,4 +1,4 @@
-import { genai, FLASH_MODEL } from "@/lib/gemini";
+import { genai, FLASH_MODEL, sanitizeLatexBackslashes } from "@/lib/gemini";
 import { Type } from "@google/genai";
 
 /**
@@ -61,7 +61,7 @@ export async function parseQuestion(rawText: string): Promise<ParsedQuestion> {
   if (!text) throw new Error("Gemini returned empty response");
 
   try {
-    return JSON.parse(text) as ParsedQuestion;
+    return JSON.parse(sanitizeLatexBackslashes(text)) as ParsedQuestion;
   } catch {
     throw new Error("Failed to parse Gemini JSON response: " + text.slice(0, 200));
   }
@@ -115,7 +115,7 @@ export async function parseMultipleQuestions(rawText: string): Promise<ParsedQue
   if (!text) throw new Error("Gemini returned empty response");
 
   try {
-    const parsed = JSON.parse(text) as { questions: ParsedQuestion[] };
+    const parsed = JSON.parse(sanitizeLatexBackslashes(text)) as { questions: ParsedQuestion[] };
     return parsed.questions ?? [];
   } catch {
     throw new Error("Failed to parse Gemini JSON response: " + text.slice(0, 200));
