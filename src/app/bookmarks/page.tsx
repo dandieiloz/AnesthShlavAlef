@@ -11,6 +11,7 @@ import { Bookmark, BookmarkX, BookOpen, Highlighter, StickyNote, Trash2 } from "
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
+import { questionAccessWhere } from "@/lib/plan";
 
 const COLOR_SWATCH: Record<number, string> = {
   1: "bg-yellow-300 dark:bg-yellow-400",
@@ -47,9 +48,11 @@ export default async function BookmarksPage() {
   const t = dict.bookmarks;
   const letters = contentLocale === "he" ? ["א", "ב", "ג", "ד"] : ["A", "B", "C", "D"];
 
+  const planGate = await questionAccessWhere(me);
+
   const [bookmarks, highlights] = await Promise.all([
     db.bookmark.findMany({
-      where: { userId: me.id },
+      where: { userId: me.id, question: planGate },
       orderBy: { createdAt: "desc" },
       include: {
         question: {
@@ -62,7 +65,7 @@ export default async function BookmarksPage() {
       },
     }),
     db.sentenceHighlight.findMany({
-      where: { userId: me.id, locale: contentLocale },
+      where: { userId: me.id, locale: contentLocale, question: planGate },
       orderBy: [{ questionId: "desc" }, { section: "asc" }, { sentenceIndex: "asc" }],
       include: {
         question: {

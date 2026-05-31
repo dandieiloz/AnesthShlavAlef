@@ -2,20 +2,20 @@ import { db } from "@/lib/db";
 import { requireCompletedProfile } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
-import { submitAttemptAction, postCommentAction, reportAnswerAction, toggleBookmarkAction } from "@/app/(user)/actions";
-import { CommentItem } from "@/components/CommentItem";
+import { submitAttemptAction, reportAnswerAction, toggleBookmarkAction } from "@/app/(user)/actions";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, XCircle, ArrowRight, BarChart2, MessageSquare, Flag, Bookmark, BookmarkCheck, ClipboardList } from "lucide-react";
+import { CheckCircle2, XCircle, BarChart2, Flag, Bookmark, BookmarkCheck, ClipboardList } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { getDictionary } from "@/lib/i18n";
 import { PrefetchNextTranslation } from "./PrefetchNextTranslation";
+import { questionAccessWhere } from "@/lib/plan";
 
 const HEBREW_LETTERS = ["א", "ב", "ג", "ד"];
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
@@ -38,9 +38,10 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
 
   // New quizzes have a fixed questionIds set; old quizzes fall back to chapterIds.
   const useFixedSet = quiz.questionIds.length > 0;
+  const planGate = await questionAccessWhere(me);
   const questionFilter = useFixedSet
-    ? { id: { in: quiz.questionIds, notIn: answeredIds }, geminiAnswer: { isNot: null } }
-    : { chapterIds: { hasSome: quiz.chapterIds }, id: { notIn: answeredIds }, geminiAnswer: { isNot: null } };
+    ? { id: { in: quiz.questionIds, notIn: answeredIds }, geminiAnswer: { isNot: null }, AND: [planGate] }
+    : { chapterIds: { hasSome: quiz.chapterIds }, id: { notIn: answeredIds }, geminiAnswer: { isNot: null }, AND: [planGate] };
 
   const next = await db.question.findFirst({
     where: questionFilter,
@@ -48,7 +49,6 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
     include: {
       chapter: true,
       geminiAnswer: true,
-      comments: { include: { user: { select: { name: true, image: true, hospitalName: true } } }, orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -60,11 +60,13 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
           ? {
               id: { in: quiz.questionIds, notIn: [...answeredIds, next.id] },
               geminiAnswer: { isNot: null },
+              AND: [planGate],
             }
           : {
               chapterIds: { hasSome: quiz.chapterIds },
               id: { notIn: [...answeredIds, next.id] },
               geminiAnswer: { isNot: null },
+              AND: [planGate],
             },
         orderBy: { id: "asc" },
         select: { id: true },
@@ -74,7 +76,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   const totalQ = useFixedSet
     ? quiz.questionIds.length
     : await db.question.count({
-        where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null } },
+        where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null }, AND: [planGate] },
       });
   const correct = await db.attempt.count({ where: { quizId: quiz.id, userId: me.id, isCorrect: true } });
   const progressPct = totalQ > 0 ? Math.round((answeredIds.length / totalQ) * 100) : 0;
@@ -161,13 +163,13 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
+    <div className="mx-auto max-w-3xl">
       {/* Background-warm the next question's translation cache so the next page
           render is instant. Renders nothing; only runs when contentLocale !== "he". */}
       {contentLocale !== "he" && lookahead && (
         <PrefetchNextTranslation questionId={lookahead.id} />
       )}
-      <div className="md:col-span-2 space-y-5">
+      <div className="space-y-5">
         {/* Progress bar */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -330,41 +332,6 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
           </Card>
         )}
       </div>
-
-      {/* Comments sidebar */}
-      <aside className="space-y-3">
-        <h2 className="font-display text-base font-semibold flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          {t.comments}
-        </h2>
-
-        {next.comments.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t.noComments}</p>
-        ) : (
-          <ul className="space-y-2">
-            {next.comments.map((c) => (
-              <li key={c.id}>
-                <CommentItem comment={c} meId={me.id} meRole={me.role} locale={uiLocale} />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <form action={postCommentAction} className="space-y-2">
-          <input type="hidden" name="questionId" value={next.id} />
-          <Textarea
-            name="body"
-            required
-            rows={2}
-            placeholder={t.writeComment}
-            className="text-sm"
-          />
-          <Button variant="secondary" size="sm" type="submit" className="w-full gap-2">
-            <ArrowRight className="h-3.5 w-3.5" />
-            {t.postComment}
-          </Button>
-        </form>
-      </aside>
     </div>
   );
 }

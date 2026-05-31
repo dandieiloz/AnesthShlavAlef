@@ -23,6 +23,7 @@ import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { computeSchedule, type PaceStatus } from "@/lib/schedule";
 import { saveScheduleAction } from "./actions";
+import { questionAccessWhere } from "@/lib/plan";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function SchedulePage() {
   const t = dict.schedule;
 
   const cutoff14 = new Date(Date.now() - 14 * MS_PER_DAY);
+  const planGate = await questionAccessWhere(me);
 
   const [user, poolWithAnswer, totalInDb, attempts, recent14, chaptersTotal] =
     await Promise.all([
@@ -42,8 +44,8 @@ export default async function SchedulePage() {
         where: { id: me.id },
         select: { examDate: true, questionsPerWeek: true },
       }),
-      db.question.count({ where: { geminiAnswer: { isNot: null } } }),
-      db.question.count(),
+      db.question.count({ where: { geminiAnswer: { isNot: null }, AND: [planGate] } }),
+      db.question.count({ where: { AND: [planGate] } }),
       db.attempt.findMany({
         where: { userId: me.id },
         select: { questionId: true },

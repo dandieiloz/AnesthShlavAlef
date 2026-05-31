@@ -53,6 +53,19 @@ export function UsersFilters() {
       </div>
 
       <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">תוכנית</label>
+        <select
+          name="plan"
+          defaultValue={params.get("plan") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="DEMO">דמו</option>
+          <option value="PAID">בתשלום</option>
+        </select>
+      </div>
+
+      <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1">בית חולים</label>
         <select
           name="hospital"

@@ -1,4 +1,4 @@
-# Anesthesia Study (אנסתזיה — שלב א׳)
+# Anesthesia Study (הרדמה — שלב א׳)
 
 Hebrew/RTL MCQ learning platform for anesthesia residents. Next.js 16 + Prisma + Neon Postgres (pgvector) + NextAuth (Google) + Gemini (RAG).
 

@@ -15,6 +15,11 @@ enum Role {
   ADMIN
 }
 
+enum Plan {
+  DEMO
+  PAID
+}
+
 enum Choice {
   A
   B
@@ -41,6 +46,12 @@ enum JobKind {
   REGENERATE
 }
 
+enum DebugReportKind {
+  BUG
+  FEEDBACK
+  TECHNICAL
+}
+
 model User {
   id             String    @id @default(cuid())
   name           String?
@@ -48,6 +59,7 @@ model User {
   emailVerified  DateTime?
   image          String?
   role           Role      @default(USER)
+  plan           Plan      @default(DEMO)
   createdAt      DateTime  @default(now())
   fullName         String?
   hospitalName     String?
@@ -67,6 +79,8 @@ model User {
   bookmarks         Bookmark[]
   generationJobs    AnswerGenerationJob[]    @relation("JobCreator")
   sentenceHighlights SentenceHighlight[]
+  debugReports      DebugReport[]            @relation("DebugReportAuthor")
+  resolvedDebugReports DebugReport[]         @relation("DebugReportResolver")
 }
 
 model Account {
@@ -157,6 +171,7 @@ model Question {
   ragRuns         RagRun[]
   generationJobs  AnswerGenerationJob[]
   sentenceHighlights SentenceHighlight[]
+  debugReports    DebugReport[]
 
   @@index([chapterId])
   @@index([chapterIds], type: Gin)
@@ -191,6 +206,14 @@ model QuestionQueryCache {
   payload      Json     // serialized v2 GeminiAnswer structured payload
   createdAt    DateTime @default(now())
   hits         Int      @default(0)
+}
+
+/// Sources of questions visible to DEMO-plan users. Presence = allowed.
+/// The sentinel value "__NULL__" represents questions with no source.
+model DemoAllowedSource {
+  id        String   @id @default(cuid())
+  source    String   @unique
+  createdAt DateTime @default(now())
 }
 
 /// Editable site content managed by admins (key→value store for pages like /about)
@@ -279,6 +302,30 @@ model AnswerReport {
   resolver     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
 
   @@index([status, createdAt])
+}
+
+/// User-submitted debug / feedback / technical reports surfaced from /study/report.
+model DebugReport {
+  id            Int             @id @default(autoincrement())
+  userId        String
+  kind          DebugReportKind
+  category      String?
+  description   String          @db.Text
+  chapterNumber Int?
+  questionId    Int?
+  pageUrl       String?
+  contactEmail  String?
+  status        ReportStatus    @default(OPEN)
+  createdAt     DateTime        @default(now())
+  resolvedById  String?
+  resolvedAt    DateTime?
+
+  user      User      @relation("DebugReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  resolver  User?     @relation("DebugReportResolver", fields: [resolvedById], references: [id])
+  question  Question? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Bookmark {

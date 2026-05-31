@@ -18,6 +18,7 @@ import {
   BookOpen,
   Layers,
   Play,
+  Bug,
 } from "lucide-react";
 
 function relativeDate(date: Date, locale: "he" | "en", t: { today: string; yesterday: string }): string {
@@ -222,6 +223,26 @@ export default async function StudyPage() {
             })}
           </div>
         )}
+      </section>
+
+      {/* Report an issue */}
+      <section>
+        <Card className="bg-muted/30">
+          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Bug className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{t.reportIssueTitle}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t.reportIssueHint}</p>
+              </div>
+            </div>
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/study/report">{t.reportIssueCta}</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

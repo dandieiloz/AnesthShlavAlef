@@ -140,6 +140,12 @@ export default async function AboutPage() {
               <h3 className="font-display text-xl font-bold text-foreground">
                 {t.danielName}
               </h3>
+              <a
+                href="mailto:dandieiloz@gmail.com"
+                className="text-sm text-primary hover:underline break-all"
+              >
+                dandieiloz@gmail.com
+              </a>
             </div>
             <div className="h-px bg-border" />
             <EditableSection

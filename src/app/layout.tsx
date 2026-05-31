@@ -5,6 +5,7 @@ import { auth, signIn, signOut } from "@/lib/auth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeaderClient } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { BetaBanner } from "@/components/BetaBanner";
 import { Toaster } from "@/components/ui/toaster";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -36,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const user = session?.user as { name?: string | null; image?: string | null; role?: string } | undefined;
+  const user = session?.user as { name?: string | null; image?: string | null; role?: string; plan?: string } | undefined;
   const locale = await getLocale();
   const dict = getDictionary(locale);
 
@@ -54,6 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen font-sans flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <SiteHeaderClient user={user} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} />
+          <BetaBanner t={dict.beta} locale={locale} />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <SiteFooter t={dict.footer} />
           <Toaster />

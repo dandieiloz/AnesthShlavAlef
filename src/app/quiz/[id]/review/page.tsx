@@ -3,11 +3,13 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
-import { toggleBookmarkAction } from "@/app/(user)/actions";
+import { toggleBookmarkAction, postCommentAction } from "@/app/(user)/actions";
+import { CommentItem } from "@/components/CommentItem";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle2,
   XCircle,
@@ -18,10 +20,12 @@ import {
   BookmarkCheck,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
 } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
+import { questionAccessWhere } from "@/lib/plan";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
@@ -64,11 +68,16 @@ export default async function QuizReviewPage({
 
   const bookmarkedIds = new Set(bookmarkRows.map((b) => b.questionId));
 
+  const planGate = await questionAccessWhere(me);
   const questions = await db.question.findMany({
-    where: { id: { in: [...attemptMap.keys()] } },
+    where: { id: { in: [...attemptMap.keys()] }, AND: [planGate] },
     include: {
       chapter: { select: { number: true, title: true } },
       geminiAnswer: true,
+      comments: {
+        include: { user: { select: { name: true, image: true, hospitalName: true } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
     orderBy: { id: "asc" },
   });
@@ -349,6 +358,47 @@ export default async function QuizReviewPage({
                       </details>
                     </>
                   )}
+
+                  {/* Comments / discussion */}
+                  <Separator className="opacity-40" />
+                  <details className="group">
+                    <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                      {dict.quiz.comments}
+                      {q.comments.length > 0 && (
+                        <span className="ms-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
+                          {q.comments.length}
+                        </span>
+                      )}
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {q.comments.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{dict.quiz.noComments}</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {q.comments.map((c) => (
+                            <li key={c.id}>
+                              <CommentItem comment={c} meId={me.id} meRole={me.role} locale={uiLocale} />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <form action={postCommentAction} className="space-y-2">
+                        <input type="hidden" name="questionId" value={q.id} />
+                        <Textarea
+                          name="body"
+                          required
+                          rows={2}
+                          placeholder={dict.quiz.writeComment}
+                          className="text-sm"
+                        />
+                        <Button variant="secondary" size="sm" type="submit" className="gap-2">
+                          <ArrowRight className="h-3.5 w-3.5" />
+                          {dict.quiz.postComment}
+                        </Button>
+                      </form>
+                    </div>
+                  </details>
                 </CardContent>
               </Card>
             );

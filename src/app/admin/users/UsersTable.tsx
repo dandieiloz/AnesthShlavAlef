@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { setUserRoleAction } from "./actions";
+import { setUserRoleAction, setUserPlanAction, deleteUserAction } from "./actions";
 
 export type UserRow = {
   id: string;
@@ -11,12 +11,13 @@ export type UserRow = {
   email: string;
   image: string | null;
   role: "USER" | "ADMIN";
+  plan: "DEMO" | "PAID";
   hospitalName: string | null;
   residencyYear: number | null;
   createdAt: string;
 };
 
-type SortField = "name" | "role" | "hospital" | "residencyYear" | "createdAt";
+type SortField = "name" | "role" | "plan" | "hospital" | "residencyYear" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", { dateStyle: "short" });
@@ -24,6 +25,7 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", { dateStyle: "short" });
 const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   name: "asc",
   role: "asc",
+  plan: "asc",
   hospital: "asc",
   residencyYear: "asc",
   createdAt: "desc",
@@ -51,6 +53,33 @@ export function UsersTable({
     setPendingId(userId);
     startTransition(async () => {
       await setUserRoleAction(userId, newRole);
+      setPendingId(null);
+      router.refresh();
+    });
+  }
+
+  function togglePlan(userId: string, currentPlan: "DEMO" | "PAID") {
+    const newPlan: "DEMO" | "PAID" = currentPlan === "PAID" ? "DEMO" : "PAID";
+    setPendingId(userId);
+    startTransition(async () => {
+      await setUserPlanAction(userId, newPlan);
+      setPendingId(null);
+      router.refresh();
+    });
+  }
+
+  function deleteUser(userId: string, displayName: string) {
+    const confirmed = window.confirm(
+      `למחוק את המשתמש "${displayName}"? פעולה זו תמחק את כל המבחנים, התשובות, הסימניות וההערות שלו ואינה ניתנת לביטול.`,
+    );
+    if (!confirmed) return;
+    setPendingId(userId);
+    startTransition(async () => {
+      try {
+        await deleteUserAction(userId);
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : "מחיקת המשתמש נכשלה");
+      }
       setPendingId(null);
       router.refresh();
     });
@@ -110,6 +139,7 @@ export function UsersTable({
         <tr className="border-b bg-muted/40">
           <SortHeader field="name" label="משתמש" />
           <SortHeader field="role" label="תפקיד" align="center" />
+          <SortHeader field="plan" label="תוכנית" align="center" />
           <SortHeader field="hospital" label="בית חולים" />
           <SortHeader field="residencyYear" label="שנה" align="center" />
           <SortHeader field="createdAt" label="הצטרף" />
@@ -161,6 +191,19 @@ export function UsersTable({
                 </span>
               </td>
 
+              {/* Plan badge */}
+              <td className="p-2 text-center">
+                <span
+                  className={`text-xs rounded px-2 py-0.5 ${
+                    u.plan === "PAID"
+                      ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300"
+                      : "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300"
+                  }`}
+                >
+                  {u.plan === "PAID" ? "בתשלום" : "דמו"}
+                </span>
+              </td>
+
               {/* Hospital */}
               <td className="p-2 text-muted-foreground">
                 {u.hospitalName ?? <span className="italic text-muted-foreground/50">—</span>}
@@ -191,18 +234,40 @@ export function UsersTable({
 
               {/* Role toggle */}
               <td className="p-2 text-center">
-                <button
-                  onClick={() => toggleRole(u.id, u.role)}
-                  disabled={isSelf || isPending}
-                  title={isSelf ? "לא ניתן לשנות את תפקידך שלך" : undefined}
-                  className={`rounded border px-2 py-1 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    u.role === "ADMIN"
-                      ? "hover:bg-muted text-muted-foreground"
-                      : "border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                  }`}
-                >
-                  {isPending ? "..." : u.role === "ADMIN" ? "הורד לרגיל" : "קדם לאדמין"}
-                </button>
+                <div className="flex flex-col gap-1 items-stretch">
+                  <button
+                    onClick={() => toggleRole(u.id, u.role)}
+                    disabled={isSelf || isPending}
+                    title={isSelf ? "לא ניתן לשנות את תפקידך שלך" : undefined}
+                    className={`rounded border px-2 py-1 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      u.role === "ADMIN"
+                        ? "hover:bg-muted text-muted-foreground"
+                        : "border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                    }`}
+                  >
+                    {isPending ? "..." : u.role === "ADMIN" ? "הורד לרגיל" : "קדם לאדמין"}
+                  </button>
+                  <button
+                    onClick={() => togglePlan(u.id, u.plan)}
+                    disabled={isSelf || isPending}
+                    title={isSelf ? "לא ניתן לשנות את התוכנית שלך" : undefined}
+                    className={`rounded border px-2 py-1 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      u.plan === "PAID"
+                        ? "hover:bg-muted text-muted-foreground"
+                        : "border-emerald-400 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    }`}
+                  >
+                    {isPending ? "..." : u.plan === "PAID" ? "הורד לדמו" : "שדרג לבתשלום"}
+                  </button>
+                  <button
+                    onClick={() => deleteUser(u.id, displayName)}
+                    disabled={isSelf || isPending}
+                    title={isSelf ? "לא ניתן למחוק את עצמך" : "מחיקת משתמש"}
+                    className="rounded border border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-2 py-1 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isPending ? "..." : "מחק משתמש"}
+                  </button>
+                </div>
               </td>
             </tr>
           );

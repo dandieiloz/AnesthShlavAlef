@@ -14,10 +14,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "USER";
+        token.plan = (user as { plan?: string }).plan ?? "DEMO";
+      }
+      // Backfill role/plan for existing sessions whose tokens predate this field,
+      // and refresh on explicit session updates so admin changes propagate without re-login.
+      const needsBackfill = token.id && (token.plan === undefined || trigger === "update");
+      if (needsBackfill) {
+        const fresh = await db.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, plan: true },
+        });
+        if (fresh) {
+          token.role = fresh.role;
+          token.plan = fresh.plan;
+        }
       }
       return token;
     },
@@ -25,6 +39,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = (token.role as "USER" | "ADMIN") ?? "USER";
+        session.user.plan = (token.plan as "DEMO" | "PAID") ?? "DEMO";
       }
       return session;
     },
@@ -40,6 +55,7 @@ export async function requireUser() {
     name?: string | null;
     image?: string | null;
     role: "USER" | "ADMIN";
+    plan: "DEMO" | "PAID";
   };
 }
 

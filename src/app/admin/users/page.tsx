@@ -6,7 +6,7 @@ import { AdminTabsNav } from "../AdminTabsNav";
 import { Suspense } from "react";
 
 const LIMIT = 200;
-const SORT_FIELDS = ["name", "role", "hospital", "residencyYear", "createdAt"] as const;
+const SORT_FIELDS = ["name", "role", "plan", "hospital", "residencyYear", "createdAt"] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
@@ -21,6 +21,7 @@ export default async function AdminUsersPage({
   searchParams: Promise<{
     q?: string;
     role?: string;
+    plan?: string;
     hospital?: string;
     profile?: string;
     sort?: string;
@@ -47,6 +48,10 @@ export default async function AdminUsersPage({
     where.role = sp.role;
   }
 
+  if (sp.plan === "DEMO" || sp.plan === "PAID") {
+    where.plan = sp.plan;
+  }
+
   if (sp.hospital?.trim()) {
     where.hospitalName = sp.hospital.trim();
   }
@@ -62,13 +67,15 @@ export default async function AdminUsersPage({
       ? [{ fullName: order }, { name: order }]
       : sort === "role"
         ? { role: order }
-        : sort === "hospital"
-          ? { hospitalName: order }
-          : sort === "residencyYear"
-            ? { residencyYear: order }
-            : { createdAt: order };
+        : sort === "plan"
+          ? { plan: order }
+          : sort === "hospital"
+            ? { hospitalName: order }
+            : sort === "residencyYear"
+              ? { residencyYear: order }
+              : { createdAt: order };
 
-  const [users, filteredTotal, totalUsers, adminCount, noProfileCount] = await Promise.all([
+  const [users, filteredTotal, totalUsers, adminCount, demoCount, noProfileCount] = await Promise.all([
     db.user.findMany({
       where,
       select: {
@@ -78,6 +85,7 @@ export default async function AdminUsersPage({
         email: true,
         image: true,
         role: true,
+        plan: true,
         hospitalName: true,
         residencyYear: true,
         createdAt: true,
@@ -88,6 +96,7 @@ export default async function AdminUsersPage({
     db.user.count({ where }),
     db.user.count(),
     db.user.count({ where: { role: "ADMIN" } }),
+    db.user.count({ where: { plan: "DEMO" } }),
     db.user.count({ where: { residencyYear: null } }),
   ]);
 
@@ -98,6 +107,7 @@ export default async function AdminUsersPage({
     email: u.email,
     image: u.image,
     role: u.role,
+    plan: u.plan,
     hospitalName: u.hospitalName,
     residencyYear: u.residencyYear,
     createdAt: u.createdAt.toISOString(),
@@ -109,7 +119,7 @@ export default async function AdminUsersPage({
       <h1 className="font-display text-2xl font-bold">ניהול משתמשים</h1>
 
       {/* Summary stat cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div className="rounded border bg-card p-3">
           <div className="text-2xl font-bold font-mono">{totalUsers}</div>
           <div className="text-xs text-muted-foreground mt-1">סה״כ משתמשים</div>
@@ -117,6 +127,10 @@ export default async function AdminUsersPage({
         <div className="rounded border bg-card p-3">
           <div className="text-2xl font-bold font-mono text-purple-600 dark:text-purple-400">{adminCount}</div>
           <div className="text-xs text-muted-foreground mt-1">מנהלים</div>
+        </div>
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{demoCount}</div>
+          <div className="text-xs text-muted-foreground mt-1">משתמשי דמו</div>
         </div>
         <div className="rounded border bg-card p-3">
           <div className="text-2xl font-bold font-mono text-orange-600 dark:text-orange-400">{noProfileCount}</div>

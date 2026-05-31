@@ -8,6 +8,7 @@ import { Choice } from "@prisma/client";
 import { ProfileSchema } from "@/app/onboarding/schema";
 import { getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
+import { questionAccessWhere, assertCanAccessQuestion } from "@/lib/plan";
 
 export async function updateProfileAction(formData: FormData) {
   const me = await requireUser();
@@ -24,7 +25,7 @@ export async function updateProfileAction(formData: FormData) {
 }
 
 const QuizSchema = z.object({
-  name: z.string().min(1).max(80),
+  name: z.string().min(1).max(200),
   chapterIds: z.array(z.coerce.number()).min(1),
   questionLimit: z.coerce.number().int().min(1).optional(),
 });
@@ -56,8 +57,9 @@ export async function createQuizAction(formData: FormData) {
     questionLimit: raw && String(raw).trim() !== "" ? raw : undefined,
   });
 
+  const planGate = await questionAccessWhere(me);
   const pool = await db.question.findMany({
-    where: { chapterIds: { hasSome: data.chapterIds }, geminiAnswer: { isNot: null } },
+    where: { chapterIds: { hasSome: data.chapterIds }, geminiAnswer: { isNot: null }, AND: [planGate] },
     select: { id: true },
   });
 
@@ -87,6 +89,7 @@ export async function submitAttemptAction(formData: FormData) {
     questionId: formData.get("questionId"),
     chosen: formData.get("chosen"),
   });
+  await assertCanAccessQuestion(me, data.questionId);
   const q = await db.question.findUnique({
     where: { id: data.questionId },
     include: { geminiAnswer: true },
@@ -112,7 +115,8 @@ export async function submitAttemptAction(formData: FormData) {
  * Idempotent: hits the translation cache if already populated.
  */
 export async function prefetchQuestionTranslationAction(questionId: number): Promise<void> {
-  await requireUser();
+  const me = await requireUser();
+  await assertCanAccessQuestion(me, questionId);
   const locale = await getContentLocale();
   if (locale === "he") return;
 

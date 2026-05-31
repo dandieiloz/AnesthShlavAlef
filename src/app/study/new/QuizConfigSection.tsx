@@ -77,7 +77,7 @@ export function QuizConfigSection({
           name="name"
           value={displayName}
           onChange={handleNameChange}
-          maxLength={80}
+          maxLength={200}
           dir={dir}
         />
       </div>

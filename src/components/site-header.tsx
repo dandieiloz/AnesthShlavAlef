@@ -21,6 +21,7 @@ interface NavUser {
   name?: string | null;
   image?: string | null;
   role?: string;
+  plan?: string;
 }
 
 interface SiteHeaderClientProps {
@@ -39,6 +40,7 @@ interface SiteHeaderClientProps {
     signIn: string;
     signOut: string;
     adminBadge: string;
+    demoBadge: string;
   };
 }
 
@@ -117,6 +119,15 @@ export function SiteHeaderClient({ user, signInAction, signOutAction, nav }: Sit
                     <p className="text-sm font-medium">{user.name}</p>
                     {user.role === "ADMIN" && (
                       <Badge variant="secondary" className="w-fit text-xs">{nav.adminBadge}</Badge>
+                    )}
+                    {user.role !== "ADMIN" && user.plan === "DEMO" && (
+                      <Badge
+                        variant="outline"
+                        className="w-fit text-xs border-amber-400 text-amber-700 dark:text-amber-300"
+                        title="לשדרוג לגישה מלאה פנה למנהלה"
+                      >
+                        {nav.demoBadge}
+                      </Badge>
                     )}
                   </div>
                 </DropdownMenuLabel>
