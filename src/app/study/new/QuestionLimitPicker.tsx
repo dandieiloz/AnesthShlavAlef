@@ -7,9 +7,17 @@ import type { Locale } from "@/lib/locale";
 
 const PRESETS = [10, 20, 50] as const;
 
-export function QuestionLimitPicker({ availableCount, locale }: { availableCount?: number; locale: Locale }) {
+export function QuestionLimitPicker({
+  availableCount,
+  locale,
+  defaultAll = false,
+}: {
+  availableCount?: number;
+  locale: Locale;
+  defaultAll?: boolean;
+}) {
   const t = getDictionary(locale).studyNew;
-  const [limit, setLimit] = useState<number | null>(10);
+  const [limit, setLimit] = useState<number | null>(defaultAll ? null : 10);
   const [custom, setCustom] = useState("");
 
   function selectPreset(n: number) {

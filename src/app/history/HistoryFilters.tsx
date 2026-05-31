@@ -2,6 +2,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 type Chapter = { number: number; title: string };
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
@@ -42,19 +43,20 @@ export function HistoryFilters({ chapters }: { chapters: Chapter[] }) {
         />
       </div>
 
-      <div>
+      <div className="min-w-[14rem]">
         <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
-        <select
+        <SearchableSelect
           name="source"
           defaultValue={params.get("source") ?? ""}
-          className="rounded border p-2 text-sm bg-background text-foreground"
-        >
-          <option value="">הכל</option>
-          <option value={NULL_SOURCE_FILTER}>ללא מוסד</option>
-          {QUESTION_SOURCES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+          options={[
+            { value: NULL_SOURCE_FILTER, label: "ללא מוסד" },
+            ...QUESTION_SOURCES.map((s) => ({ value: s, label: s })),
+          ]}
+          clearable
+          clearLabel="הכל"
+          placeholder="הכל"
+          searchPlaceholder="חיפוש מוסד..."
+        />
       </div>
 
       <div>

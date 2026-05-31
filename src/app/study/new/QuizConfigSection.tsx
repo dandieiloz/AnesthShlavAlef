@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ChapterPicker } from "./ChapterPicker";
 import { QuestionLimitPicker } from "./QuestionLimitPicker";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
@@ -10,7 +11,9 @@ import type { Locale } from "@/lib/locale";
 type StudyNewT = Dictionary["studyNew"];
 
 const MODE_STORAGE_KEY = "quizAnswerMode";
+const SETUP_MODE_STORAGE_KEY = "quizSetupMode";
 type AnswerMode = "immediate" | "full";
+type SetupMode = "chapters" | "exam";
 
 interface ChapterRow {
   id: number;
@@ -19,6 +22,16 @@ interface ChapterRow {
   learningUsefulnessIndex: number | null;
   questionCount: number;
   totalQuestionCount: number;
+}
+
+export interface ExamYearOption {
+  year: number;
+  total: number;
+  remaining: number;
+}
+export interface ExamInstituteOption {
+  institute: string;
+  years: ExamYearOption[];
 }
 
 function buildAutoName(chapters: ChapterRow[], t: StudyNewT): string {
@@ -34,10 +47,18 @@ export function QuizConfigSection({
   chapters,
   preselected = [],
   locale,
+  examOptions,
+  initialMode = "chapters",
+  initialInstitute = null,
+  initialYear = null,
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
   locale: Locale;
+  examOptions: ExamInstituteOption[];
+  initialMode?: SetupMode;
+  initialInstitute?: string | null;
+  initialYear?: number | null;
 }) {
   const t = getDictionary(locale).studyNew;
   const tq = getDictionary(locale).quiz;
@@ -47,6 +68,39 @@ export function QuizConfigSection({
   const [nameValue, setNameValue] = useState("");
   const [mode, setMode] = useState<AnswerMode>("immediate");
   const [includeSeen, setIncludeSeen] = useState(false);
+  const [setupMode, setSetupMode] = useState<SetupMode>(initialMode);
+
+  // Exam-mode selections. Default to URL-provided values if valid, else first option.
+  const initialInst = useMemo(() => {
+    if (initialInstitute && examOptions.some((e) => e.institute === initialInstitute)) {
+      return initialInstitute;
+    }
+    return examOptions[0]?.institute ?? "";
+  }, [examOptions, initialInstitute]);
+  const [institute, setInstitute] = useState<string>(initialInst);
+
+  const yearsForInstitute = useMemo(
+    () => examOptions.find((e) => e.institute === institute)?.years ?? [],
+    [examOptions, institute],
+  );
+  const initialYr = useMemo(() => {
+    if (initialYear && yearsForInstitute.some((y) => y.year === initialYear)) {
+      return initialYear;
+    }
+    return yearsForInstitute[0]?.year ?? null;
+  }, [yearsForInstitute, initialYear]);
+  const [year, setYear] = useState<number | null>(initialYr);
+
+  // Keep year valid when institute changes.
+  useEffect(() => {
+    if (yearsForInstitute.length === 0) {
+      setYear(null);
+      return;
+    }
+    if (!yearsForInstitute.some((y) => y.year === year)) {
+      setYear(yearsForInstitute[0].year);
+    }
+  }, [yearsForInstitute, year]);
 
   const displayedChapters = chapters.map((c) => ({
     ...c,
@@ -61,9 +115,20 @@ export function QuizConfigSection({
     try {
       const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
       if (stored === "immediate" || stored === "full") setMode(stored);
+      const storedSetup = window.localStorage.getItem(SETUP_MODE_STORAGE_KEY);
+      // Only honor stored setup mode if the URL didn't pin one.
+      if (
+        !initialInstitute &&
+        !initialYear &&
+        initialMode === "chapters" &&
+        (storedSetup === "chapters" || storedSetup === "exam")
+      ) {
+        setSetupMode(storedSetup);
+      }
     } catch {
       /* ignore */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function changeMode(next: AnswerMode) {
@@ -75,8 +140,31 @@ export function QuizConfigSection({
     }
   }
 
-  const availableCount = displayedSelected.reduce((sum, c) => sum + c.questionCount, 0);
-  const autoName = buildAutoName(selectedChapters, t);
+  function changeSetupMode(next: SetupMode) {
+    setSetupMode(next);
+    try {
+      window.localStorage.setItem(SETUP_MODE_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const selectedYear = yearsForInstitute.find((y) => y.year === year) ?? null;
+  const examAvailableCount = selectedYear
+    ? includeSeen
+      ? selectedYear.total
+      : selectedYear.remaining
+    : 0;
+
+  const chaptersAvailableCount = displayedSelected.reduce((sum, c) => sum + c.questionCount, 0);
+  const availableCount = setupMode === "exam" ? examAvailableCount : chaptersAvailableCount;
+
+  const autoName =
+    setupMode === "exam"
+      ? institute && year
+        ? `${institute} ${year}`
+        : t.defaultName
+      : buildAutoName(selectedChapters, t);
   const displayName = nameTouched ? nameValue : autoName;
 
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -86,51 +174,46 @@ export function QuizConfigSection({
   }
 
   const dir = locale === "he" ? "rtl" : "ltr";
+  const hasExamOptions = examOptions.length > 0;
 
   return (
     <>
-      <div className="space-y-2">
-        <Label>{t.chooseChapters}</Label>
-        <ChapterPicker
-          chapters={displayedChapters}
-          preselected={preselected}
-          onSelectedChaptersChange={(rows) =>
-            setSelectedChapters(chapters.filter((c) => rows.some((r) => r.id === c.id)))
-          }
-          locale={locale}
-        />
-        <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            name="includeSeen"
-            value="1"
-            checked={includeSeen}
-            onChange={(e) => setIncludeSeen(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-input accent-primary"
-          />
-          <span>
-            {locale === "he"
-              ? "כלול שאלות שכבר ענית עליהן"
-              : "Include questions I've already seen"}
-          </span>
-        </label>
-      </div>
-
-      <div className="space-y-2">
-        <Label>{t.questionCount}</Label>
-        <QuestionLimitPicker availableCount={availableCount} locale={locale} />
-      </div>
+      {/* Hidden marker for server action */}
+      <input type="hidden" name="mode" value={setupMode} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="quiz-name">{t.quizName}</Label>
-        <Input
-          id="quiz-name"
-          name="name"
-          value={displayName}
-          onChange={handleNameChange}
-          maxLength={200}
-          dir={dir}
-        />
+        <Label>{t.setupMode}</Label>
+        <div
+          className="inline-flex rounded-md border bg-muted/40 p-0.5 text-xs"
+          role="group"
+          aria-label={t.setupMode}
+        >
+          <button
+            type="button"
+            onClick={() => changeSetupMode("chapters")}
+            aria-pressed={setupMode === "chapters"}
+            className={`rounded px-3 py-1.5 transition-colors ${
+              setupMode === "chapters"
+                ? "bg-background font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.modeChapters}
+          </button>
+          <button
+            type="button"
+            onClick={() => changeSetupMode("exam")}
+            disabled={!hasExamOptions}
+            aria-pressed={setupMode === "exam"}
+            className={`rounded px-3 py-1.5 transition-colors ${
+              setupMode === "exam"
+                ? "bg-background font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            {t.modeExam}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-1.5">
@@ -167,6 +250,113 @@ export function QuizConfigSection({
         </div>
         <p className="text-xs text-muted-foreground">{t.answerModeHint}</p>
       </div>
+
+      {setupMode === "chapters" ? (
+        <div className="space-y-2">
+          <Label>{t.chooseChapters}</Label>
+          <ChapterPicker
+            chapters={displayedChapters}
+            preselected={preselected}
+            onSelectedChaptersChange={(rows) =>
+              setSelectedChapters(chapters.filter((c) => rows.some((r) => r.id === c.id)))
+            }
+            locale={locale}
+          />
+          <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              name="includeSeen"
+              value="1"
+              checked={includeSeen}
+              onChange={(e) => setIncludeSeen(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-input accent-primary"
+            />
+            <span>
+              {locale === "he"
+                ? "כלול שאלות שכבר ענית עליהן"
+                : "Include questions I've already seen"}
+            </span>
+          </label>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {!hasExamOptions ? (
+            <p className="text-sm text-muted-foreground">{t.noExamQuestions}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="exam-institute">{t.chooseInstitute}</Label>
+                  <SearchableSelect
+                    id="exam-institute"
+                    name="sourceInstitution"
+                    value={institute}
+                    onChange={(v) => setInstitute(v)}
+                    options={examOptions.map((opt) => ({ value: opt.institute, label: opt.institute }))}
+                    placeholder={t.chooseInstitute}
+                    searchPlaceholder={t.chooseInstitute}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="exam-year">{t.chooseYear}</Label>
+                  <select
+                    id="exam-year"
+                    name="sourceYear"
+                    value={year ?? ""}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    disabled={yearsForInstitute.length === 0}
+                    className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {yearsForInstitute.map((y) => (
+                      <option key={y.year} value={y.year}>
+                        {y.year} ({includeSeen ? y.total : y.remaining})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="includeSeen"
+                  value="1"
+                  checked={includeSeen}
+                  onChange={(e) => setIncludeSeen(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-input accent-primary"
+                />
+                <span>
+                  {locale === "he"
+                    ? "כלול שאלות שכבר ענית עליהן"
+                    : "Include questions I've already seen"}
+                </span>
+              </label>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label>{t.questionCount}</Label>
+        <QuestionLimitPicker
+          key={setupMode}
+          availableCount={availableCount}
+          locale={locale}
+          defaultAll={setupMode === "exam"}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="quiz-name">{t.quizName}</Label>
+        <Input
+          id="quiz-name"
+          name="name"
+          value={displayName}
+          onChange={handleNameChange}
+          maxLength={200}
+          dir={dir}
+        />
+      </div>
     </>
   );
 }
+

@@ -2,6 +2,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
 import { HOSPITALS } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export function UsersFilters() {
   const router = useRouter();
@@ -65,18 +66,17 @@ export function UsersFilters() {
         </select>
       </div>
 
-      <div>
+      <div className="min-w-[14rem]">
         <label className="block text-xs font-medium text-muted-foreground mb-1">בית חולים</label>
-        <select
+        <SearchableSelect
           name="hospital"
           defaultValue={params.get("hospital") ?? ""}
-          className="rounded border p-2 text-sm bg-background text-foreground"
-        >
-          <option value="">הכל</option>
-          {HOSPITALS.map((h) => (
-            <option key={h} value={h}>{h}</option>
-          ))}
-        </select>
+          options={HOSPITALS}
+          clearable
+          clearLabel="הכל"
+          placeholder="הכל"
+          searchPlaceholder="חיפוש בית חולים..."
+        />
       </div>
 
       <div>

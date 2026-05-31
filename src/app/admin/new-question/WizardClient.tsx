@@ -12,6 +12,7 @@ import {
 } from "@/app/admin/new-question/actions";
 import type { ParsedQuestion } from "@/lib/wizard";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 type Chapter = { number: number; title: string; ingested: boolean };
 
@@ -191,18 +192,17 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
         <h2 className="text-base font-semibold">מקור השאלות</h2>
         <p className="text-xs text-muted-foreground mt-0.5">ייושם על כל השאלות בתור</p>
         <div className="mt-2 flex flex-wrap gap-3 items-end">
-          <div>
+          <div className="min-w-[16rem]">
             <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
-            <select
+            <SearchableSelect
               value={sourceInstitution}
-              onChange={(e) => setSourceInstitution(e.target.value)}
-              className="rounded border p-1 text-sm bg-background text-foreground"
-            >
-              <option value="">— ללא מוסד —</option>
-              {QUESTION_SOURCES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+              onChange={(v) => setSourceInstitution(v)}
+              options={QUESTION_SOURCES}
+              clearable
+              clearLabel="— ללא מוסד —"
+              placeholder="— ללא מוסד —"
+              searchPlaceholder="חיפוש מוסד..."
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">שנה</label>

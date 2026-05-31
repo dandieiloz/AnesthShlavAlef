@@ -14,11 +14,18 @@ import { questionAccessWhere } from "@/lib/plan";
 export default async function NewQuizPage({
   searchParams,
 }: {
-  searchParams: Promise<{ chapter?: string; empty?: string }>;
+  searchParams: Promise<{
+    chapter?: string;
+    empty?: string;
+    mode?: string;
+    inst?: string;
+    year?: string;
+  }>;
 }) {
   const me = await requireCompletedProfile();
-  const { chapter, empty } = await searchParams;
+  const { chapter, empty, mode, inst, year } = await searchParams;
   const preselectedChapter = chapter ? Number(chapter) : null;
+  const initialMode: "chapters" | "exam" = mode === "exam" ? "exam" : "chapters";
 
   const locale = await getLocale();
   const dict = getDictionary(locale);
@@ -50,10 +57,13 @@ export default async function NewQuizPage({
       geminiAnswer: { isNot: null },
       AND: [planGate],
     },
-    select: { id: true, chapterIds: true },
+    select: { id: true, chapterIds: true, source: true },
   });
   const remainingByChapterId = new Map<number, number>();
   const totalByChapterId = new Map<number, number>();
+  // Past-exam mode: group by "<institute> <year>" (split on last space).
+  type ExamCounts = { total: number; remaining: number };
+  const examMap = new Map<string, Map<number, ExamCounts>>(); // institute -> year -> counts
   for (const q of allQuestions) {
     const seen = attemptedIds.has(q.id);
     for (const cid of q.chapterIds) {
@@ -62,7 +72,35 @@ export default async function NewQuizPage({
         remainingByChapterId.set(cid, (remainingByChapterId.get(cid) ?? 0) + 1);
       }
     }
+    if (q.source) {
+      const lastSpace = q.source.lastIndexOf(" ");
+      if (lastSpace > 0) {
+        const institute = q.source.slice(0, lastSpace).trim();
+        const yr = Number(q.source.slice(lastSpace + 1).trim());
+        if (institute && Number.isFinite(yr)) {
+          let years = examMap.get(institute);
+          if (!years) {
+            years = new Map();
+            examMap.set(institute, years);
+          }
+          const counts = years.get(yr) ?? { total: 0, remaining: 0 };
+          counts.total += 1;
+          if (!seen) counts.remaining += 1;
+          years.set(yr, counts);
+        }
+      }
+    }
   }
+
+  // Shape exam options for the client: sorted institutes, each with sorted years (desc).
+  const examOptions = [...examMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "he"))
+    .map(([institute, years]) => ({
+      institute,
+      years: [...years.entries()]
+        .sort(([a], [b]) => b - a)
+        .map(([yr, counts]) => ({ year: yr, total: counts.total, remaining: counts.remaining })),
+    }));
 
   const titles = await Promise.all(
     chapters.map((c) =>
@@ -110,7 +148,11 @@ export default async function NewQuizPage({
           role="alert"
           className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
         >
-          {locale === "he"
+          {initialMode === "exam"
+            ? locale === "he"
+              ? "כבר ענית על כל השאלות במבחן שבחרת. נסה לבחור מבחן אחר."
+              : "You've already answered every question in that exam. Try a different one."
+            : locale === "he"
             ? "כבר ענית על כל השאלות בפרקים שבחרת. נסה לבחור פרקים אחרים."
             : "You've already answered every question in the chapters you picked. Try selecting different chapters."}
         </div>
@@ -120,7 +162,15 @@ export default async function NewQuizPage({
         <CardContent className="pt-6">
           <form action={createQuizAction} className="space-y-6">
             {/* Chapter picker, question limit, and auto-named quiz name */}
-            <QuizConfigSection chapters={rows} preselected={preselected} locale={locale} />
+            <QuizConfigSection
+              chapters={rows}
+              preselected={preselected}
+              locale={locale}
+              examOptions={examOptions}
+              initialMode={initialMode}
+              initialInstitute={inst ?? null}
+              initialYear={year ? Number(year) : null}
+            />
 
             <Button type="submit" className="w-full gap-2" size="lg">
               <PlusCircle className="h-4 w-4" />

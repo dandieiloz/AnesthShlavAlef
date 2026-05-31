@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction } from "./actions";
 
 export type QuestionRow = {
@@ -216,18 +217,17 @@ export function QuestionsTable({
         <div className="mb-3 rounded border bg-card p-4 space-y-3">
           <h3 className="text-sm font-semibold">עדכן מקור עבור {selected.size} שאלות</h3>
           <div className="flex flex-wrap gap-3 items-end">
-            <div>
+            <div className="min-w-[16rem]">
               <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
-              <select
+              <SearchableSelect
                 value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-                className="rounded border p-1.5 text-sm bg-background text-foreground"
-              >
-                <option value="">— ללא מוסד —</option>
-                {QUESTION_SOURCES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+                onChange={(v) => setInstitution(v)}
+                options={QUESTION_SOURCES}
+                clearable
+                clearLabel="— ללא מוסד —"
+                placeholder="— ללא מוסד —"
+                searchPlaceholder="חיפוש מוסד..."
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">שנה</label>

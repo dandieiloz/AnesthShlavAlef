@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { saveProfileAction } from "./actions";
 import { HOSPITALS } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,18 +61,14 @@ export default async function OnboardingPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="hospitalName">{t.hospitalName}</Label>
-              <select
+              <SearchableSelect
                 id="hospitalName"
                 name="hospitalName"
                 required
-                defaultValue=""
-                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="" disabled>{t.hospitalPlaceholder}</option>
-                {HOSPITALS.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
+                options={HOSPITALS}
+                placeholder={t.hospitalPlaceholder}
+                searchPlaceholder={t.hospitalPlaceholder}
+              />
             </div>
 
             <div className="space-y-1.5">

@@ -32,6 +32,14 @@ const QuizSchema = z.object({
   includeSeen: z.boolean().optional().default(false),
 });
 
+const QuizExamSchema = z.object({
+  name: z.string().min(1).max(200),
+  sourceInstitution: z.string().min(1).max(200),
+  sourceYear: z.coerce.number().int().min(1900).max(2100),
+  questionLimit: z.coerce.number().int().min(1).optional(),
+  includeSeen: z.boolean().optional().default(false),
+});
+
 function fisherYatesSample<T>(arr: T[], n: number): T[] {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -53,6 +61,60 @@ async function resolveUniqueName(userId: string, baseName: string): Promise<stri
 export async function createQuizAction(formData: FormData) {
   const me = await requireUser();
   const raw = formData.get("questionLimit");
+  const mode = formData.get("mode") === "exam" ? "exam" : "chapters";
+
+  if (mode === "exam") {
+    const data = QuizExamSchema.parse({
+      name: formData.get("name") || "מבחן",
+      sourceInstitution: formData.get("sourceInstitution"),
+      sourceYear: formData.get("sourceYear"),
+      questionLimit: raw && String(raw).trim() !== "" ? raw : undefined,
+      includeSeen: formData.get("includeSeen") === "1",
+    });
+
+    const planGate = await questionAccessWhere(me);
+    const attemptedIds = data.includeSeen
+      ? []
+      : (
+          await db.attempt.findMany({
+            where: { userId: me.id },
+            select: { questionId: true },
+            distinct: ["questionId"],
+          })
+        ).map((a) => a.questionId);
+    const sourceValue = `${data.sourceInstitution} ${data.sourceYear}`;
+    const pool = await db.question.findMany({
+      where: {
+        source: sourceValue,
+        geminiAnswer: { isNot: null },
+        id: { notIn: attemptedIds },
+        AND: [planGate],
+      },
+      select: { id: true },
+    });
+
+    if (pool.length === 0) {
+      const q = new URLSearchParams({
+        empty: "1",
+        mode: "exam",
+        inst: data.sourceInstitution,
+        year: String(data.sourceYear),
+      });
+      redirect(`/study/new?${q.toString()}`);
+    }
+
+    const questionIds = fisherYatesSample(
+      pool.map((q) => q.id),
+      data.questionLimit ?? pool.length,
+    );
+
+    const resolvedName = await resolveUniqueName(me.id, data.name);
+    const quiz = await db.quiz.create({
+      data: { userId: me.id, name: resolvedName, chapterIds: [], questionIds },
+    });
+    redirect(`/quiz/${quiz.id}`);
+  }
+
   const data = QuizSchema.parse({
     name: formData.get("name") || "מבחן",
     chapterIds: formData.getAll("chapterIds").map(String),

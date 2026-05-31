@@ -15,6 +15,7 @@ import {
 } from "@/app/admin/queue/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export default async function AdminQuestionPage({
   params,
@@ -78,14 +79,17 @@ export default async function AdminQuestionPage({
           const defYear = lastSpace >= 0 ? (q.source ?? "").slice(lastSpace + 1) : "";
           return (
             <div className="flex flex-wrap items-end gap-2">
-              <div>
+              <div className="min-w-[16rem]">
                 <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
-                <select name="sourceInstitution" defaultValue={defInstitution} className="rounded border p-1 text-sm bg-background text-foreground">
-                  <option value="">— ללא מוסד —</option>
-                  {QUESTION_SOURCES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  name="sourceInstitution"
+                  defaultValue={defInstitution}
+                  options={QUESTION_SOURCES}
+                  clearable
+                  clearLabel="— ללא מוסד —"
+                  placeholder="— ללא מוסד —"
+                  searchPlaceholder="חיפוש מוסד..."
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">שנה</label>
