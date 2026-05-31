@@ -72,12 +72,22 @@ export async function generateJson<T>(
   }
 }
 
-// Gemini frequently emits LaTeX (e.g. \text, \times, \Delta, \frac) with a single
-// backslash inside JSON string values. JSON.parse would then interpret \t / \b /
-// \f / \n / \r as control characters and silently drop the backslash, corrupting
-// downstream KaTeX rendering. A backslash followed by a letter that is part of a
-// letter run can only be a LaTeX command — never a real JSON escape — so we
-// double the backslash. Leaves legitimate escapes like \n", \t", \" untouched.
+// Gemini frequently emits LaTeX inside JSON string values with a single backslash,
+// which either (a) silently corrupts text via JSON escape collapse (`\text` → TAB+"ext",
+// `\beta` → BS+"eta", `\frac` → FF+"rac"), or (b) throws "Bad escaped character" for
+// LaTeX spacing/delimiters like `\(`, `\)`, `\,`, `\;`, `\$`, `\!`.
+//
+// Fix in two passes:
+//   1. `\X` where X is a letter that begins a multi-letter run → LaTeX command;
+//      double the backslash (handles \text, \beta, \frac, \nabla, \rho, \Delta…).
+//   2. `\X` where X is any char NOT a valid JSON escape (`"\/bfnrtu`) → also LaTeX;
+//      double the backslash (handles \(, \), \,, \;, \$, \!, \%, \&, \#…).
+// Legitimate JSON escapes like `\n"`, `\t,`, `\"`, `\\`, `\u00e9` are untouched.
 export function sanitizeLatexBackslashes(raw: string): string {
-  return raw.replace(/\\([a-zA-Z])(?=[a-zA-Z])/g, "\\\\$1");
+  return raw
+    // Pass 1: `\X` where X is a letter that begins a multi-letter run → LaTeX command.
+    .replace(/\\([a-zA-Z])(?=[a-zA-Z])/g, "\\\\$1")
+    // Pass 2: `\X` where X is any other char NOT a valid JSON escape (`"\/bfnrtu`).
+    // Lookbehind skips the second `\` of pairs already doubled by pass 1.
+    .replace(/(?<!\\)\\([^"\\/bfnrtu])/g, "\\\\$1");
 }
