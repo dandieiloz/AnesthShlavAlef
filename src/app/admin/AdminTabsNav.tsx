@@ -12,6 +12,7 @@ const ADMIN_TABS = [
   { href: "/admin/debug-reports", label: "דיווחי באג" },
   { href: "/admin/users", label: "משתמשים" },
   { href: "/admin/demo-plan", label: "תוכנית דמו" },
+  { href: "/admin/announcements", label: "הודעות" },
 ] as const;
 
 function isTabActive(pathname: string, href: string) {

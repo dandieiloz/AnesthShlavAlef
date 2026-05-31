@@ -1,22 +1,38 @@
 import Link from "next/link";
 import { Sparkles, ArrowLeft, MessageSquareHeart } from "lucide-react";
+import { db } from "@/lib/db";
+import { AnnouncementsRotator } from "./AnnouncementsRotator";
 
-export function BetaBanner({
+export async function BetaBanner({
   t,
   locale,
 }: {
   t: { label: string; message: string; cta: string };
   locale: "he" | "en";
 }) {
+  const announcements = await db.announcement
+    .findMany({
+      where: { enabled: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, message: true, ctaLabel: true, ctaHref: true },
+    })
+    .catch(
+      () =>
+        [] as { id: string; message: string; ctaLabel: string | null; ctaHref: string | null }[]
+    );
+
+  if (announcements.length > 0) {
+    return <AnnouncementsRotator items={announcements} locale={locale} />;
+  }
+
   const isRtl = locale === "he";
   return (
     <div className="sticky top-14 z-30 w-full border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-2 text-sm sm:justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="relative inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
-            <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-40" aria-hidden />
-            <Sparkles className="relative h-3 w-3" />
-            <span className="relative">{t.label}</span>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground">
+            <Sparkles className="h-3 w-3" />
+            <span>{t.label}</span>
           </span>
           <span className="text-foreground/90 font-medium leading-snug">{t.message}</span>
         </div>
