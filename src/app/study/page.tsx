@@ -10,12 +10,12 @@ import { usefulnessTone, TONE_DOT_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/l
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
+import { StatsSection } from "./StatsSection";
+import { QuizzesClient, type QuizRow } from "@/app/quizzes/QuizzesClient";
 import {
   PlusCircle,
-  ArrowLeft,
   Clock,
-  CheckCircle2,
-  BookOpen,
+  ListChecks,
   Layers,
   Play,
   Bug,
@@ -74,9 +74,22 @@ export default async function StudyPage() {
     return p && !p.isComplete && p.answered > 0;
   });
 
-  const recentCompleted = allQuizzes
-    .filter((q) => progressMap.get(q.id)?.isComplete)
-    .slice(0, 5);
+  const quizRows: QuizRow[] = allQuizzes.map((q) => {
+    const p = progressMap.get(q.id)!;
+    return {
+      id: q.id,
+      name: q.name,
+      chapterCount: q.chapterIds.length,
+      createdAt: q.createdAt.toISOString(),
+      answered: p.answered,
+      total: p.total,
+      correct: p.correct,
+      isComplete: p.isComplete,
+      accuracyPct: p.accuracyPct,
+      lastActivityAt: p.lastActivityAt?.toISOString() ?? null,
+    };
+  });
+  const tQuizzes = getDictionary(locale).quizzes;
 
   return (
     <div className="space-y-10 animate-fade-in">
@@ -177,51 +190,32 @@ export default async function StudyPage() {
         </div>
       </section>
 
-      {/* Recent quizzes strip */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-primary" />
-            {t.recentQuizzes}
-          </h2>
-          <Link href="/quizzes" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            {t.allQuizzes}
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </Link>
-        </div>
+      {/* Stats */}
+      <section>
+        <StatsSection userId={me.id} locale={locale} />
+      </section>
 
-        {recentCompleted.length === 0 && inProgress.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center text-sm text-muted-foreground space-y-3">
-              <CheckCircle2 className="mx-auto h-8 w-8 text-muted-foreground/40" />
-              <p>{t.noQuizzes}</p>
-              <Button asChild size="sm">
-                <Link href="/study/new">{t.createFirst}</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory">
-            {recentCompleted.map((q) => {
-              const p = progressMap.get(q.id)!;
-              return (
-                <Link key={q.id} href={`/quiz/${q.id}`} className="snap-start shrink-0">
-                  <Card className="group w-44 transition-all hover:shadow-md hover:-translate-y-0.5">
-                    <CardContent className="p-3 space-y-2">
-                      <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{q.name}</p>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3 text-success" />
-                          {p.accuracyPct}%
-                        </span>
-                        <span>{q.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
+      {/* My quizzes (tabbed) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-primary" />
+              {tQuizzes.title}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {quizRows.length === 0 ? tQuizzes.empty : tQuizzes.countSuffix(quizRows.length)}
+            </p>
           </div>
+          <Button asChild size="sm" className="gap-1.5">
+            <Link href="/study/new">
+              <PlusCircle className="h-3.5 w-3.5" />
+              {tQuizzes.newQuiz}
+            </Link>
+          </Button>
+        </div>
+        {quizRows.length > 0 && (
+          <QuizzesClient quizzes={quizRows} locale={locale} />
         )}
       </section>
 

@@ -20,6 +20,8 @@
  * the source text is unchanged. `hashSentence` lets callers detect drift.
  */
 
+import { ensureMathDelimiters } from "@/lib/math-delimit";
+
 const HE_TERMINATORS = ".!?;:";
 // Match a sentence terminator followed by whitespace OR end-of-string,
 // while staying outside `...$`, `$$...$$`, and `` `...` `` spans.
@@ -78,7 +80,8 @@ function splitBlockIntoSentences(block: string): string[] {
  */
 export function splitSentences(markdown: string): string[] {
   if (!markdown) return [];
-  const blocks = markdown.split(/\n\s*\n/);
+  const normalized = ensureMathDelimiters(markdown);
+  const blocks = normalized.split(/\n\s*\n/);
   const out: string[] = [];
   for (const block of blocks) {
     const trimmed = block.trim();

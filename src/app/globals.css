@@ -286,4 +286,17 @@
   .answer-highlightable .answer-content :where(ul, ol) {
     padding-inline-start: 1.25rem;
   }
+
+  /* KaTeX renders math LTR. When the surrounding container is RTL (Hebrew
+     explanations), inline math fragments would otherwise be reordered with
+     adjacent text, flipping subscripts/superscripts visually. Isolate them. */
+  .answer-content :where(.katex, .katex-display) {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: initial;
+  }
+  .answer-content .katex-display {
+    display: block;
+    margin: 0.5em 0;
+  }
 }

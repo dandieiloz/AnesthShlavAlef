@@ -146,7 +146,7 @@ export default async function QuizReviewPage({
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
-            <Link href="/quizzes" className="hover:text-foreground transition-colors">
+            <Link href="/study" className="hover:text-foreground transition-colors">
               {t.myQuizzes}
             </Link>
             <ChevronIcon className="h-3.5 w-3.5" />
@@ -409,7 +409,7 @@ export default async function QuizReviewPage({
       {/* Bottom nav */}
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button asChild variant="outline" size="sm">
-          <Link href="/quizzes" className="gap-2">
+          <Link href="/study" className="gap-2">
             <ArrowIcon className="h-3.5 w-3.5" />
             {t.allQuizzes}
           </Link>

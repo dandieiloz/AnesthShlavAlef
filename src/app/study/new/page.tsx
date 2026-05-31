@@ -9,14 +9,15 @@ import Link from "next/link";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
+import { questionAccessWhere } from "@/lib/plan";
 
 export default async function NewQuizPage({
   searchParams,
 }: {
-  searchParams: Promise<{ chapter?: string }>;
+  searchParams: Promise<{ chapter?: string; empty?: string }>;
 }) {
-  await requireCompletedProfile();
-  const { chapter } = await searchParams;
+  const me = await requireCompletedProfile();
+  const { chapter, empty } = await searchParams;
   const preselectedChapter = chapter ? Number(chapter) : null;
 
   const locale = await getLocale();
@@ -25,10 +26,43 @@ export default async function NewQuizPage({
 
   const chapters = await db.chapter.findMany({
     orderBy: { number: "asc" },
-    include: {
-      _count: { select: { questions: { where: { geminiAnswer: { isNot: null } } } } },
+    select: {
+      id: true,
+      number: true,
+      title: true,
+      learningUsefulnessIndex: true,
     },
   });
+
+  // Count questions per chapter using chapterIds[] — same membership +
+  // plan-gate rules the quiz pool uses in createQuizAction. Compute both
+  // "remaining" (un-attempted) and "total" so the client can switch counts
+  // based on the "include questions I've already seen" toggle.
+  const planGate = await questionAccessWhere(me);
+  const attempted = await db.attempt.findMany({
+    where: { userId: me.id },
+    select: { questionId: true },
+    distinct: ["questionId"],
+  });
+  const attemptedIds = new Set(attempted.map((a) => a.questionId));
+  const allQuestions = await db.question.findMany({
+    where: {
+      geminiAnswer: { isNot: null },
+      AND: [planGate],
+    },
+    select: { id: true, chapterIds: true },
+  });
+  const remainingByChapterId = new Map<number, number>();
+  const totalByChapterId = new Map<number, number>();
+  for (const q of allQuestions) {
+    const seen = attemptedIds.has(q.id);
+    for (const cid of q.chapterIds) {
+      totalByChapterId.set(cid, (totalByChapterId.get(cid) ?? 0) + 1);
+      if (!seen) {
+        remainingByChapterId.set(cid, (remainingByChapterId.get(cid) ?? 0) + 1);
+      }
+    }
+  }
 
   const titles = await Promise.all(
     chapters.map((c) =>
@@ -41,7 +75,8 @@ export default async function NewQuizPage({
     number: c.number,
     title: titles[i].title,
     learningUsefulnessIndex: c.learningUsefulnessIndex,
-    questionCount: c._count.questions,
+    questionCount: remainingByChapterId.get(c.id) ?? 0,
+    totalQuestionCount: totalByChapterId.get(c.id) ?? 0,
   }));
 
   // Pre-select chapter by number if query-param given
@@ -69,6 +104,17 @@ export default async function NewQuizPage({
         <h1 className="font-display text-2xl font-bold">{t.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
+
+      {empty === "1" && (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+        >
+          {locale === "he"
+            ? "כבר ענית על כל השאלות בפרקים שבחרת. נסה לבחור פרקים אחרים."
+            : "You've already answered every question in the chapters you picked. Try selecting different chapters."}
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-6">

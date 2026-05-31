@@ -51,7 +51,6 @@ export function ChapterPicker({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return chapters.filter((c) => {
-      if (c.questionCount === 0) return false;
       if (toneFilter.size > 0 && !toneFilter.has(usefulnessTone(c.learningUsefulnessIndex))) return false;
       if (q) {
         const num = String(c.number);
@@ -72,7 +71,9 @@ export function ChapterPicker({
   function selectAllVisible() {
     setSelected((prev) => {
       const next = new Set(prev);
-      visible.forEach((c) => next.add(c.id));
+      visible.forEach((c) => {
+        if (c.questionCount > 0) next.add(c.id);
+      });
       return next;
     });
   }
@@ -86,6 +87,8 @@ export function ChapterPicker({
   }
 
   function toggle(id: number) {
+    const chapter = chapters.find((c) => c.id === id);
+    if (chapter && chapter.questionCount === 0) return;
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -156,23 +159,29 @@ export function ChapterPicker({
           visible.map((c) => {
             const tone = usefulnessTone(c.learningUsefulnessIndex);
             const isSelected = selected.has(c.id);
+            const disabled = c.questionCount === 0;
             return (
               <label
                 key={c.id}
-                className={`flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer transition-colors hover:brightness-95 dark:hover:brightness-110 ${TONE_ROW_CLASS[tone]}`}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors ${
+                  disabled
+                    ? "cursor-not-allowed opacity-50"
+                    : `cursor-pointer hover:brightness-95 dark:hover:brightness-110 ${TONE_ROW_CLASS[tone]}`
+                }`}
               >
                 <input
                   type="checkbox"
                   name="chapterIds"
                   value={c.id}
                   checked={isSelected}
+                  disabled={disabled}
                   onChange={() => toggle(c.id)}
-                  className="h-4 w-4 rounded border-input accent-primary"
+                  className="h-4 w-4 rounded border-input accent-primary disabled:cursor-not-allowed"
                 />
                 <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT_CLASS[tone]}`} />
                 <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">{c.number}</span>
                 <span className="flex-1 font-medium">{c.title}</span>
-                <Badge variant="secondary" className="shrink-0 text-xs">{c.questionCount}</Badge>
+                <Badge variant={disabled ? "outline" : "secondary"} className="shrink-0 text-xs">{c.questionCount}</Badge>
               </label>
             );
           })

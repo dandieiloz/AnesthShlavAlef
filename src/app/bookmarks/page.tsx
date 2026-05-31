@@ -4,14 +4,18 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toggleBookmarkAction } from "@/app/(user)/actions";
 import { removeHighlightByIdAction } from "@/app/(user)/highlight-actions";
-import { Bookmark, BookmarkX, BookOpen, Highlighter, StickyNote, Trash2 } from "lucide-react";
+import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
+import { Bookmark, BookmarkX, BookOpen, CheckCircle2, Highlighter, StickyNote, Trash2 } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
+
+const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
 const COLOR_SWATCH: Record<number, string> = {
   1: "bg-yellow-300 dark:bg-yellow-400",
@@ -59,7 +63,12 @@ export default async function BookmarksPage() {
           select: {
             id: true,
             stem: true,
+            optionA: true,
+            optionB: true,
+            optionC: true,
+            optionD: true,
             chapter: { select: { number: true, title: true } },
+            geminiAnswer: true,
           },
         },
       },
@@ -79,12 +88,45 @@ export default async function BookmarksPage() {
     }),
   ]);
 
+  const bookmarkedQuestionIds = bookmarks.map((b) => b.question.id);
+  const bookmarkHighlights = bookmarkedQuestionIds.length
+    ? await db.sentenceHighlight.findMany({
+        where: {
+          userId: me.id,
+          locale: contentLocale,
+          questionId: { in: bookmarkedQuestionIds },
+        },
+        select: {
+          id: true,
+          questionId: true,
+          section: true,
+          sentenceIndex: true,
+          colorId: true,
+          sentenceHash: true,
+          note: true,
+        },
+      })
+    : [];
+  const bookmarkHighlightsByQ = new Map<number, typeof bookmarkHighlights>();
+  for (const h of bookmarkHighlights) {
+    const arr = bookmarkHighlightsByQ.get(h.questionId) ?? [];
+    arr.push(h);
+    bookmarkHighlightsByQ.set(h.questionId, arr);
+  }
+
   const translated = await Promise.all(
     bookmarks.map((b) =>
       getTranslatedFields(
         "Question",
         String(b.question.id),
-        { stem: b.question.stem, chapterTitle: b.question.chapter.title },
+        {
+          stem: b.question.stem,
+          optionA: b.question.optionA,
+          optionB: b.question.optionB,
+          optionC: b.question.optionC,
+          optionD: b.question.optionD,
+          chapterTitle: b.question.chapter.title,
+        },
         contentLocale,
       ),
     ),
@@ -151,24 +193,31 @@ export default async function BookmarksPage() {
             </Card>
           ) : (
             <ul className="space-y-3">
-              {bookmarks.map((b, i) => (
+              {bookmarks.map((b, i) => {
+                const q = b.question;
+                const qT = translated[i];
+                const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
+                const correctAnswer = q.geminiAnswer?.correctAnswer;
+                return (
                 <li key={b.id}>
                   <Card className="transition-all hover:shadow-sm">
-                    <CardContent className="p-4 space-y-2">
+                    <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <Badge variant="secondary" className="text-xs shrink-0">
-                              {dict.common.chapter} {b.question.chapter.number}
+                              {dict.common.chapter} {q.chapter.number}
                             </Badge>
                             <span className="text-xs text-muted-foreground line-clamp-1">
-                              {translated[i].chapterTitle}
+                              {qT.chapterTitle}
                             </span>
                           </div>
-                          <p className="text-sm font-medium line-clamp-3">{translated[i].stem}</p>
+                          <p dir="auto" className="text-sm font-medium leading-relaxed [unicode-bidi:plaintext]">
+                            {qT.stem}
+                          </p>
                         </div>
                         <form action={toggleBookmarkAction}>
-                          <input type="hidden" name="questionId" value={b.question.id} />
+                          <input type="hidden" name="questionId" value={q.id} />
                           <button
                             type="submit"
                             title={t.removeBookmark}
@@ -179,6 +228,63 @@ export default async function BookmarksPage() {
                           </button>
                         </form>
                       </div>
+
+                      {/* Answer options */}
+                      <div className="space-y-1.5">
+                        {OPTION_KEYS.map((k, idx) => {
+                          const isCorrect = correctAnswer === k;
+                          const rowClass = isCorrect
+                            ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
+                            : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
+                          const letterClass = isCorrect
+                            ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-success text-white"
+                            : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-muted text-muted-foreground";
+                          return (
+                            <div key={k} className={rowClass}>
+                              <span className={letterClass}>{letters[idx]}</span>
+                              <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]">
+                                {optionTexts[idx]}
+                              </span>
+                              {isCorrect && (
+                                <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Full answer / explanation */}
+                      {q.geminiAnswer && (
+                        <>
+                          <Separator className="opacity-40" />
+                          <details className="group">
+                            <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
+                              <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                              {dict.review.detailedExplanation}
+                            </summary>
+                            <div className="mt-3">
+                              <AnswerExplanation
+                                explanation={q.geminiAnswer.explanation}
+                                evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
+                                whyOthersWrong={q.geminiAnswer.whyOthersWrong}
+                                correctAnswer={q.geminiAnswer.correctAnswer}
+                                options={[
+                                  { key: "A", text: q.optionA },
+                                  { key: "B", text: q.optionB },
+                                  { key: "C", text: q.optionC },
+                                  { key: "D", text: q.optionD },
+                                ]}
+                                insufficientEvidence={q.geminiAnswer.insufficientEvidence}
+                                locale={contentLocale}
+                                questionId={q.id}
+                                highlights={bookmarkHighlightsByQ.get(q.id) ?? []}
+                                highlightT={dict.highlights}
+                              />
+                            </div>
+                          </details>
+                        </>
+                      )}
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           {t.savedOn} {b.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
@@ -187,7 +293,8 @@ export default async function BookmarksPage() {
                     </CardContent>
                   </Card>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </TabsContent>
