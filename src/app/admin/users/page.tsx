@@ -100,6 +100,20 @@ export default async function AdminUsersPage({
     db.user.count({ where: { residencyYear: null } }),
   ]);
 
+  // Fetch attempt counts only for the users we're about to render. One indexed
+  // groupBy on Attempt(userId) keeps this O(visibleUsers) rather than N+1.
+  const userIds = users.map((u) => u.id);
+  const attemptCounts = userIds.length
+    ? await db.attempt.groupBy({
+        by: ["userId"],
+        where: { userId: { in: userIds } },
+        _count: { _all: true },
+      })
+    : [];
+  const attemptCountByUser = new Map<string, number>(
+    attemptCounts.map((row) => [row.userId, row._count._all]),
+  );
+
   const rows: UserRow[] = users.map((u) => ({
     id: u.id,
     name: u.name,
@@ -111,6 +125,7 @@ export default async function AdminUsersPage({
     hospitalName: u.hospitalName,
     residencyYear: u.residencyYear,
     createdAt: u.createdAt.toISOString(),
+    attemptCount: attemptCountByUser.get(u.id) ?? 0,
   }));
 
   return (

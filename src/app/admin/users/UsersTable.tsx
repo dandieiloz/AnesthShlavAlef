@@ -15,6 +15,7 @@ export type UserRow = {
   hospitalName: string | null;
   residencyYear: number | null;
   createdAt: string;
+  attemptCount: number;
 };
 
 type SortField = "name" | "role" | "plan" | "hospital" | "residencyYear" | "createdAt";
@@ -144,6 +145,7 @@ export function UsersTable({
           <SortHeader field="residencyYear" label="שנה" align="center" />
           <SortHeader field="createdAt" label="הצטרף" />
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרופיל</th>
+          <th className="p-2 text-center text-muted-foreground whitespace-nowrap">היסטוריה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פעולות</th>
         </tr>
       </thead>
@@ -230,6 +232,24 @@ export function UsersTable({
                 >
                   {profileComplete ? "מלא" : "חסר"}
                 </span>
+              </td>
+
+              {/* History link */}
+              <td className="p-2 text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <span
+                    className="font-mono text-xs text-muted-foreground tabular-nums min-w-[2ch] text-end"
+                    title="סה”כ ניסיונות"
+                  >
+                    {u.attemptCount}
+                  </span>
+                  <Link
+                    href={`/admin/users/${u.id}/attempts`}
+                    className="inline-block rounded border px-2 py-1 text-xs hover:bg-muted"
+                  >
+                    צפייה
+                  </Link>
+                </div>
               </td>
 
               {/* Role toggle */}
