@@ -267,7 +267,10 @@ export const DICTIONARIES = {
       defaultName: "מבחן שלי",
       singleChapter: (n: number) => `פרק ${n}`,
       twoChapters: (a: number, b: number) => `פרק ${a} + פרק ${b}`,
-      multipleChapters: (nums: number[]) => `פרקים ${nums.join(", ")}`,
+      multipleChapters: (nums: number[]) =>
+        nums.length > 3
+          ? `פרקים ${nums.slice(0, 3).join(", ")} ועוד`
+          : `פרקים ${nums.join(", ")}`,
     },
     review: {
       myQuizzes: "המבחנים שלי",
@@ -688,7 +691,10 @@ export const DICTIONARIES = {
       defaultName: "My quiz",
       singleChapter: (n: number) => `Chapter ${n}`,
       twoChapters: (a: number, b: number) => `Chapter ${a} + Chapter ${b}`,
-      multipleChapters: (nums: number[]) => `Chapters ${nums.join(", ")}`,
+      multipleChapters: (nums: number[]) =>
+        nums.length > 3
+          ? `Chapters ${nums.slice(0, 3).join(", ")} and more`
+          : `Chapters ${nums.join(", ")}`,
     },
     review: {
       myQuizzes: "My quizzes",
