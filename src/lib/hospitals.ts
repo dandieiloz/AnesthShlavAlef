@@ -29,4 +29,6 @@ export const HOSPITALS = [
   "בית החולים הצרפתי",
 ] as const;
 
-export const QUESTION_SOURCES = [...HOSPITALS, "מבחן שלב א' רשמי"] as const;
+export const OFFICIAL_EXAM_SOURCE = "מבחן שלב א' רשמי" as const;
+
+export const QUESTION_SOURCES = [...HOSPITALS, OFFICIAL_EXAM_SOURCE] as const;

@@ -10,6 +10,7 @@ import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
+import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
 
 export default async function NewQuizPage({
   searchParams,
@@ -61,15 +62,27 @@ export default async function NewQuizPage({
   });
   const remainingByChapterId = new Map<number, number>();
   const totalByChapterId = new Map<number, number>();
+  const remainingNonOfficialByChapterId = new Map<number, number>();
+  const totalNonOfficialByChapterId = new Map<number, number>();
   // Past-exam mode: group by institute, then by yearKey ("<year>" or "<year> <suffix>").
   type ExamCounts = { year: number; suffix: string; total: number; remaining: number };
   const examMap = new Map<string, Map<string, ExamCounts>>(); // institute -> yearKey -> counts
   for (const q of allQuestions) {
     const seen = attemptedIds.has(q.id);
+    const isOfficial = q.source?.startsWith(OFFICIAL_EXAM_SOURCE) ?? false;
     for (const cid of q.chapterIds) {
       totalByChapterId.set(cid, (totalByChapterId.get(cid) ?? 0) + 1);
       if (!seen) {
         remainingByChapterId.set(cid, (remainingByChapterId.get(cid) ?? 0) + 1);
+      }
+      if (!isOfficial) {
+        totalNonOfficialByChapterId.set(cid, (totalNonOfficialByChapterId.get(cid) ?? 0) + 1);
+        if (!seen) {
+          remainingNonOfficialByChapterId.set(
+            cid,
+            (remainingNonOfficialByChapterId.get(cid) ?? 0) + 1,
+          );
+        }
       }
     }
     if (q.source) {
@@ -123,6 +136,8 @@ export default async function NewQuizPage({
     learningUsefulnessIndex: c.learningUsefulnessIndex,
     questionCount: remainingByChapterId.get(c.id) ?? 0,
     totalQuestionCount: totalByChapterId.get(c.id) ?? 0,
+    questionCountNonOfficial: remainingNonOfficialByChapterId.get(c.id) ?? 0,
+    totalQuestionCountNonOfficial: totalNonOfficialByChapterId.get(c.id) ?? 0,
   }));
 
   // Pre-select chapter by number if query-param given

@@ -9,6 +9,7 @@ import { ProfileSchema } from "@/app/onboarding/schema";
 import { getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere, assertCanAccessQuestion } from "@/lib/plan";
+import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
 import { loadQuizBatch, type QuizBatch } from "@/app/quiz/[id]/quiz-session";
 
 export async function updateProfileAction(formData: FormData) {
@@ -30,6 +31,7 @@ const QuizSchema = z.object({
   chapterIds: z.array(z.coerce.number()).min(1),
   questionLimit: z.coerce.number().int().min(1).optional(),
   includeSeen: z.boolean().optional().default(false),
+  excludeOfficial: z.boolean().optional().default(false),
 });
 
 const QuizExamSchema = z.object({
@@ -120,6 +122,7 @@ export async function createQuizAction(formData: FormData) {
     chapterIds: formData.getAll("chapterIds").map(String),
     questionLimit: raw && String(raw).trim() !== "" ? raw : undefined,
     includeSeen: formData.get("includeSeen") === "1",
+    excludeOfficial: formData.get("excludeOfficial") === "1",
   });
 
   const planGate = await questionAccessWhere(me);
@@ -137,7 +140,12 @@ export async function createQuizAction(formData: FormData) {
       chapterIds: { hasSome: data.chapterIds },
       geminiAnswer: { isNot: null },
       id: { notIn: attemptedIds },
-      AND: [planGate],
+      AND: [
+        planGate,
+        ...(data.excludeOfficial
+          ? [{ NOT: { source: { startsWith: OFFICIAL_EXAM_SOURCE } } }]
+          : []),
+      ],
     },
     select: { id: true },
   });

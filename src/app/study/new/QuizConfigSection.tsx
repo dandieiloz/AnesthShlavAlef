@@ -22,6 +22,8 @@ interface ChapterRow {
   learningUsefulnessIndex: number | null;
   questionCount: number;
   totalQuestionCount: number;
+  questionCountNonOfficial: number;
+  totalQuestionCountNonOfficial: number;
 }
 
 export interface ExamYearOption {
@@ -73,6 +75,7 @@ export function QuizConfigSection({
   const [nameValue, setNameValue] = useState("");
   const [mode, setMode] = useState<AnswerMode>("immediate");
   const [includeSeen, setIncludeSeen] = useState(false);
+  const [excludeOfficial, setExcludeOfficial] = useState(false);
   const [setupMode, setSetupMode] = useState<SetupMode>(initialMode);
 
   // Exam-mode selections. Default to URL-provided values if valid, else first option.
@@ -108,10 +111,14 @@ export function QuizConfigSection({
     }
   }, [yearsForInstitute, yearKey]);
 
-  const displayedChapters = chapters.map((c) => ({
-    ...c,
-    questionCount: includeSeen ? c.totalQuestionCount : c.questionCount,
-  }));
+  const displayedChapters = chapters.map((c) => {
+    const total = excludeOfficial ? c.totalQuestionCountNonOfficial : c.totalQuestionCount;
+    const remaining = excludeOfficial ? c.questionCountNonOfficial : c.questionCount;
+    return {
+      ...c,
+      questionCount: includeSeen ? total : remaining,
+    };
+  });
   const displayedSelected = selectedChapters.map((c) => {
     const match = displayedChapters.find((x) => x.id === c.id);
     return match ?? c;
@@ -281,6 +288,21 @@ export function QuizConfigSection({
               {locale === "he"
                 ? "כלול שאלות שכבר ענית עליהן"
                 : "Include questions I've already seen"}
+            </span>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              name="excludeOfficial"
+              value="1"
+              checked={excludeOfficial}
+              onChange={(e) => setExcludeOfficial(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-input accent-primary"
+            />
+            <span>
+              {locale === "he"
+                ? "אל תכלול שאלות ממבחנים רשמיים"
+                : "Exclude questions from official exams"}
             </span>
           </label>
         </div>
