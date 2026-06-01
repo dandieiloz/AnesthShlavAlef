@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { UsersTable, type UserRow } from "./UsersTable";
 import { UsersFilters } from "./UsersFilters";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 import { Suspense } from "react";
 
 const LIMIT = 200;
@@ -220,7 +220,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-4">
-      <AdminTabsNav />
+      <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול משתמשים</h1>
 
       {/* Summary stat cards */}

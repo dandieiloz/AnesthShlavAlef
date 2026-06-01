@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 import { DemoPlanClient, type SourceRow } from "./DemoPlanClient";
 import { NULL_SOURCE_SENTINEL } from "@/lib/plan";
 
@@ -52,7 +52,7 @@ export default async function DemoPlanPage() {
 
   return (
     <div className="space-y-4">
-      <AdminTabsNav />
+      <AdminNav />
       <div>
         <h1 className="font-display text-2xl font-bold">תוכנית דמו</h1>
         <p className="mt-1 text-sm text-muted-foreground">

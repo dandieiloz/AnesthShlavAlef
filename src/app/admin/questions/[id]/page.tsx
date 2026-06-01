@@ -74,9 +74,10 @@ export default async function AdminQuestionPage({
         <input name="optionC" defaultValue={q.optionC} className="w-full rounded border p-2 bg-background text-foreground" />
         <input name="optionD" defaultValue={q.optionD} className="w-full rounded border p-2 bg-background text-foreground" />
         {(() => {
-          const lastSpace = (q.source ?? "").lastIndexOf(" ");
-          const defInstitution = lastSpace >= 0 ? (q.source ?? "").slice(0, lastSpace) : "";
-          const defYear = lastSpace >= 0 ? (q.source ?? "").slice(lastSpace + 1) : "";
+          const m = (q.source ?? "").match(/^(.+?)\s+(\d{4})(?:\s+(.+))?$/);
+          const defInstitution = m ? m[1] : "";
+          const defYear = m ? m[2] : "";
+          const defGroup = m ? (m[3] ?? "") : "";
           return (
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-[16rem]">
@@ -100,6 +101,16 @@ export default async function AdminQuestionPage({
                   max={2030}
                   defaultValue={defYear}
                   className="w-24 rounded border p-1 text-sm bg-background text-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה (אופציונלי)</label>
+                <input
+                  type="text"
+                  name="sourceGroup"
+                  defaultValue={defGroup}
+                  placeholder="לדוגמה: א, ב, מועד א"
+                  className="w-32 rounded border p-1 text-sm bg-background text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             </div>

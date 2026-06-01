@@ -33,7 +33,10 @@ export async function saveQuestionAction(formData: FormData) {
     source: (() => {
       const inst = ((formData.get("sourceInstitution") as string) || "").trim();
       const yr = ((formData.get("sourceYear") as string) || "").trim();
-      return inst && yr ? `${inst} ${yr}` : inst || yr || undefined;
+      const grp = ((formData.get("sourceGroup") as string) || "").trim();
+      return inst && yr
+        ? grp ? `${inst} ${yr} ${grp}` : `${inst} ${yr}`
+        : inst || yr || undefined;
     })(),
   });
   const chapter = await db.chapter.findUnique({ where: { number: data.chapterNumber } });

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
 import { resolveReportAction } from "@/app/admin/reports/actions";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 
 export default async function ReportsPage() {
   await requireAdmin();
@@ -17,7 +17,7 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-4">
-      <AdminTabsNav />
+      <AdminNav />
       <h1 className="text-2xl font-bold">דיווחים על תשובות שגויות ({reports.length})</h1>
       {reports.length === 0 && <p className="text-slate-500">אין דיווחים פתוחים.</p>}
       <ul className="space-y-4">

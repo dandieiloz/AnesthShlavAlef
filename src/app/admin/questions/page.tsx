@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { QuestionsFilters } from "./QuestionsFilters";
 import { QuestionsTable, type QuestionRow } from "./QuestionsTable";
 import { Suspense } from "react";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 
 const LIMIT = 100;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
@@ -153,7 +153,7 @@ export default async function AdminQuestionsPage({
 
   return (
     <div className="space-y-4">
-      <AdminTabsNav />
+      <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול שאלות</h1>
 
       <Suspense>

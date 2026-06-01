@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
 import { QueueClient, type QueueJobRow, type UnansweredQuestion } from "./QueueClient";
 import type { JobStatus } from "@prisma/client";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   PENDING: "ממתין",
@@ -130,7 +130,7 @@ export default async function QueuePage({
 
   return (
     <div className="space-y-6">
-      <AdminTabsNav />
+      <AdminNav />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">מרכז התור — חילול הסברים</h1>
         <Link

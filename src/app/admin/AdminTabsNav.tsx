@@ -15,6 +15,8 @@ const ADMIN_TABS = [
   { href: "/admin/announcements", label: "הודעות" },
 ] as const;
 
+export type AdminTabHref = (typeof ADMIN_TABS)[number]["href"];
+
 function isTabActive(pathname: string, href: string) {
   if (href === "/admin") {
     return pathname === "/admin" || pathname.startsWith("/admin/chapters");
@@ -23,7 +25,7 @@ function isTabActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AdminTabsNav() {
+export function AdminTabsNav({ badges }: { badges?: Partial<Record<AdminTabHref, number>> }) {
   const pathname = usePathname();
 
   return (
@@ -31,6 +33,7 @@ export function AdminTabsNav() {
       <div className="inline-flex min-w-full items-center gap-2 rounded-xl border bg-card p-1 text-sm text-muted-foreground sm:min-w-0">
         {ADMIN_TABS.map((tab) => {
           const active = isTabActive(pathname, tab.href);
+          const count = badges?.[tab.href] ?? 0;
 
           return (
             <Link
@@ -44,6 +47,11 @@ export function AdminTabsNav() {
               aria-current={active ? "page" : undefined}
             >
               {tab.label}
+              {count > 0 && (
+                <span className="ms-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
             </Link>
           );
         })}

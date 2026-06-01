@@ -26,8 +26,13 @@ interface ChapterRow {
 
 export interface ExamYearOption {
   year: number;
+  suffix: string;
   total: number;
   remaining: number;
+}
+
+function toYearKey(y: ExamYearOption): string {
+  return y.suffix ? `${y.year} ${y.suffix}` : `${y.year}`;
 }
 export interface ExamInstituteOption {
   institute: string;
@@ -58,7 +63,7 @@ export function QuizConfigSection({
   examOptions: ExamInstituteOption[];
   initialMode?: SetupMode;
   initialInstitute?: string | null;
-  initialYear?: number | null;
+  initialYear?: string | null;
 }) {
   const t = getDictionary(locale).studyNew;
   const tq = getDictionary(locale).quiz;
@@ -83,24 +88,25 @@ export function QuizConfigSection({
     () => examOptions.find((e) => e.institute === institute)?.years ?? [],
     [examOptions, institute],
   );
-  const initialYr = useMemo(() => {
-    if (initialYear && yearsForInstitute.some((y) => y.year === initialYear)) {
-      return initialYear;
+  const initialYrKey = useMemo(() => {
+    if (initialYear) {
+      const match = yearsForInstitute.find((y) => toYearKey(y) === initialYear);
+      if (match) return toYearKey(match);
     }
-    return yearsForInstitute[0]?.year ?? null;
+    return yearsForInstitute[0] ? toYearKey(yearsForInstitute[0]) : null;
   }, [yearsForInstitute, initialYear]);
-  const [year, setYear] = useState<number | null>(initialYr);
+  const [yearKey, setYearKey] = useState<string | null>(initialYrKey);
 
-  // Keep year valid when institute changes.
+  // Keep yearKey valid when institute changes.
   useEffect(() => {
     if (yearsForInstitute.length === 0) {
-      setYear(null);
+      setYearKey(null);
       return;
     }
-    if (!yearsForInstitute.some((y) => y.year === year)) {
-      setYear(yearsForInstitute[0].year);
+    if (!yearsForInstitute.some((y) => toYearKey(y) === yearKey)) {
+      setYearKey(toYearKey(yearsForInstitute[0]));
     }
-  }, [yearsForInstitute, year]);
+  }, [yearsForInstitute, yearKey]);
 
   const displayedChapters = chapters.map((c) => ({
     ...c,
@@ -149,7 +155,7 @@ export function QuizConfigSection({
     }
   }
 
-  const selectedYear = yearsForInstitute.find((y) => y.year === year) ?? null;
+  const selectedYear = yearsForInstitute.find((y) => toYearKey(y) === yearKey) ?? null;
   const examAvailableCount = selectedYear
     ? includeSeen
       ? selectedYear.total
@@ -161,8 +167,8 @@ export function QuizConfigSection({
 
   const autoName =
     setupMode === "exam"
-      ? institute && year
-        ? `${institute} ${year}`
+      ? institute && yearKey
+        ? `${institute} ${yearKey}`
         : t.defaultName
       : buildAutoName(selectedChapters, t);
   const displayName = nameTouched ? nameValue : autoName;
@@ -302,16 +308,19 @@ export function QuizConfigSection({
                   <select
                     id="exam-year"
                     name="sourceYear"
-                    value={year ?? ""}
-                    onChange={(e) => setYear(Number(e.target.value))}
+                    value={yearKey ?? ""}
+                    onChange={(e) => setYearKey(e.target.value)}
                     disabled={yearsForInstitute.length === 0}
                     className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    {yearsForInstitute.map((y) => (
-                      <option key={y.year} value={y.year}>
-                        {y.year} ({includeSeen ? y.total : y.remaining})
-                      </option>
-                    ))}
+                    {yearsForInstitute.map((y) => {
+                      const key = toYearKey(y);
+                      return (
+                        <option key={key} value={key}>
+                          {y.year}{y.suffix ? ` ${y.suffix}` : ""} ({includeSeen ? y.total : y.remaining})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>

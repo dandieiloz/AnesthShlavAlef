@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, TONE_LABEL } from "@/lib/usefulness";
 import { AlertTriangle } from "lucide-react";
-import { AdminTabsNav } from "./AdminTabsNav";
+import { AdminNav } from "./AdminNav";
 
 export default async function AdminHome() {
   await requireAdmin();
@@ -35,7 +35,7 @@ export default async function AdminHome() {
 
   return (
     <div className="space-y-6">
-      <AdminTabsNav />
+      <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול פרקים</h1>
 
       <Table>

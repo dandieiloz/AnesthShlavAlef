@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { AdminTabsNav } from "../../../AdminTabsNav";
+import { AdminNav } from "../../../AdminNav";
 import { AttemptsFilters, type ChapterOption } from "./AttemptsFilters";
 
 const LIMIT = 500;
@@ -158,7 +158,7 @@ export default async function AdminUserAttemptsPage({
 
   return (
     <div className="space-y-4">
-      <AdminTabsNav />
+      <AdminNav />
 
       <div className="flex flex-col gap-1">
         <Link

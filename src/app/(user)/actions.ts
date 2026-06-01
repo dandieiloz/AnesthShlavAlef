@@ -35,7 +35,7 @@ const QuizSchema = z.object({
 const QuizExamSchema = z.object({
   name: z.string().min(1).max(200),
   sourceInstitution: z.string().min(1).max(200),
-  sourceYear: z.coerce.number().int().min(1900).max(2100),
+  sourceYear: z.string().min(4).max(50), // "2024" or "2024 א"
   questionLimit: z.coerce.number().int().min(1).optional(),
   includeSeen: z.boolean().optional().default(false),
 });

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +24,7 @@ export default async function AdminAnnouncementsPage() {
 
   return (
     <div className="space-y-6">
-      <AdminTabsNav />
+      <AdminNav />
       <h1 className="font-display text-2xl font-bold">הודעות</h1>
 
       <Card>

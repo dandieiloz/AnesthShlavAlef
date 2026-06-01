@@ -42,6 +42,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
   const [saveResult, setSaveResult] = useState<SaveMultipleResult | null>(null);
   const [sourceInstitution, setSourceInstitution] = useState("");
   const [sourceYear, setSourceYear] = useState("2026");
+  const [sourceSuffix, setSourceSuffix] = useState("");
 
   function handleParse() {
     setError(null);
@@ -78,7 +79,9 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
 
   function addAllToQueue() {
     if (!batch) return;
-    const source = sourceInstitution && sourceYear ? `${sourceInstitution} ${sourceYear}` : null;
+    const source = sourceInstitution && sourceYear
+      ? sourceSuffix.trim() ? `${sourceInstitution} ${sourceYear} ${sourceSuffix.trim()}` : `${sourceInstitution} ${sourceYear}`
+      : null;
     let queueDupeCount = 0;
     let dbDupeSkipped = 0;
     const toAdd: QueueItem[] = [];
@@ -215,8 +218,18 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
               className="w-24 rounded border p-1 text-sm bg-background text-foreground"
             />
           </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה (אופציונלי)</label>
+            <input
+              type="text"
+              value={sourceSuffix}
+              onChange={(e) => setSourceSuffix(e.target.value)}
+              placeholder="לדוגמה: א, ב, מועד א"
+              className="w-28 rounded border p-1 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+            />
+          </div>
           {sourceInstitution && sourceYear && (
-            <span className="text-xs text-muted-foreground pb-1">· מקור: {sourceInstitution} {sourceYear}</span>
+            <span className="text-xs text-muted-foreground pb-1">· מקור: {sourceInstitution} {sourceYear}{sourceSuffix.trim() ? ` ${sourceSuffix.trim()}` : ""}</span>
           )}
         </div>
       </section>

@@ -61,9 +61,9 @@ export default async function NewQuizPage({
   });
   const remainingByChapterId = new Map<number, number>();
   const totalByChapterId = new Map<number, number>();
-  // Past-exam mode: group by "<institute> <year>" (split on last space).
-  type ExamCounts = { total: number; remaining: number };
-  const examMap = new Map<string, Map<number, ExamCounts>>(); // institute -> year -> counts
+  // Past-exam mode: group by institute, then by yearKey ("<year>" or "<year> <suffix>").
+  type ExamCounts = { year: number; suffix: string; total: number; remaining: number };
+  const examMap = new Map<string, Map<string, ExamCounts>>(); // institute -> yearKey -> counts
   for (const q of allQuestions) {
     const seen = attemptedIds.has(q.id);
     for (const cid of q.chapterIds) {
@@ -73,33 +73,41 @@ export default async function NewQuizPage({
       }
     }
     if (q.source) {
-      const lastSpace = q.source.lastIndexOf(" ");
-      if (lastSpace > 0) {
-        const institute = q.source.slice(0, lastSpace).trim();
-        const yr = Number(q.source.slice(lastSpace + 1).trim());
-        if (institute && Number.isFinite(yr)) {
-          let years = examMap.get(institute);
-          if (!years) {
-            years = new Map();
-            examMap.set(institute, years);
-          }
-          const counts = years.get(yr) ?? { total: 0, remaining: 0 };
-          counts.total += 1;
-          if (!seen) counts.remaining += 1;
-          years.set(yr, counts);
+      const m = q.source.match(/^(.+?)\s+(\d{4})(?:\s+(.+))?$/);
+      if (m) {
+        const institute = m[1];
+        const yr = Number(m[2]);
+        const suffix = m[3] ?? "";
+        const yearKey = suffix ? `${yr} ${suffix}` : `${yr}`;
+        let yearMap = examMap.get(institute);
+        if (!yearMap) {
+          yearMap = new Map();
+          examMap.set(institute, yearMap);
         }
+        const counts = yearMap.get(yearKey) ?? { year: yr, suffix, total: 0, remaining: 0 };
+        counts.total += 1;
+        if (!seen) counts.remaining += 1;
+        yearMap.set(yearKey, counts);
       }
     }
   }
 
-  // Shape exam options for the client: sorted institutes, each with sorted years (desc).
+  // Shape exam options for the client: sorted institutes, each with sorted yearKeys (year desc, suffix asc).
   const examOptions = [...examMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "he"))
-    .map(([institute, years]) => ({
+    .map(([institute, yearMap]) => ({
       institute,
-      years: [...years.entries()]
-        .sort(([a], [b]) => b - a)
-        .map(([yr, counts]) => ({ year: yr, total: counts.total, remaining: counts.remaining })),
+      years: [...yearMap.entries()]
+        .sort(([aKey, aVal], [bKey, bVal]) => {
+          if (bVal.year !== aVal.year) return bVal.year - aVal.year;
+          return aKey.localeCompare(bKey, "he");
+        })
+        .map(([, counts]) => ({
+          year: counts.year,
+          suffix: counts.suffix,
+          total: counts.total,
+          remaining: counts.remaining,
+        })),
     }));
 
   const titles = await Promise.all(
@@ -169,7 +177,7 @@ export default async function NewQuizPage({
               examOptions={examOptions}
               initialMode={initialMode}
               initialInstitute={inst ?? null}
-              initialYear={year ? Number(year) : null}
+              initialYear={year ?? null}
             />
 
             <Button type="submit" className="w-full gap-2" size="lg">

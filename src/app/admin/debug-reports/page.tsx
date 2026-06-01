@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { AdminTabsNav } from "../AdminTabsNav";
+import { AdminNav } from "../AdminNav";
 import { resolveDebugReportAction } from "./actions";
 import type { ReportStatus } from "@prisma/client";
 
@@ -43,7 +43,7 @@ export default async function DebugReportsPage({
 
   return (
     <div className="space-y-4">
-      <AdminTabsNav />
+      <AdminNav />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">דיווחי באג ומשוב ({reports.length})</h1>
         <div className="inline-flex items-center gap-1 rounded-lg border bg-card p-1 text-sm">
