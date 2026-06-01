@@ -13,6 +13,21 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
   dateStyle: "short",
   timeStyle: "short",
 });
+const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat("he-IL", { numeric: "auto" });
+
+function formatRelative(date: Date): string {
+  const diffSec = Math.round((date.getTime() - Date.now()) / 1000);
+  if (Math.abs(diffSec) < 60) return RELATIVE_FORMATTER.format(diffSec, "second");
+  const diffMin = Math.round(diffSec / 60);
+  if (Math.abs(diffMin) < 60) return RELATIVE_FORMATTER.format(diffMin, "minute");
+  const diffHr = Math.round(diffMin / 60);
+  if (Math.abs(diffHr) < 24) return RELATIVE_FORMATTER.format(diffHr, "hour");
+  const diffDay = Math.round(diffHr / 24);
+  if (Math.abs(diffDay) < 30) return RELATIVE_FORMATTER.format(diffDay, "day");
+  const diffMo = Math.round(diffDay / 30);
+  if (Math.abs(diffMo) < 12) return RELATIVE_FORMATTER.format(diffMo, "month");
+  return RELATIVE_FORMATTER.format(Math.round(diffMo / 12), "year");
+}
 
 type AttemptRow = {
   id: number;
@@ -83,7 +98,7 @@ export default async function AdminUserAttemptsPage({
   if (correctFilter !== null) where.isCorrect = correctFilter;
   if (Object.keys(questionFilter).length > 0) where.question = questionFilter;
 
-  const [attempts, filteredTotal, totalAttempts, correctCount, uniqueQuestionsGroup, chapters] =
+  const [attempts, filteredTotal, totalAttempts, correctCount, uniqueQuestionsGroup, lastAttempt, chapters] =
     await Promise.all([
       db.attempt.findMany({
         where,
@@ -104,6 +119,11 @@ export default async function AdminUserAttemptsPage({
       db.attempt.count({ where: { userId } }),
       db.attempt.count({ where: { userId, isCorrect: true } }),
       db.attempt.groupBy({ by: ["questionId"], where: { userId } }),
+      db.attempt.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
       db.chapter.findMany({
         select: { id: true, number: true, title: true },
         orderBy: { number: "asc" },
@@ -179,6 +199,17 @@ export default async function AdminUserAttemptsPage({
           </div>
           <div className="text-xs text-muted-foreground mt-1">אחוז הצלחה</div>
         </div>
+      </div>
+
+      <div className="text-sm text-muted-foreground">
+        פעיל לאחרונה:{" "}
+        {lastAttempt ? (
+          <span className="text-foreground" title={DATE_FORMATTER.format(lastAttempt.createdAt)}>
+            {formatRelative(lastAttempt.createdAt)}
+          </span>
+        ) : (
+          <span className="italic">מעולם לא ענה</span>
+        )}
       </div>
 
       <Suspense>

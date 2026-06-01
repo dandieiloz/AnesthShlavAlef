@@ -15,13 +15,42 @@ export type UserRow = {
   hospitalName: string | null;
   residencyYear: number | null;
   createdAt: string;
+  lastActiveAt: string | null;
   attemptCount: number;
 };
 
-type SortField = "name" | "role" | "plan" | "hospital" | "residencyYear" | "createdAt";
+type SortField =
+  | "name"
+  | "role"
+  | "plan"
+  | "hospital"
+  | "residencyYear"
+  | "createdAt"
+  | "lastActive";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", { dateStyle: "short" });
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("he-IL", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
+const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat("he-IL", { numeric: "auto" });
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diffSec = Math.round((then - Date.now()) / 1000);
+  const absSec = Math.abs(diffSec);
+  if (absSec < 60) return RELATIVE_FORMATTER.format(diffSec, "second");
+  const diffMin = Math.round(diffSec / 60);
+  if (Math.abs(diffMin) < 60) return RELATIVE_FORMATTER.format(diffMin, "minute");
+  const diffHr = Math.round(diffMin / 60);
+  if (Math.abs(diffHr) < 24) return RELATIVE_FORMATTER.format(diffHr, "hour");
+  const diffDay = Math.round(diffHr / 24);
+  if (Math.abs(diffDay) < 30) return RELATIVE_FORMATTER.format(diffDay, "day");
+  const diffMo = Math.round(diffDay / 30);
+  if (Math.abs(diffMo) < 12) return RELATIVE_FORMATTER.format(diffMo, "month");
+  return RELATIVE_FORMATTER.format(Math.round(diffMo / 12), "year");
+}
 
 const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   name: "asc",
@@ -30,6 +59,7 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   hospital: "asc",
   residencyYear: "asc",
   createdAt: "desc",
+  lastActive: "desc",
 };
 
 export function UsersTable({
@@ -144,6 +174,7 @@ export function UsersTable({
           <SortHeader field="hospital" label="בית חולים" />
           <SortHeader field="residencyYear" label="שנה" align="center" />
           <SortHeader field="createdAt" label="הצטרף" />
+          <SortHeader field="lastActive" label="פעיל לאחרונה" />
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרופיל</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">היסטוריה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פעולות</th>
@@ -219,6 +250,17 @@ export function UsersTable({
               {/* Joined */}
               <td className="p-2 text-muted-foreground whitespace-nowrap">
                 {DATE_FORMATTER.format(new Date(u.createdAt))}
+              </td>
+
+              {/* Last active */}
+              <td className="p-2 text-muted-foreground whitespace-nowrap">
+                {u.lastActiveAt ? (
+                  <span title={DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))}>
+                    {formatRelative(u.lastActiveAt)}
+                  </span>
+                ) : (
+                  <span className="italic text-muted-foreground/50">—</span>
+                )}
               </td>
 
               {/* Profile status */}

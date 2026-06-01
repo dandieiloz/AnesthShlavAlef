@@ -92,6 +92,21 @@ export function UsersFilters() {
         </select>
       </div>
 
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">פעילות</label>
+        <select
+          name="activity"
+          defaultValue={params.get("activity") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="7d">פעיל ב‑7 ימים האחרונים</option>
+          <option value="30d">פעיל ב‑30 ימים האחרונים</option>
+          <option value="inactive30">לא פעיל מעל 30 ימים</option>
+          <option value="never">מעולם לא ענה</option>
+        </select>
+      </div>
+
       <div className="flex gap-2">
         <button
           type="submit"
