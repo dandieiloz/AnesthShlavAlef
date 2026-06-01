@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   ClipboardList,
   Loader2,
+  RotateCcw,
+  X,
   XCircle,
 } from "lucide-react";
 import { AnswerExplanation } from "@/components/AnswerExplanation";
@@ -62,11 +64,19 @@ export function QuizRunner(props: Props) {
   const [revealed, setRevealed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<AnswerMode>("immediate");
-  // Stack of previously-answered questions plus what the user chose, so the
-  // "previous question" button can rewind through them in read-only mode.
-  const [past, setPast] = useState<{ question: QuestionPayload; chosen: Choice }[]>([]);
+  // Stack of previously-visited questions. `chosen` is null when the user
+  // skipped the question (no Attempt recorded). The "previous question" button
+  // walks both answered and skipped entries.
+  const [past, setPast] = useState<{ question: QuestionPayload; chosen: Choice | null }[]>([]);
   // -1 = viewing the live (current) question; otherwise index into `past`.
   const [viewingIndex, setViewingIndex] = useState<number>(-1);
+  // Gates the pre-finish summary: once the user opts to "finish anyway" we
+  // fall through to the existing finished screen even with skipped questions.
+  const [finishConfirmed, setFinishConfirmed] = useState(false);
+  // Per-question set of options the user has eliminated (struck-through, not
+  // selectable). Cleared per question on successful submit; preserved across
+  // skip/back navigation otherwise.
+  const [eliminated, setEliminated] = useState<Record<number, Choice[]>>({});
   const [, startTransition] = useTransition();
   const refillInFlight = useRef(false);
   // Synchronous guards: state-based `submitting` is read from a stale closure
@@ -143,6 +153,47 @@ export function QuizRunner(props: Props) {
 
   // ── Finished ────────────────────────────────────────────────────────────
   if (queue.length === 0 && !hasMore && !refillInFlight.current) {
+    const pendingSkipped = past.filter((p) => p.chosen === null).map((p) => p.question);
+    // If there are skipped questions, give the user a chance to answer them
+    // before showing the finish screen or jumping to /review.
+    if (pendingSkipped.length > 0 && !finishConfirmed) {
+      return (
+        <div className="mx-auto max-w-2xl animate-fade-in py-10">
+          <div className="text-center">
+            <h1 className="font-display text-2xl font-bold">{t.unansweredTitle}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t.unansweredIntro(pendingSkipped.length)}
+            </p>
+          </div>
+          <Card className="mt-6">
+            <CardContent className="pt-5 pb-5">
+              <ul className="divide-y">
+                {pendingSkipped.map((q) => (
+                  <li key={q.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <Badge variant="secondary" className="shrink-0 text-xs">
+                      {common.chapter} {q.chapter.number}
+                    </Badge>
+                    <span className="line-clamp-2 text-sm leading-snug">{q.stem}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button size="lg" onClick={() => requeueSkipped(pendingSkipped)}>
+              {t.answerSkipped}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setFinishConfirmed(true)}
+            >
+              {t.finishAnyway}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     if (mode === "full") {
       // Skip the inline summary and jump straight to סקירה.
       router.replace(`/quiz/${props.quizId}/review`);
@@ -211,6 +262,12 @@ export function QuizRunner(props: Props) {
     const isCorrect = chosen === current!.answer.correctAnswer;
     setAnswered((n) => n + 1);
     if (isCorrect) setCorrect((n) => n + 1);
+    // Drop eliminations for this question — it's answered now.
+    setEliminated((prev) => {
+      if (!(questionId in prev)) return prev;
+      const { [questionId]: _drop, ...rest } = prev;
+      return rest;
+    });
 
     if (mode === "immediate") {
       setRevealed(true);
@@ -262,15 +319,56 @@ export function QuizRunner(props: Props) {
     }
   }
 
+  function handleSkip() {
+    if (!current) return;
+    // Always skip the LIVE current question, even if the user is currently
+    // viewing a past question — return them to the live view first.
+    setPast((prev) => [...prev, { question: current, chosen: null }]);
+    setQueue((prev) => prev.slice(1));
+    setChosen(null);
+    setRevealed(false);
+    setViewingIndex(-1);
+    lastRecordedQuestionId.current = null;
+  }
+
+  function toggleEliminated(questionId: number, key: Choice) {
+    setEliminated((prev) => {
+      const current = prev[questionId] ?? [];
+      const next = current.includes(key)
+        ? current.filter((k) => k !== key)
+        : [...current, key];
+      return { ...prev, [questionId]: next };
+    });
+    // If we just eliminated the currently-chosen option on the LIVE question,
+    // clear the selection so Submit becomes disabled.
+    if (viewingIndex === -1 && chosen === key) {
+      const already = eliminated[questionId]?.includes(key) ?? false;
+      if (!already) setChosen(null);
+    }
+  }
+
+  function requeueSkipped(questions: QuestionPayload[]) {
+    if (questions.length === 0) return;
+    const ids = new Set(questions.map((q) => q.id));
+    setPast((prev) => prev.filter((p) => !(p.chosen === null && ids.has(p.question.id))));
+    setQueue((prev) => [...questions, ...prev]);
+    setViewingIndex(-1);
+    setChosen(null);
+    setRevealed(false);
+    lastRecordedQuestionId.current = null;
+  }
+
   const isViewingPast = viewingIndex !== -1;
   const pastEntry = isViewingPast ? past[viewingIndex] : null;
+  const isViewingSkipped = pastEntry !== null && pastEntry.chosen === null;
   const display = pastEntry ? pastEntry.question : current;
   const displayChosen: Choice | null = pastEntry ? pastEntry.chosen : chosen;
-  const displayRevealed = pastEntry ? true : revealed;
+  const displayRevealed = pastEntry ? pastEntry.chosen !== null : revealed;
   const correctChoice = display.answer.correctAnswer;
   const isCorrectChoice = displayRevealed && displayChosen === correctChoice;
-  const showReveal = isViewingPast || (revealed && mode === "immediate");
+  const showReveal = displayRevealed && (isViewingPast || mode === "immediate");
   const canGoPrev = past.length > 0 && (viewingIndex === -1 || viewingIndex > 0);
+  const skippedRemaining = past.filter((p) => p.chosen === null).map((p) => p.question);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -357,17 +455,34 @@ export function QuizRunner(props: Props) {
                 const isChosen = displayChosen === k;
                 const isCorrectOption = displayRevealed && k === correctChoice;
                 const isWrongChosen = displayRevealed && isChosen && k !== correctChoice;
+                const isEliminated =
+                  !displayRevealed && (eliminated[display.id]?.includes(k) ?? false);
+                const canEliminate = !displayRevealed && !isViewingPast;
                 const optionText = display[`option${k}` as "optionA" | "optionB" | "optionC" | "optionD"];
                 return (
                   <label
                     key={k}
+                    onClick={
+                      isEliminated && canEliminate
+                        ? (e) => {
+                            e.preventDefault();
+                            toggleEliminated(display.id, k);
+                          }
+                        : undefined
+                    }
                     className={[
                       "flex items-start gap-3 rounded-lg border p-3.5 text-sm transition-colors",
-                      displayRevealed ? "cursor-default" : "cursor-pointer hover:border-primary/40 hover:bg-primary/5",
+                      displayRevealed
+                        ? "cursor-default"
+                        : isEliminated
+                        ? "cursor-pointer hover:border-border hover:bg-muted/60"
+                        : "cursor-pointer hover:border-primary/40 hover:bg-primary/5",
                       isCorrectOption
                         ? "border-success bg-success/10"
                         : isWrongChosen
                         ? "border-destructive bg-destructive/10"
+                        : isEliminated
+                        ? "border-border bg-muted/40 text-muted-foreground line-through opacity-60"
                         : isChosen
                         ? "border-primary bg-primary/5"
                         : "border-border bg-background",
@@ -378,8 +493,10 @@ export function QuizRunner(props: Props) {
                       name="chosen"
                       value={k}
                       checked={isChosen}
-                      onChange={() => !displayRevealed && !isViewingPast && setChosen(k)}
-                      disabled={displayRevealed || isViewingPast}
+                      onChange={() =>
+                        !displayRevealed && !isViewingPast && !isEliminated && setChosen(k)
+                      }
+                      disabled={displayRevealed || isViewingPast || isEliminated}
                       required
                       className="sr-only"
                     />
@@ -396,47 +513,85 @@ export function QuizRunner(props: Props) {
                       {HEBREW_LETTERS[i]}
                     </span>
                     <span className="flex-1 leading-snug pt-0.5">{optionText}</span>
+                    {canEliminate && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleEliminated(display.id, k);
+                        }}
+                        title={isEliminated ? t.restoreOption : t.eliminateOption}
+                        aria-label={isEliminated ? t.restoreOption : t.eliminateOption}
+                        className="-my-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        {isEliminated ? (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
                   </label>
                 );
               })}
 
-              {!displayRevealed ? (
-                <div className="mt-1 flex gap-2">
-                  {canGoPrev && (
+              {(() => {
+                const prevBtn = canGoPrev ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={handlePrev}
+                    className="gap-1.5"
+                  >
+                    <ArrowRight className="h-4 w-4 ltr:rotate-180" />
+                    {t.previousQuestion}
+                  </Button>
+                ) : null;
+                const skipBtn = current ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="lg"
+                    onClick={handleSkip}
+                  >
+                    {t.skipQuestion}
+                  </Button>
+                ) : null;
+                let mainBtn: React.ReactNode;
+                if (displayRevealed) {
+                  mainBtn = (
+                    <Button type="button" className="flex-1" size="lg" onClick={handleNext}>
+                      {t.nextQuestion}
+                    </Button>
+                  );
+                } else if (isViewingSkipped) {
+                  mainBtn = (
                     <Button
                       type="button"
-                      variant="outline"
+                      className="flex-1"
                       size="lg"
-                      onClick={handlePrev}
-                      className="gap-1.5"
+                      onClick={() => requeueSkipped([pastEntry!.question])}
                     >
-                      <ArrowRight className="h-4 w-4 ltr:rotate-180" />
-                      {t.previousQuestion}
+                      {t.answerSkipped}
                     </Button>
-                  )}
-                  <Button type="submit" className="flex-1" size="lg" disabled={!chosen || submitting}>
-                    {t.submitAnswer}
-                  </Button>
-                </div>
-              ) : (
-                <div className="mt-1 flex gap-2">
-                  {canGoPrev && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="lg"
-                      onClick={handlePrev}
-                      className="gap-1.5"
-                    >
-                      <ArrowRight className="h-4 w-4 ltr:rotate-180" />
-                      {t.previousQuestion}
+                  );
+                } else {
+                  mainBtn = (
+                    <Button type="submit" className="flex-1" size="lg" disabled={!chosen || submitting}>
+                      {t.submitAnswer}
                     </Button>
-                  )}
-                  <Button type="button" className="flex-1" size="lg" onClick={handleNext}>
-                    {t.nextQuestion}
-                  </Button>
-                </div>
-              )}
+                  );
+                }
+                return (
+                  <div className="mt-1 flex gap-2">
+                    {prevBtn}
+                    {mainBtn}
+                    {skipBtn}
+                  </div>
+                );
+              })()}
             </form>
           </CardContent>
         </Card>

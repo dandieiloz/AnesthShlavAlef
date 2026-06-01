@@ -111,6 +111,16 @@ export const DICTIONARIES = {
       newQuiz: "מבחן חדש",
       exitQuiz: "חזרה",
       previousQuestion: "שאלה קודמת",
+      skipQuestion: "דלג",
+      unansweredTitle: "שאלות שדילגת עליהן",
+      unansweredIntro: (n: number) =>
+        n === 1
+          ? "דילגת על שאלה אחת. תרצה לענות עליה לפני סיום המבחן?"
+          : `דילגת על ${n} שאלות. תרצה לענות עליהן לפני סיום המבחן?`,
+      answerSkipped: "ענה על השאלות",
+      finishAnyway: "סיים בכל זאת",
+      eliminateOption: "פסול תשובה",
+      restoreOption: "החזר תשובה",
     },
     study: {
       title: "ספריית מבחנים",
@@ -552,6 +562,16 @@ export const DICTIONARIES = {
       newQuiz: "New quiz",
       exitQuiz: "Back",
       previousQuestion: "Previous question",
+      skipQuestion: "Skip",
+      unansweredTitle: "Skipped questions",
+      unansweredIntro: (n: number) =>
+        n === 1
+          ? "You skipped 1 question. Answer it before finishing the quiz?"
+          : `You skipped ${n} questions. Answer them before finishing the quiz?`,
+      answerSkipped: "Answer skipped",
+      finishAnyway: "Finish anyway",
+      eliminateOption: "Eliminate answer",
+      restoreOption: "Restore answer",
     },
     study: {
       title: "Quiz Library",
