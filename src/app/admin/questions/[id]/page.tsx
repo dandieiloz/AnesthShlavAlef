@@ -2,18 +2,21 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
+import { type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import {
   saveQuestionAction,
   deleteQuestionAction,
   updateQuestionChaptersAction,
   resetChapterAutoTagAction,
+  addAdminNoteAction,
+  deleteAdminNoteAction,
 } from "@/app/admin/actions";
 import {
   enqueueInitialJobAction,
   enqueueRegenerationAction,
 } from "@/app/admin/queue/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
+import { EditableGeminiAnswer } from "./EditableGeminiAnswer";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
@@ -48,6 +51,12 @@ export default async function AdminQuestionPage({
   const allChapters = await db.chapter.findMany({
     select: { number: true, title: true },
     orderBy: { number: "asc" },
+  });
+
+  const adminNotes = await db.questionAdminNote.findMany({
+    where: { questionId: q.id },
+    include: { author: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "desc" },
   });
 
   return (
@@ -149,10 +158,11 @@ export default async function AdminQuestionPage({
               )}
             </p>
             <div className="mt-3">
-              <AnswerExplanation
+              <EditableGeminiAnswer
+                questionId={q.id}
                 explanation={q.geminiAnswer.explanation}
-                evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
                 whyOthersWrong={q.geminiAnswer.whyOthersWrong}
+                evidenceCitations={(q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null) ?? []}
                 correctAnswer={q.geminiAnswer.correctAnswer}
                 options={[
                   { key: "A", text: q.optionA },
@@ -161,9 +171,36 @@ export default async function AdminQuestionPage({
                   { key: "D", text: q.optionD },
                 ]}
                 insufficientEvidence={q.geminiAnswer.insufficientEvidence}
+                defaultChapterNumber={q.chapter.number}
               />
             </div>
-            <form action={async () => { "use server"; await enqueueRegenerationAction(q.id); }} className="mt-2">
+            <form
+              action={async (formData: FormData) => {
+                "use server";
+                const hint = String(formData.get("hint") ?? "");
+                await enqueueRegenerationAction(q.id, hint);
+              }}
+              className="mt-2 space-y-2"
+            >
+              {!openJob && (
+                <details className="rounded border bg-muted/30 px-3 py-2 text-sm">
+                  <summary className="cursor-pointer text-primary hover:underline">
+                    הוסף הערה / רמז למודל (אופציונלי)
+                  </summary>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    הסבר בקצרה למה ההסבר הקיים שגוי כדי לעזור למודל לחולל תשובה טובה יותר. לדוגמה:
+                    "התשובה הנכונה היא B כי...", "המודל התעלם מהשפעת...", "המקור הנכון נמצא בפרק X".
+                    הראיות עדיין חייבות להגיע מקטעי המקור.
+                  </p>
+                  <textarea
+                    name="hint"
+                    rows={4}
+                    maxLength={2000}
+                    className="mt-2 w-full rounded border p-2 text-sm bg-background text-foreground"
+                    placeholder="הערה למודל (עד 2000 תווים)..."
+                  />
+                </details>
+              )}
               <button className="rounded border px-3 py-1 text-sm hover:bg-muted">
                 {openJob ? "✓ ממתין בתור" : "חולל מחדש (+ לתור)"}
               </button>
@@ -242,6 +279,45 @@ export default async function AdminQuestionPage({
             </form>
           )}
         </details>
+      </section>
+
+      <section className="mt-8 rounded border bg-card p-4">
+        <h2 className="text-base font-semibold">הערות מנהל (פנימי)</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          הערות אלו גלויות רק למנהלים. שימושי לתיעוד שינויים, החלטות עריכה, וכד׳.
+        </p>
+        <form action={addAdminNoteAction} className="mt-3 space-y-2">
+          <input type="hidden" name="questionId" value={q.id} />
+          <textarea
+            name="body"
+            required
+            rows={3}
+            placeholder="כתוב הערה..."
+            className="w-full rounded border p-2 text-sm bg-background text-foreground"
+            dir="rtl"
+          />
+          <button className="rounded bg-slate-900 px-3 py-1 text-xs text-white">הוסף הערה</button>
+        </form>
+        <ul className="mt-4 space-y-2">
+          {adminNotes.length === 0 && (
+            <li className="text-xs text-muted-foreground">אין הערות.</li>
+          )}
+          {adminNotes.map((n) => (
+            <li key={n.id} className="rounded border bg-background/60 p-2">
+              <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                <span>
+                  {n.author?.name ?? n.author?.email ?? "לא ידוע"} ·{" "}
+                  {n.createdAt.toLocaleString("he-IL")}
+                </span>
+                <form action={deleteAdminNoteAction}>
+                  <input type="hidden" name="noteId" value={n.id} />
+                  <button className="text-red-700 hover:underline">מחק</button>
+                </form>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm" dir="rtl">{n.body}</p>
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );

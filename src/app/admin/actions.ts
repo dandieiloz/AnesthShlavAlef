@@ -111,15 +111,16 @@ export async function generateExplanationAction(questionId: number) {
   revalidatePath(`/admin/questions/${questionId}`);
 }
 
-export async function regenerateExplanationAction(questionId: number) {
+export async function regenerateExplanationAction(questionId: number, hint?: string | null) {
   await requireAdmin();
   // Guard: don't enqueue if an open job already exists
   const existing = await db.answerGenerationJob.findFirst({
     where: { questionId, status: { in: ["PENDING", "PROCESSING"] } },
   });
   if (!existing) {
+    const trimmed = hint?.trim().slice(0, 2000) || null;
     await db.answerGenerationJob.create({
-      data: { questionId, kind: "REGENERATE" },
+      data: { questionId, kind: "REGENERATE", regenerationHint: trimmed },
     });
   }
   revalidatePath(`/admin/questions/${questionId}`);
@@ -189,4 +190,81 @@ export async function resetChapterAutoTagAction(questionId: number) {
     data: { chapterAutoTagged: true },
   });
   revalidatePath(`/admin/questions/${questionId}`);
+}
+
+const EvidenceCitationSchema = z.object({
+  chapterNumber: z.coerce.number().int().positive(),
+  chapterTitle: z.string().default(""),
+  sectionPath: z.string().nullable().optional().transform((v) => (v && v.trim() ? v : null)),
+  quote: z.string().min(1),
+});
+
+const SaveGeminiAnswerSchema = z.object({
+  questionId: z.coerce.number().int().positive(),
+  explanation: z.string().min(1),
+  whyOthersWrong: z.string().min(1),
+  evidenceCitationsJson: z.string(),
+});
+
+export async function saveGeminiAnswerFieldsAction(formData: FormData) {
+  await requireAdmin();
+  const data = SaveGeminiAnswerSchema.parse({
+    questionId: formData.get("questionId"),
+    explanation: formData.get("explanation"),
+    whyOthersWrong: formData.get("whyOthersWrong"),
+    evidenceCitationsJson: formData.get("evidenceCitationsJson") ?? "[]",
+  });
+  let parsedCitations: z.infer<typeof EvidenceCitationSchema>[];
+  try {
+    const raw = JSON.parse(data.evidenceCitationsJson);
+    if (!Array.isArray(raw)) throw new Error("evidenceCitations must be an array");
+    parsedCitations = raw.map((c) => EvidenceCitationSchema.parse(c));
+  } catch (e) {
+    throw new Error(`Invalid evidence citations: ${(e as Error).message}`);
+  }
+  const existing = await db.geminiAnswer.findUnique({
+    where: { questionId: data.questionId },
+    select: { id: true, explanation: true, whyOthersWrong: true },
+  });
+  if (!existing) throw new Error("No GeminiAnswer to edit for this question");
+  await db.geminiAnswer.update({
+    where: { id: existing.id },
+    data: {
+      explanation: data.explanation,
+      whyOthersWrong: data.whyOthersWrong,
+      evidenceCitations: parsedCitations,
+    },
+  });
+  const changed: string[] = [];
+  if (existing.explanation !== data.explanation) changed.push("explanation");
+  if (existing.whyOthersWrong !== data.whyOthersWrong) changed.push("whyOthersWrong");
+  if (changed.length > 0) {
+    await invalidateTranslations("GeminiAnswer", String(existing.id), changed);
+  }
+  revalidatePath(`/admin/questions/${data.questionId}`);
+}
+
+const AdminNoteSchema = z.object({
+  questionId: z.coerce.number().int().positive(),
+  body: z.string().trim().min(1).max(4000),
+});
+
+export async function addAdminNoteAction(formData: FormData) {
+  const me = await requireAdmin();
+  const data = AdminNoteSchema.parse({
+    questionId: formData.get("questionId"),
+    body: formData.get("body"),
+  });
+  await db.questionAdminNote.create({
+    data: { questionId: data.questionId, body: data.body, authorId: me.id },
+  });
+  revalidatePath(`/admin/questions/${data.questionId}`);
+}
+
+export async function deleteAdminNoteAction(formData: FormData) {
+  await requireAdmin();
+  const noteId = Number(formData.get("noteId"));
+  if (!Number.isFinite(noteId)) throw new Error("Invalid noteId");
+  const note = await db.questionAdminNote.delete({ where: { id: noteId } });
+  revalidatePath(`/admin/questions/${note.questionId}`);
 }

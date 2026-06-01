@@ -81,6 +81,7 @@ model User {
   sentenceHighlights SentenceHighlight[]
   debugReports      DebugReport[]            @relation("DebugReportAuthor")
   resolvedDebugReports DebugReport[]         @relation("DebugReportResolver")
+  adminNotes        QuestionAdminNote[]      @relation("AdminNoteAuthor")
 }
 
 model Account {
@@ -172,9 +173,25 @@ model Question {
   generationJobs  AnswerGenerationJob[]
   sentenceHighlights SentenceHighlight[]
   debugReports    DebugReport[]
+  adminNotes      QuestionAdminNote[]
 
   @@index([chapterId])
   @@index([chapterIds], type: Gin)
+}
+
+/// Admin-only free-form notes attached to a question (audit/log/comments).
+/// Visible only inside /admin routes.
+model QuestionAdminNote {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  authorId   String?
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  author     User?    @relation("AdminNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([questionId, createdAt])
 }
 
 model GeminiAnswer {
@@ -408,6 +425,7 @@ model AnswerGenerationJob {
   startedAt   DateTime?
   finishedAt  DateTime?
   createdById String?
+  regenerationHint String? @db.Text
 
   question    Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
   createdBy   User?      @relation("JobCreator", fields: [createdById], references: [id])

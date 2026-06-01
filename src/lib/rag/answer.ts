@@ -88,6 +88,7 @@ function buildUserPrompt(opts: {
   optionC: string;
   optionD: string;
   chunks: RetrievedChunk[];
+  hint?: string;
 }): string {
   const sourceBlock = opts.chunks
     .map(
@@ -96,7 +97,7 @@ function buildUserPrompt(opts: {
     )
     .join("\n\n");
 
-  return [
+  const lines = [
     "שאלה:",
     opts.stem,
     "",
@@ -107,7 +108,19 @@ function buildUserPrompt(opts: {
     "",
     `להלן ${opts.chunks.length} קטעי מקור מספר הלימוד (ממספר פרקים). אלה הם היחידים שמותר להסתמך עליהם:`,
     sourceBlock,
-  ].join("\n");
+  ];
+
+  if (opts.hint && opts.hint.trim()) {
+    lines.push(
+      "",
+      "--- הערת מהאדמין (חילול חוזר): ---",
+      opts.hint.trim(),
+      "--- סוף הערה ---",
+      "הערה זו מסבירה למה התשובה הקודמת היתה שגויה או חלקית. התייחס אליה כרמז לכיוון, אך אל תסתמך עליה כראיה עצמאית — כל טענה חייבת להיתמך על קטעי המקור המצורפים.",
+    );
+  }
+
+  return lines.join("\n");
 }
 
 /** Render the structured payload back to a Hebrew Markdown block matching the legacy v1 format. */
@@ -170,8 +183,9 @@ async function runGenerationPass(
     optionC: string;
     optionD: string;
   },
+  hint?: string,
 ): Promise<StructuredAnswer> {
-  const userPrompt = buildUserPrompt({ ...question, chunks });
+  const userPrompt = buildUserPrompt({ ...question, chunks, hint });
   const parsed = await generateJson<StructuredAnswer>(model, SYSTEM_PROMPT, userPrompt, RESPONSE_SCHEMA, 0.2);
   // Defensive coercion: ensure confidence is in [0,1] and whyOthersWrong has all keys
   parsed.confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
@@ -185,8 +199,12 @@ async function runGenerationPass(
   return parsed;
 }
 
-export async function generateExplanationForQuestionV2(questionId: number) {
+export async function generateExplanationForQuestionV2(
+  questionId: number,
+  opts?: { hint?: string | null },
+) {
   const startedAt = Date.now();
+  const hint = opts?.hint?.trim() || undefined;
   const question = await db.question.findUnique({
     where: { id: questionId },
     include: { chapter: true, geminiAnswer: true },
@@ -202,7 +220,10 @@ export async function generateExplanationForQuestionV2(questionId: number) {
     optionC: question.optionC,
     optionD: question.optionD,
   });
-  const cached = await db.questionQueryCache.findUnique({ where: { questionHash: hash } });
+  // Skip cache entirely when an admin hint is in play — the hint changes the
+  // expected output, and we don't want the hint-specific result to become the
+  // default cached answer for this question fingerprint.
+  const cached = hint ? null : await db.questionQueryCache.findUnique({ where: { questionHash: hash } });
   if (cached) {
     const payload = cached.payload as unknown as CachedAnswerPayload;
     await db.questionQueryCache.update({
@@ -261,7 +282,7 @@ export async function generateExplanationForQuestionV2(questionId: number) {
   const reranked = await rerankWithFlashJudge(question.stem, candidates, TOP_K_PASS1);
 
   // 5) Pass 1: cheap model -------------------------------------------------
-  let structured = await runGenerationPass(FLASH_MODEL, reranked, question);
+  let structured = await runGenerationPass(FLASH_MODEL, reranked, question, hint);
   let usedModel = FLASH_MODEL;
   let escalated = false;
   let finalChunks = reranked;
@@ -290,7 +311,7 @@ export async function generateExplanationForQuestionV2(questionId: number) {
       perQueryK: PER_QUERY_K + 10,
     });
     finalChunks = await rerankWithFlashJudge(question.stem, expandedCandidates, TOP_K_PASS2);
-    structured = await runGenerationPass(GEN_MODEL, finalChunks, question);
+    structured = await runGenerationPass(GEN_MODEL, finalChunks, question, hint);
     usedModel = GEN_MODEL;
   }
 
@@ -309,12 +330,16 @@ export async function generateExplanationForQuestionV2(questionId: number) {
 
   const answer = await persistAnswer({ questionId, payload, autoTagged: question.chapterAutoTagged, escalated });
 
-  // Best-effort cache write (a race here just keeps the earlier entry)
-  await db.questionQueryCache.upsert({
-    where: { questionHash: hash },
-    create: { questionHash: hash, payload: payload as unknown as Prisma.InputJsonValue },
-    update: {},
-  });
+  // Best-effort cache write (a race here just keeps the earlier entry).
+  // Skip when a hint was supplied so hint-specific output never becomes the
+  // default cached answer.
+  if (!hint) {
+    await db.questionQueryCache.upsert({
+      where: { questionHash: hash },
+      create: { questionHash: hash, payload: payload as unknown as Prisma.InputJsonValue },
+      update: {},
+    });
+  }
 
   await db.ragRun.create({
     data: {

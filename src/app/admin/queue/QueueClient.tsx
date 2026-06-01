@@ -29,6 +29,7 @@ export type QueueJobRow = {
   queuedAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  regenerationHint: string | null;
 };
 
 export type UnansweredQuestion = {
@@ -638,6 +639,15 @@ export function QueueClient({
                     >
                       {KIND_LABEL[row.kind]}
                     </span>
+                    {row.regenerationHint && (
+                      <span
+                        className="ml-1 cursor-help"
+                        title={row.regenerationHint}
+                        aria-label="הערת מהאדמין"
+                      >
+                        💬
+                      </span>
+                    )}
                   </td>
 
                   <td className="px-3 py-2 text-center">

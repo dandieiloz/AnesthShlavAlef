@@ -22,15 +22,15 @@ export default async function ReportsPage() {
       {reports.length === 0 && <p className="text-slate-500">אין דיווחים פתוחים.</p>}
       <ul className="space-y-4">
         {reports.map((r) => (
-          <li key={r.id} className="rounded border bg-white p-4">
-            <div className="text-xs text-slate-500">
+          <li key={r.id} className="rounded border bg-card text-card-foreground p-4">
+            <div className="text-xs text-muted-foreground">
               דווח על ידי {r.user.name ?? r.user.email} · {r.createdAt.toLocaleString("he-IL")} · פרק {r.question.chapter.number}
             </div>
             <p className="mt-2"><strong>שאלה:</strong> {r.question.stem}</p>
             <p className="mt-1 text-sm"><strong>Gemini אמר:</strong> {r.question.geminiAnswer?.correctAnswer}</p>
-            <p className="mt-2 rounded bg-yellow-50 p-2 text-sm whitespace-pre-wrap"><strong>הסבר המשתמש:</strong> {r.explanation}</p>
+            <p className="mt-2 rounded bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-200 p-2 text-sm whitespace-pre-wrap"><strong>הסבר המשתמש:</strong> {r.explanation}</p>
             <div className="mt-3 flex gap-2">
-              <Link href={`/admin/questions/${r.questionId}`} className="rounded border px-3 py-1 text-sm hover:bg-slate-100">פתח שאלה</Link>
+              <Link href={`/admin/questions/${r.questionId}`} className="rounded border px-3 py-1 text-sm hover:bg-muted">פתח שאלה</Link>
               <form action={async () => { "use server"; await resolveReportAction(r.id, "RESOLVED"); }}>
                 <button className="rounded bg-green-600 px-3 py-1 text-sm text-white">סמן כטופל</button>
               </form>

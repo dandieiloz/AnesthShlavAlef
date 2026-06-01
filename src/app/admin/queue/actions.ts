@@ -67,7 +67,9 @@ export async function runJobAction(jobId: number): Promise<RunJobResult> {
   }
 
   try {
-    await generateExplanationForQuestion(job.questionId);
+    await generateExplanationForQuestion(job.questionId, {
+      hint: job.kind === "REGENERATE" ? job.regenerationHint ?? undefined : undefined,
+    });
     await db.answerGenerationJob.update({
       where: { id: jobId },
       data: { status: "DONE", finishedAt: new Date(), lastError: null },
@@ -128,7 +130,19 @@ export async function enqueueInitialJobAction(questionId: number): Promise<Enque
 
 // ─── Enqueue a re-generation job ──────────────────────────────────────────────
 
-export async function enqueueRegenerationAction(questionId: number): Promise<EnqueueResult> {
+const MAX_HINT_LENGTH = 2000;
+
+function sanitizeHint(hint: string | undefined | null): string | null {
+  if (!hint) return null;
+  const trimmed = hint.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_HINT_LENGTH);
+}
+
+export async function enqueueRegenerationAction(
+  questionId: number,
+  hint?: string | null,
+): Promise<EnqueueResult> {
   await requireAdmin();
 
   // Guard: only one open job per question
@@ -138,7 +152,7 @@ export async function enqueueRegenerationAction(questionId: number): Promise<Enq
   if (existing) return { ok: false, error: "כבר יש משימה פתוחה לשאלה זו" };
 
   const job = await db.answerGenerationJob.create({
-    data: { questionId, kind: "REGENERATE" },
+    data: { questionId, kind: "REGENERATE", regenerationHint: sanitizeHint(hint) },
   });
   revalidatePath("/admin/queue");
   revalidatePath(`/admin/questions/${questionId}`);

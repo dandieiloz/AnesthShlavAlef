@@ -100,6 +100,7 @@ export default async function QueuePage({
     queuedAt: j.queuedAt.toISOString(),
     startedAt: j.startedAt?.toISOString() ?? null,
     finishedAt: j.finishedAt?.toISOString() ?? null,
+    regenerationHint: j.regenerationHint ?? null,
   }));
 
   // On the active tab only: find questions without an answer and without any open job
