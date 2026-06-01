@@ -355,19 +355,19 @@ export default async function QuizReviewPage({
                             highlights={highlightsByQ.get(q.id) ?? []}
                             highlightT={dict.highlights}
                           />
-                          <ReportAnswerForm
-                            questionId={q.id}
-                            labels={{
-                              reportButton: t.reportButton,
-                              reportHint: t.reportHint,
-                              reportFieldLabel: t.reportFieldLabel,
-                              reportPlaceholder: t.reportPlaceholder,
-                              reportMinHint: t.reportMinHint,
-                              sendReport: t.sendReport,
-                            }}
-                          />
                         </div>
                       </details>
+                      <ReportAnswerForm
+                        questionId={q.id}
+                        labels={{
+                          reportButton: t.reportButton,
+                          reportHint: t.reportHint,
+                          reportFieldLabel: t.reportFieldLabel,
+                          reportPlaceholder: t.reportPlaceholder,
+                          reportMinHint: t.reportMinHint,
+                          sendReport: t.sendReport,
+                        }}
+                      />
                     </>
                   )}
 
