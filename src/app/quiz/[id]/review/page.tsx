@@ -244,6 +244,11 @@ export default async function QuizReviewPage({
                       <span className="text-xs text-muted-foreground hidden sm:block truncate">
                         {qT.chapterTitle}
                       </span>
+                      {q.source && (
+                        <span className="text-xs text-muted-foreground hidden md:block truncate">
+                          · {q.source}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {attempt.isCorrect ? (
@@ -326,7 +331,7 @@ export default async function QuizReviewPage({
                   {q.geminiAnswer && (
                     <>
                       <Separator className="opacity-40" />
-                      <details open={!attempt.isCorrect} className="group">
+                      <details className="group">
                         <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
                           <BookOpen className="h-3.5 w-3.5 shrink-0" />
                           {t.detailedExplanation}
