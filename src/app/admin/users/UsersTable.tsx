@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { setUserRoleAction, setUserPlanAction, deleteUserAction } from "./actions";
@@ -36,9 +36,9 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("he-IL", {
 });
 const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat("he-IL", { numeric: "auto" });
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, nowMs: number): string {
   const then = new Date(iso).getTime();
-  const diffSec = Math.round((then - Date.now()) / 1000);
+  const diffSec = Math.round((then - nowMs) / 1000);
   const absSec = Math.abs(diffSec);
   if (absSec < 60) return RELATIVE_FORMATTER.format(diffSec, "second");
   const diffMin = Math.round(diffSec / 60);
@@ -77,7 +77,14 @@ export function UsersTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [relativeNowMs, setRelativeNowMs] = useState<number | null>(null);
   const [, startTransition] = useTransition();
+
+  // Avoid SSR/CSR hydration drift by rendering a stable fallback first,
+  // then enabling live relative timestamps on the client after mount.
+  useEffect(() => {
+    setRelativeNowMs(Date.now());
+  }, []);
 
   function toggleRole(userId: string, currentRole: "USER" | "ADMIN") {
     const newRole: "USER" | "ADMIN" = currentRole === "ADMIN" ? "USER" : "ADMIN";
@@ -256,7 +263,9 @@ export function UsersTable({
               <td className="p-2 text-muted-foreground whitespace-nowrap">
                 {u.lastActiveAt ? (
                   <span title={DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))}>
-                    {formatRelative(u.lastActiveAt)}
+                    {relativeNowMs === null
+                      ? DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))
+                      : formatRelative(u.lastActiveAt, relativeNowMs)}
                   </span>
                 ) : (
                   <span className="italic text-muted-foreground/50">—</span>

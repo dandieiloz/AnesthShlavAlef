@@ -3,6 +3,7 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
+import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import { toggleBookmarkAction, postCommentAction } from "@/app/(user)/actions";
 import { CommentItem } from "@/components/CommentItem";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -353,6 +354,17 @@ export default async function QuizReviewPage({
                             questionId={q.id}
                             highlights={highlightsByQ.get(q.id) ?? []}
                             highlightT={dict.highlights}
+                          />
+                          <ReportAnswerForm
+                            questionId={q.id}
+                            labels={{
+                              reportButton: t.reportButton,
+                              reportHint: t.reportHint,
+                              reportFieldLabel: t.reportFieldLabel,
+                              reportPlaceholder: t.reportPlaceholder,
+                              reportMinHint: t.reportMinHint,
+                              sendReport: t.sendReport,
+                            }}
                           />
                         </div>
                       </details>
