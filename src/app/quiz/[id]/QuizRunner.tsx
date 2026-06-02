@@ -369,8 +369,8 @@ export function QuizRunner(props: Props) {
     );
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: React.FormEvent | React.MouseEvent) {
+    if (e && "preventDefault" in e) e.preventDefault();
     if (viewingIndex !== -1) return;
     if (!chosen || submittingRef.current) return;
     if (mode === "immediate" && revealed) return;
@@ -695,7 +695,14 @@ export function QuizRunner(props: Props) {
               </p>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form
+              onSubmit={(e) => {
+                // Prevent implicit submission via Enter key on radios — the user
+                // must explicitly click the submit button to reveal the answer.
+                e.preventDefault();
+              }}
+              className="space-y-3"
+            >
               {OPTION_KEYS.map((k, i) => {
                 const isChosen = displayChosen === k;
                 const isCorrectOption = displayRevealed && k === correctChoice;
@@ -855,7 +862,13 @@ export function QuizRunner(props: Props) {
                   );
                 } else {
                   mainBtn = (
-                    <Button type="submit" className="flex-1" size="lg" disabled={!chosen || submitting}>
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      size="lg"
+                      disabled={!chosen || submitting}
+                      onClick={handleSubmit}
+                    >
                       {t.submitAnswer}
                     </Button>
                   );
