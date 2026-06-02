@@ -18,6 +18,7 @@ export type HistoryRow = {
   lastQuizId: number | null;
   bookmarked: boolean;
   communityAttempts: number;
+  communityCorrect: number;
   communityPercentCorrect: number | null;
 };
 
@@ -189,7 +190,7 @@ export function HistoryTable({
             <SortHeader field="chapter" label="פרק" align="center" />
             <SortHeader field="source" label="מקור" />
             <SortHeader field="attempts" label="ניסיונות" align="center" />
-            <SortHeader field="communityPercent" label="% כלל" align="center" />
+            <SortHeader field="communityPercent" label="שאר המשתמשים" align="center" />
             <SortHeader field="lastSeen" label="נצפה לאחרונה" align="center" />
             <SortHeader field="lastResult" label="תוצאה אחרונה" align="center" />
           </tr>
@@ -256,9 +257,9 @@ export function HistoryTable({
                             ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
                             : "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
                       }`}
-                      title={`${r.communityAttempts} ניסיונות במערכת`}
+                      title={`${r.communityPercentCorrect}% הצליחו מתוך שאר המשתמשים`}
                     >
-                      {r.communityPercentCorrect}%
+                      {r.communityCorrect}/{r.communityAttempts}
                     </span>
                   )}
                 </td>

@@ -106,20 +106,20 @@ export default async function QuizReviewPage({
   });
   const pendingReportSet = new Set(pendingReportRows.map((r) => r.questionId));
 
-  // Community-wide stats (all users) per question — total attempts and correct attempts.
+  // Stats from other users (excluding current user) per question — total + correct.
   const reviewedIds = [...attemptMap.keys()];
   const [communityTotalRows, communityCorrectRows] = await Promise.all([
     reviewedIds.length
       ? db.attempt.groupBy({
           by: ["questionId"],
-          where: { questionId: { in: reviewedIds } },
+          where: { questionId: { in: reviewedIds }, userId: { not: me.id } },
           _count: { _all: true },
         })
       : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
     reviewedIds.length
       ? db.attempt.groupBy({
           by: ["questionId"],
-          where: { questionId: { in: reviewedIds }, isCorrect: true },
+          where: { questionId: { in: reviewedIds }, isCorrect: true, userId: { not: me.id } },
           _count: { _all: true },
         })
       : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
@@ -297,9 +297,9 @@ export default async function QuizReviewPage({
                                 ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
                                 : "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
                           }`}
-                          title={`${communityCorrect} מתוך ${communityTotal} ניסיונות במערכת`}
+                          title={`${communityPercent}% הצליחו מתוך שאר המשתמשים`}
                         >
-                          {communityPercent}% כלל
+                          {communityCorrect}/{communityTotal} שאר המשתמשים
                         </span>
                       )}
                       {attempt.isCorrect ? (

@@ -99,19 +99,19 @@ export default async function HistoryPage({
   const countMap = new Map<number, number>();
   for (const c of counts) countMap.set(c.questionId, c._count._all);
 
-  // Community-wide stats (across all users) per question — total + correct.
+  // Stats from other users (excluding current user) per question — total + correct.
   const [communityTotalRows, communityCorrectRows] = await Promise.all([
     questionIds.length
       ? db.attempt.groupBy({
           by: ["questionId"],
-          where: { questionId: { in: questionIds } },
+          where: { questionId: { in: questionIds }, userId: { not: me.id } },
           _count: { _all: true },
         })
       : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
     questionIds.length
       ? db.attempt.groupBy({
           by: ["questionId"],
-          where: { questionId: { in: questionIds }, isCorrect: true },
+          where: { questionId: { in: questionIds }, isCorrect: true, userId: { not: me.id } },
           _count: { _all: true },
         })
       : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
@@ -164,6 +164,7 @@ export default async function HistoryPage({
         lastQuizId: latest.quizId,
         bookmarked: bookmarkSet.has(q.id),
         communityAttempts: communityTotal,
+        communityCorrect,
         communityPercentCorrect:
           communityTotal === 0 ? null : Math.round((communityCorrect / communityTotal) * 100),
       } satisfies HistoryRow;
