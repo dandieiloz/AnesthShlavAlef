@@ -34,16 +34,19 @@ export function invalidateDemoAllowedSources() {}
  * ADMIN and PAID users get an empty fragment (no restriction).
  */
 export async function questionAccessWhere(user: PlanGatedUser) {
-  if (user.role === "ADMIN" || user.plan === "PAID") return {};
+  if (user.role === "ADMIN") return {};
+  // Non-admin users never see disabled questions.
+  const baseGate: Record<string, unknown> = { disabled: false };
+  if (user.plan === "PAID") return baseGate;
   const { sources, allowNullSource } = await getDemoAllowedSources();
   if (sources.length === 0 && !allowNullSource) {
-    // Nothing allowed → match no rows.
     return { id: -1 };
   }
   const or: Array<Record<string, unknown>> = [];
   if (sources.length > 0) or.push({ source: { in: sources } });
   if (allowNullSource) or.push({ source: null });
-  return or.length === 1 ? or[0] : { OR: or };
+  const sourceGate = or.length === 1 ? or[0] : { OR: or };
+  return { ...baseGate, ...sourceGate };
 }
 
 /**
@@ -66,10 +69,15 @@ export async function withQuestionAccess<T extends Record<string, unknown>>(
  * Use for single-question routes (/quiz/[id], single fetches).
  */
 export async function assertCanAccessQuestion(user: PlanGatedUser, questionId: number): Promise<void> {
-  if (user.role === "ADMIN" || user.plan === "PAID") return;
-  const { sources, allowNullSource } = await getDemoAllowedSources();
-  const q = await db.question.findUnique({ where: { id: questionId }, select: { source: true } });
+  if (user.role === "ADMIN") return;
+  const q = await db.question.findUnique({
+    where: { id: questionId },
+    select: { source: true, disabled: true },
+  });
   if (!q) notFound();
+  if (q.disabled) notFound();
+  if (user.plan === "PAID") return;
+  const { sources, allowNullSource } = await getDemoAllowedSources();
   if (q.source === null) {
     if (!allowNullSource) notFound();
     return;

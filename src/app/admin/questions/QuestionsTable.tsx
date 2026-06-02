@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction } from "./actions";
+import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction, batchSetDisabledAction } from "./actions";
 
 export type QuestionRow = {
   id: number;
@@ -13,6 +13,7 @@ export type QuestionRow = {
   createdAt: string;
   chapterNumber: number;
   hasExplanation: boolean;
+  disabled: boolean;
   /** Confidence in [0,1] from the GeminiAnswer, or null when no answer exists. */
   confidence: number | null;
   escalated: boolean | null;
@@ -60,7 +61,7 @@ export function QuestionsTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [panel, setPanel] = useState<"source" | "delete" | "translate" | null>(null);
+  const [panel, setPanel] = useState<"source" | "delete" | "translate" | "disable" | "enable" | null>(null);
   const [translateDone, setTranslateDone] = useState<number | null>(null);
 
   // Source edit form state
@@ -119,6 +120,15 @@ export function QuestionsTable({
     startTransition(async () => {
       const count = await batchTranslateMissingAction([...selected]);
       setTranslateDone(count);
+      setPanel(null);
+      router.refresh();
+    });
+  }
+
+  function handleSetDisabled(disabled: boolean) {
+    startTransition(async () => {
+      await batchSetDisabledAction([...selected], disabled);
+      setSelected(new Set());
       setPanel(null);
       router.refresh();
     });
@@ -209,6 +219,20 @@ export function QuestionsTable({
             disabled={pending}
           >
             תרגם חסר (EN)
+          </button>
+          <button
+            onClick={() => setPanel("disable")}
+            className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+            disabled={pending}
+          >
+            השבת
+          </button>
+          <button
+            onClick={() => setPanel("enable")}
+            className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+            disabled={pending}
+          >
+            הפעל
           </button>
           <button
             onClick={() => setPanel("delete")}
@@ -306,6 +330,54 @@ export function QuestionsTable({
         </div>
       )}
 
+      {/* Disable confirmation panel */}
+      {panel === "disable" && (
+        <div className="mb-3 rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            להשבית <strong>{selected.size}</strong> שאלות? הן לא יוצגו למשתמשים אך יישמרו במערכת.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSetDisabled(true)}
+              disabled={pending}
+              className="rounded bg-amber-600 px-4 py-1.5 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              {pending ? "משבית..." : "כן, השבת"}
+            </button>
+            <button
+              onClick={() => setPanel(null)}
+              className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Enable confirmation panel */}
+      {panel === "enable" && (
+        <div className="mb-3 rounded border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 space-y-3">
+          <p className="text-sm text-emerald-800 dark:text-emerald-300">
+            להפעיל <strong>{selected.size}</strong> שאלות מחדש?
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSetDisabled(false)}
+              disabled={pending}
+              className="rounded bg-emerald-600 px-4 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {pending ? "מפעיל..." : "כן, הפעל"}
+            </button>
+            <button
+              onClick={() => setPanel(null)}
+              className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Delete confirmation panel */}
       {panel === "delete" && (
         <div className="mb-3 rounded border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 space-y-3">
@@ -375,12 +447,19 @@ export function QuestionsTable({
                 </td>
                 <td className="p-2 text-muted-foreground font-mono">{q.id}</td>
                 <td className="p-2 max-w-md">
-                  <Link
-                    href={`/admin/questions/${q.id}`}
-                    className="text-primary hover:underline line-clamp-2"
-                  >
-                    {q.stem.slice(0, 120)}{q.stem.length > 120 ? "…" : ""}
-                  </Link>
+                  <div className="flex items-start gap-2">
+                    <Link
+                      href={`/admin/questions/${q.id}`}
+                      className={`text-primary hover:underline line-clamp-2 ${q.disabled ? "opacity-60" : ""}`}
+                    >
+                      {q.stem.slice(0, 120)}{q.stem.length > 120 ? "…" : ""}
+                    </Link>
+                    {q.disabled ? (
+                      <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                        מושבתת
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="p-2 text-muted-foreground whitespace-nowrap">
                   {q.source ?? <span className="italic text-muted-foreground/50">—</span>}

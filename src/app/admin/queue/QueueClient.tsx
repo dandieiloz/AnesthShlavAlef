@@ -95,6 +95,8 @@ export function QueueClient({
   const [rows, setRows] = useState<QueueJobRow[]>(initialRows);
   const [unanswered, setUnanswered] = useState<UnansweredQuestion[]>(initialUnanswered);
   const [lowQuality, setLowQuality] = useState<LowQualityQuestion[]>(initialLowQuality);
+  const [hintModalQ, setHintModalQ] = useState<LowQualityQuestion | null>(null);
+  const [hintText, setHintText] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
@@ -350,9 +352,9 @@ export function QueueClient({
   // ── Regenerate one low-quality question ───────────────────────────
 
   const handleRegenerateOne = useCallback(
-    (questionId: number) => {
+    (questionId: number, hint?: string) => {
       startTransition(async () => {
-        const result = await enqueueRegenerationAction(questionId);
+        const result = await enqueueRegenerationAction(questionId, hint ?? null);
         if (result.ok) {
           setLowQuality((prev) => prev.filter((q) => q.id !== questionId));
           router.refresh();
@@ -361,6 +363,24 @@ export function QueueClient({
     },
     [router],
   );
+
+  const openHintModal = useCallback((q: LowQualityQuestion) => {
+    setHintModalQ(q);
+    setHintText("");
+  }, []);
+
+  const closeHintModal = useCallback(() => {
+    setHintModalQ(null);
+    setHintText("");
+  }, []);
+
+  const submitHintModal = useCallback(() => {
+    if (!hintModalQ) return;
+    const qId = hintModalQ.id;
+    const hint = hintText.trim() || undefined;
+    closeHintModal();
+    handleRegenerateOne(qId, hint);
+  }, [hintModalQ, hintText, closeHintModal, handleRegenerateOne]);
 
   // ── Bulk regenerate all low-quality questions ───────────────────────
 
@@ -513,7 +533,7 @@ export function QueueClient({
                       </td>
                       <td className="px-3 py-2 text-center">
                         <button
-                          onClick={() => handleRegenerateOne(q.id)}
+                          onClick={() => openHintModal(q)}
                           className="rounded border px-2 py-1 text-xs hover:bg-muted"
                         >
                           + חולל מחדש
@@ -839,6 +859,84 @@ export function QueueClient({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Hint modal for regenerating a low-quality answer */}
+      {hintModalQ && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeHintModal}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg border bg-card p-5 shadow-xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <h2 className="text-lg font-semibold">חולל מחדש — שאלה #{hintModalQ.id}</h2>
+            <p className="text-sm text-muted-foreground line-clamp-3" title={hintModalQ.stem}>
+              {hintModalQ.stem}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {hintModalQ.confidence !== null && Math.round(hintModalQ.confidence * 100) < 70 && (
+                <span className="rounded bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 text-xs font-mono text-yellow-800 dark:text-yellow-300">
+                  ביטחון: {Math.round(hintModalQ.confidence * 100)}%
+                </span>
+              )}
+              {hintModalQ.escalated && (
+                <span className="rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-xs text-amber-800 dark:text-amber-300">
+                  Escalated
+                </span>
+              )}
+              {hintModalQ.insufficientEvidence && (
+                <span className="rounded bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 text-xs text-red-800 dark:text-red-300">
+                  ראיות חסרות
+                </span>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                הערה / רמז למודל (אופציונלי)
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                הסבר בקצרה למה ההסבר הקיים שגוי כדי לעזור למודל לחולל תשובה טובה יותר. לדוגמה:
+                &quot;התשובה הנכונה היא B כי...&quot;, &quot;המודל התעלם מהשפעת...&quot;, &quot;המקור הנכון נמצא בפרק X&quot;.
+                הראיות עדיין חייבות להגיע מקטעי המקור.
+              </p>
+              <textarea
+                value={hintText}
+                onChange={(e) => setHintText(e.target.value)}
+                rows={5}
+                maxLength={2000}
+                className="w-full rounded border p-2 text-sm bg-background text-foreground"
+                placeholder="הערה למודל (עד 2000 תווים)..."
+                autoFocus
+              />
+              <p className="mt-1 text-xs text-muted-foreground text-left font-mono">
+                {hintText.length} / 2000
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={closeHintModal}
+                className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+              >
+                ביטול
+              </button>
+              <Link
+                href={`/admin/questions/${hintModalQ.id}`}
+                className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+              >
+                פתח דף שאלה
+              </Link>
+              <button
+                onClick={submitHintModal}
+                className="rounded bg-rose-600 px-4 py-1.5 text-sm text-white hover:bg-rose-700"
+              >
+                חולל מחדש
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

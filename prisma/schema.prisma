@@ -159,6 +159,7 @@ model Question {
   optionD           String        @db.Text
   correctAnswer     Choice?
   source            String?
+  disabled          Boolean       @default(false)  // when true, question is hidden from learners; admin still sees it
   createdById       String?
   createdAt         DateTime      @default(now())
 

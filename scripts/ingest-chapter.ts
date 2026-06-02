@@ -26,7 +26,8 @@ export async function ingestChapter(chapterNumber: number, pdfPath: string): Pro
 
   let inserted = 0;
   for (const chunk of chunks) {
-    const vec = await embedWithRetry(chunk.text, chunkLabel(chunk));
+    const embedInput = buildEmbedInput(chapter.number, chapter.title, chunk);
+    const vec = await embedWithRetry(embedInput, chunkLabel(chunk));
     if (!vec) continue;
     const vecLiteral = `[${vec.join(",")}]`;
     await db.$executeRawUnsafe(
@@ -53,6 +54,15 @@ export async function ingestChapter(chapterNumber: number, pdfPath: string): Pro
 
 function chunkLabel(c: ExtractedChunk): string {
   return `[ord=${c.ord} pages=${c.pageStart}-${c.pageEnd} section=${c.sectionPath ?? "(root)"}]`;
+}
+
+/**
+ * Embedding input is the chunk text prefixed with chapter and section context.
+ * Stored `chunk.text` stays untouched so downstream quotes remain literal.
+ */
+function buildEmbedInput(chapterNumber: number, chapterTitle: string, c: ExtractedChunk): string {
+  const path = c.sectionPath ? ` > ${c.sectionPath}` : "";
+  return `[Ch ${chapterNumber} — ${chapterTitle}${path}]\n${c.text}`;
 }
 
 async function embedWithRetry(text: string, label: string): Promise<number[] | undefined> {

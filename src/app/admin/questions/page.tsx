@@ -28,6 +28,7 @@ export default async function AdminQuestionsPage({
     confidence?: string;
     escalated?: string;
     insufficient?: string;
+    status?: string;
     sort?: string;
     order?: string;
   }>;
@@ -76,6 +77,11 @@ export default async function AdminQuestionsPage({
     where.geminiAnswer = hasAnswerFilter ? { is: answerIs } : { isNot: null };
   }
 
+  if (sp.status === "disabled") where.disabled = true;
+  else if (sp.status === "all") {
+    // no filter
+  } else where.disabled = false; // default: active only
+
   if (sp.chapter?.trim()) {
     const chapterNum = Number(sp.chapter.trim());
     if (Number.isFinite(chapterNum) && chapterNum > 0) {
@@ -115,6 +121,7 @@ export default async function AdminQuestionsPage({
         id: true,
         stem: true,
         source: true,
+        disabled: true,
         createdAt: true,
         chapter: { select: { number: true } },
         geminiAnswer: {
@@ -203,6 +210,7 @@ export default async function AdminQuestionsPage({
       createdAt: q.createdAt.toISOString(),
       chapterNumber: q.chapter.number,
       hasExplanation: q.geminiAnswer !== null,
+      disabled: q.disabled,
       confidence: q.geminiAnswer?.confidence ?? null,
       escalated: q.geminiAnswer?.escalated ?? null,
       insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,

@@ -21,6 +21,23 @@ export async function batchDeleteQuestionsAction(ids: number[]) {
   revalidatePath("/admin/questions");
 }
 
+export async function batchSetDisabledAction(ids: number[], disabled: boolean) {
+  await requireAdmin();
+  if (ids.length === 0) return;
+  await db.question.updateMany({
+    where: { id: { in: ids } },
+    data: { disabled },
+  });
+  revalidatePath("/admin/questions");
+}
+
+export async function setQuestionDisabledAction(id: number, disabled: boolean) {
+  await requireAdmin();
+  await db.question.update({ where: { id }, data: { disabled } });
+  revalidatePath("/admin/questions");
+  revalidatePath(`/admin/questions/${id}`);
+}
+
 /**
  * For each supplied question id, translate any missing EN fields
  * (stem + options, and explanation + whyOthersWrong if a GeminiAnswer exists).

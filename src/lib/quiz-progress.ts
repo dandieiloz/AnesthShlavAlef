@@ -18,7 +18,7 @@ export async function getQuizProgress(quiz: Quiz): Promise<QuizProgress> {
     useFixedSet
       ? Promise.resolve(quiz.questionIds.length)
       : db.question.count({
-          where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null } },
+          where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null }, disabled: false },
         }),
     db.attempt.findMany({
       where: { quizId: quiz.id },
@@ -51,7 +51,7 @@ export async function getQuizProgressMany(
 
   // Count eligible questions per chapter (a question may surface under multiple chapters via chapterIds[])
   const eligibleQuestions = await db.question.findMany({
-    where: { chapterIds: { hasSome: allChapterIds }, geminiAnswer: { isNot: null } },
+    where: { chapterIds: { hasSome: allChapterIds }, geminiAnswer: { isNot: null }, disabled: false },
     select: { id: true, chapterIds: true },
   });
   // For each chapter, count how many eligible questions list it in their chapterIds

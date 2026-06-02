@@ -16,6 +16,7 @@ import {
   enqueueRegenerationAction,
 } from "@/app/admin/queue/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
+import { DisableQuestionButton } from "./DisableQuestionButton";
 import { EditableGeminiAnswer } from "./EditableGeminiAnswer";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -76,7 +77,15 @@ export default async function AdminQuestionPage({
       </Link>
       <div className="flex items-center justify-between mt-2">
         <h1 className="text-xl font-bold">שאלה #{q.id}</h1>
-        <DeleteQuestionButton questionId={q.id} chapterNumber={q.chapter.number} />
+        <div className="flex items-center gap-2">
+          {q.disabled ? (
+            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+              מושבתת
+            </span>
+          ) : null}
+          <DisableQuestionButton questionId={q.id} disabled={q.disabled} />
+          <DeleteQuestionButton questionId={q.id} chapterNumber={q.chapter.number} />
+        </div>
       </div>
       {error && (
         <div className="mt-2 rounded border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-800 dark:text-red-300">
