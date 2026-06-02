@@ -43,6 +43,10 @@ export const DICTIONARIES = {
       signOut: "יציאה",
       adminBadge: "מנהל",
       demoBadge: "דמו",
+      fontSize: {
+        increase: "הגדלת גופן",
+        decrease: "הקטנת גופן",
+      },
     },
     footer: {
       tagline: "הרדמה שלב א׳ · מבוסס Miller's Anesthesia",
@@ -513,6 +517,10 @@ export const DICTIONARIES = {
       signOut: "Sign out",
       adminBadge: "Admin",
       demoBadge: "Demo",
+      fontSize: {
+        increase: "Increase font size",
+        decrease: "Decrease font size",
+      },
     },
     footer: {
       tagline: "Anesthesiology Step 1 · based on Miller's Anesthesia",

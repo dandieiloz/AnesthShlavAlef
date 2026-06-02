@@ -8,6 +8,8 @@ export type RetrievedChunk = {
   chapterNumber: number;
   chapterTitle: string;
   sectionPath: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
   /** Vector-distance score (lower = closer) from pgvector. */
   vectorScore: number;
   /** 0..10 score from the LLM-judge reranker. Populated after rerank step. */
@@ -19,6 +21,10 @@ export type EvidenceCitation = {
   chapterTitle: string;
   sectionPath: string | null;
   quote: string;
+  /** PDF page where the quote starts (1-based, optional for legacy rows). */
+  pageStart?: number | null;
+  /** PDF page where the quote ends. Equal to pageStart when same page. */
+  pageEnd?: number | null;
 };
 
 /** What the structured-output LLM returns. */

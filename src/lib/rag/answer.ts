@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = [
   "- translation: תרגום קצר של השאלה והאפשרויות לעברית.",
   "- correctAnswer: A | B | C | D",
   "- confidence: מספר בין 0 ל-1, המבטא עד כמה אתה בטוח בתשובה על סמך הראיות.",
-  "- evidence: מערך ראיות מסודר לפי חוזק — הראיה החזקה ביותר ראשונה. כל ראיה כוללת: chapterNumber, chapterTitle, sectionPath (אם ידוע, אחרת null), quote (ציטוט קצר מהקטע).",
+  "- evidence: מערך ראיות מסודר לפי חוזק — הראיה החזקה ביותר ראשונה. כל ראיה כוללת: chapterNumber, chapterTitle, sectionPath (אם ידוע, אחרת null), pageStart ו- pageEnd (מספרי העמוד בהדפסה להם מופיע הציטוט — מתוך תוית ה-pages של ה-CHAPTER block, אחרת null), quote (ציטוט קצר מהקטע).",
   "- explanation: הסבר פיזיולוגי/פרמקולוגי/קליני בעברית. עטוף כל ביטוי מתמטי/נוסחה בתוך תוחמי LaTeX: `$...$` לנוסחה בתוך משפט, או `$$...$$` לנוסחה בשורה נפרדת. זה כולל כל שימוש בפקודות כמו \\Delta, \\times, \\approx, \\dot, \\text, וכן תחתיות/מעריכים (CMRO_2 -> $CMRO_2$). אל תכתוב פקודות LaTeX ללא תוחמים.",
   "- whyOthersWrong: אובייקט עם A/B/C/D — הסבר ספציפי מדוע כל אפשרות שגויה (לאפשרות הנכונה כתוב מחרוזת ריקה).",
   "- insufficientEvidence: boolean. true רק אם באמת אין במקור מידע שמכריע.",
@@ -47,6 +47,8 @@ const RESPONSE_SCHEMA = {
           chapterNumber: { type: Type.INTEGER, description: "Exact chapter number from the [CHAPTER N: ...] header of the source block that contains this quote" },
           chapterTitle: { type: Type.STRING },
           sectionPath: { type: Type.STRING, nullable: true },
+          pageStart: { type: Type.INTEGER, nullable: true, description: "PDF page where the quote starts. Copy from the (pp. X-Y) marker on the source block. Use null if absent." },
+          pageEnd: { type: Type.INTEGER, nullable: true, description: "PDF page where the quote ends. Copy from the (pp. X-Y) marker on the source block. Use null if absent." },
           quote: { type: Type.STRING },
         },
         required: ["chapterNumber", "chapterTitle", "quote"],
@@ -91,10 +93,12 @@ function buildUserPrompt(opts: {
   hint?: string;
 }): string {
   const sourceBlock = opts.chunks
-    .map(
-      (c) =>
-        `--- [CHAPTER ${c.chapterNumber}: ${c.chapterTitle}${c.sectionPath ? ` > ${c.sectionPath}` : ""}] ---\n${c.text}`,
-    )
+    .map((c) => {
+      const pages = formatPageRange(c.pageStart ?? null, c.pageEnd ?? null);
+      const sec = c.sectionPath ? ` > ${c.sectionPath}` : "";
+      const pp = pages ? ` (${pages})` : "";
+      return `--- [CHAPTER ${c.chapterNumber}: ${c.chapterTitle}${sec}${pp}] ---\n${c.text}`;
+    })
     .join("\n\n");
 
   const lines = [
@@ -123,14 +127,23 @@ function buildUserPrompt(opts: {
   return lines.join("\n");
 }
 
+/** Render a "p. N" or "pp. N–M" string, or empty when no pages are known. */
+function formatPageRange(pageStart: number | null | undefined, pageEnd: number | null | undefined): string {
+  if (!pageStart) return "";
+  if (!pageEnd || pageEnd === pageStart) return `p. ${pageStart}`;
+  return `pp. ${pageStart}–${pageEnd}`;
+}
+
 /** Render the structured payload back to a Hebrew Markdown block matching the legacy v1 format. */
 function renderMarkdown(s: StructuredAnswer): string {
   const heLetter: Record<Choice, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
   const evidenceBlock = s.evidence
-    .map(
-      (e) =>
-        `> "${e.quote}"\n> — פרק ${e.chapterNumber} — ${e.chapterTitle}${e.sectionPath ? ` > ${e.sectionPath}` : ""}`,
-    )
+    .map((e) => {
+      const pages = formatPageRange(e.pageStart, e.pageEnd);
+      const sec = e.sectionPath ? ` > ${e.sectionPath}` : "";
+      const pp = pages ? `, ${pages}` : "";
+      return `> "${e.quote}"\n> — פרק ${e.chapterNumber} — ${e.chapterTitle}${sec}${pp}`;
+    })
     .join("\n\n");
   const wrongChoices: Choice[] = (["A", "B", "C", "D"] as Choice[]).filter((c) => c !== s.correctAnswer);
   const wrongBlock = wrongChoices
@@ -386,7 +399,11 @@ async function persistAnswer(opts: {
       rawMarkdown: payload.rawMarkdown,
       correctAnswer: structured.correctAnswer,
       evidence: structured.evidence
-        .map((e) => `[פרק ${e.chapterNumber} — ${e.chapterTitle}] "${e.quote}"`)
+        .map((e) => {
+          const pages = formatPageRange(e.pageStart, e.pageEnd);
+          const pp = pages ? ` (${pages})` : "";
+          return `[פרק ${e.chapterNumber} — ${e.chapterTitle}${pp}] "${e.quote}"`;
+        })
         .join("\n\n"),
       explanation: structured.explanation,
       whyOthersWrong: Object.entries(structured.whyOthersWrong)

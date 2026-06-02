@@ -52,6 +52,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale} dir={locale === "en" ? "ltr" : "rtl"} className={`${heebo.variable} ${frankRuhl.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var v=localStorage.getItem('perl.fontSizePx');if(v){var n=parseInt(v,10);if(n>=14&&n<=18)document.documentElement.style.fontSize=n+'px';}}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-screen font-sans flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <SiteHeaderClient user={user} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} />

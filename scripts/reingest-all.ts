@@ -23,6 +23,9 @@ interface CliArgs {
   from: number | null;
 }
 
+const DB_CONNECT_ATTEMPTS = 6;
+const CHAPTER_RETRY_ATTEMPTS = 3;
+
 function parseArgs(): CliArgs {
   const args = process.argv.slice(2);
   let force = false;
@@ -39,6 +42,39 @@ function parseArgs(): CliArgs {
     }
   }
   return { force, only, from };
+}
+
+function isTransientDbError(error: unknown): boolean {
+  const msg = String(error);
+  return (
+    msg.includes("PrismaClientInitializationError") ||
+    msg.includes("Can't reach database server") ||
+    msg.includes("ECONNRESET") ||
+    msg.includes("ETIMEDOUT") ||
+    msg.includes("Connection terminated") ||
+    msg.includes("Timed out")
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withDbRetry<T>(label: string, fn: () => Promise<T>, attempts: number): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const transient = isTransientDbError(e);
+      if (!transient || i === attempts - 1) break;
+      const waitMs = 2000 * Math.pow(2, i);
+      console.warn(`${label} failed (attempt ${i + 1}/${attempts}), retrying in ${(waitMs / 1000).toFixed(0)}s...`);
+      await delay(waitMs);
+    }
+  }
+  throw lastErr;
 }
 
 async function discoverPdfs(): Promise<{ chapterNumber: number; pdfPath: string }[]> {
@@ -69,10 +105,17 @@ async function main() {
   console.log(`discovered ${allPdfs.length} PDFs; processing ${filtered.length} after filters`);
   console.log(`force=${args.force} only=${args.only ? [...args.only].join(",") : "-"} from=${args.from ?? "-"}`);
 
+  await withDbRetry("database connect", () => db.$connect(), DB_CONNECT_ATTEMPTS);
+
   // Pre-fetch ingest status to decide skips
-  const chapters = await db.chapter.findMany({
-    select: { number: true, ingestedAt: true, id: true },
-  });
+  const chapters = await withDbRetry(
+    "chapter status prefetch",
+    () =>
+      db.chapter.findMany({
+        select: { number: true, ingestedAt: true, id: true },
+      }),
+    DB_CONNECT_ATTEMPTS,
+  );
   const statusByNum = new Map(chapters.map((c) => [c.number, c]));
 
   const t0 = Date.now();
@@ -96,7 +139,13 @@ async function main() {
     console.log(`\n=== [ch${p.chapterNumber}] ${path.basename(p.pdfPath)} (${(fileInfo.size / 1024).toFixed(0)} KB) ===`);
     const t1 = Date.now();
     try {
-      await ingestChapter(p.chapterNumber, p.pdfPath);
+      await withDbRetry(
+        `[ch${p.chapterNumber}] ingest`,
+        async () => {
+          await ingestChapter(p.chapterNumber, p.pdfPath);
+        },
+        CHAPTER_RETRY_ATTEMPTS,
+      );
       done++;
       console.log(`[ch${p.chapterNumber}] elapsed ${((Date.now() - t1) / 1000).toFixed(1)}s`);
     } catch (e) {

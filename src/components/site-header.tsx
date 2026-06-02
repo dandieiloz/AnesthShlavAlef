@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { FontSizeToggle } from "@/components/font-size-toggle";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,10 @@ interface SiteHeaderClientProps {
     signOut: string;
     adminBadge: string;
     demoBadge: string;
+    fontSize: {
+      increase: string;
+      decrease: string;
+    };
   };
 }
 
@@ -98,6 +103,7 @@ export function SiteHeaderClient({ user, signInAction, signOutAction, nav }: Sit
             </nav>
           )}
 
+          <FontSizeToggle t={nav.fontSize} />
           <ThemeToggle />
 
           {user ? (

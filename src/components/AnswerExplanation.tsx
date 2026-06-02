@@ -11,6 +11,8 @@ export type EvidenceCitationDisplay = {
   chapterTitle: string;
   sectionPath: string | null;
   quote: string;
+  pageStart?: number | null;
+  pageEnd?: number | null;
 };
 
 type Props = {
@@ -47,6 +49,8 @@ const UI = {
     whyWrong: "מדוע שאר האפשרויות שגויות",
     evidence: "ראיות מספר הלימוד",
     chapter: "פרק",
+    page: "עמ׳",
+    pages: "עמ׳׳",
   },
   en: {
     insufficient: "The textbook evidence is insufficient for a definitive proof. The explanation is based on general guidelines.",
@@ -54,6 +58,8 @@ const UI = {
     whyWrong: "Why the other options are wrong",
     evidence: "Textbook Evidence",
     chapter: "Chapter",
+    page: "p.",
+    pages: "pp.",
   },
 };
 
@@ -216,6 +222,14 @@ export function AnswerExplanation({
                         >
                           {" "}
                           › {e.sectionPath}
+                        </span>
+                      )}
+                      {e.pageStart != null && (
+                        <span className="text-muted-foreground/60 [unicode-bidi:isolate]">
+                          {" · "}
+                          {e.pageEnd != null && e.pageEnd !== e.pageStart
+                            ? `${ui.pages} ${e.pageStart}–${e.pageEnd}`
+                            : `${ui.page} ${e.pageStart}`}
                         </span>
                       )}
                     </p>

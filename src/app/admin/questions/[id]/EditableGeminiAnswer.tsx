@@ -50,7 +50,7 @@ export function EditableGeminiAnswer({
   function addCite() {
     setCites((prev) => [
       ...prev,
-      { chapterNumber: defaultChapterNumber, chapterTitle: "", sectionPath: null, quote: "" },
+      { chapterNumber: defaultChapterNumber, chapterTitle: "", sectionPath: null, quote: "", pageStart: null, pageEnd: null },
     ]);
   }
 
@@ -156,6 +156,34 @@ export function EditableGeminiAnswer({
                   }
                   className="flex-1 rounded border p-1 bg-background text-foreground"
                 />
+                <label className="flex items-center gap-1">
+                  עמ׳:
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="מ-"
+                    value={c.pageStart ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? null : Number(e.target.value);
+                      updateCite(i, { pageStart: v && Number.isFinite(v) && v > 0 ? v : null });
+                    }}
+                    className="w-16 rounded border p-1 bg-background text-foreground"
+                  />
+                </label>
+                <label className="flex items-center gap-1">
+                  עד:
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="עד-"
+                    value={c.pageEnd ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? null : Number(e.target.value);
+                      updateCite(i, { pageEnd: v && Number.isFinite(v) && v > 0 ? v : null });
+                    }}
+                    className="w-16 rounded border p-1 bg-background text-foreground"
+                  />
+                </label>
                 <button
                   type="button"
                   onClick={() => removeCite(i)}

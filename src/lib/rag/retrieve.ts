@@ -15,6 +15,8 @@ type Row = {
   chapterNumber: number;
   chapterTitle: string;
   sectionPath: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
   vectorScore: number;
 };
 
@@ -27,6 +29,8 @@ async function annSearch(queryVector: number[], k: number): Promise<Row[]> {
             c.number       AS "chapterNumber",
             c.title        AS "chapterTitle",
             cc."sectionPath" AS "sectionPath",
+            cc."pageStart"   AS "pageStart",
+            cc."pageEnd"     AS "pageEnd",
             (cc.embedding <=> $1::vector) AS "vectorScore"
      FROM "ChapterChunk" cc
      JOIN "Chapter" c ON c.id = cc."chapterId"
@@ -72,6 +76,8 @@ export async function retrieveCandidates(opts: {
         chapterNumber: r.chapterNumber,
         chapterTitle: r.chapterTitle,
         sectionPath: r.sectionPath,
+        pageStart: r.pageStart,
+        pageEnd: r.pageEnd,
         vectorScore: r.vectorScore,
       });
     }

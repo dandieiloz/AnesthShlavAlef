@@ -197,6 +197,8 @@ const EvidenceCitationSchema = z.object({
   chapterTitle: z.string().default(""),
   sectionPath: z.string().nullable().optional().transform((v) => (v && v.trim() ? v : null)),
   quote: z.string().min(1),
+  pageStart: z.coerce.number().int().positive().nullable().optional(),
+  pageEnd: z.coerce.number().int().positive().nullable().optional(),
 });
 
 const SaveGeminiAnswerSchema = z.object({
