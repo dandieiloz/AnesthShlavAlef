@@ -9,6 +9,8 @@ import {
   retryJobsAction,
   cleanupDoneJobsAction,
   enqueueInitialJobAction,
+  enqueueRegenerationAction,
+  enqueueRegenerationBatchAction,
   estimateJobsCostAction,
   type RunJobResult,
   type CostEstimateResult,
@@ -38,6 +40,13 @@ export type UnansweredQuestion = {
   source: string | null;
   chapterNumber: number;
   chapterTitle: string;
+};
+
+export type LowQualityQuestion = UnansweredQuestion & {
+  /** [0,1], or null if no answer */
+  confidence: number | null;
+  escalated: boolean;
+  insufficientEvidence: boolean;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -76,13 +85,16 @@ function formatDuration(ms: number): string {
 export function QueueClient({
   rows: initialRows,
   unansweredQuestions: initialUnanswered = [],
+  lowQualityQuestions: initialLowQuality = [],
 }: {
   rows: QueueJobRow[];
   unansweredQuestions?: UnansweredQuestion[];
+  lowQualityQuestions?: LowQualityQuestion[];
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<QueueJobRow[]>(initialRows);
   const [unanswered, setUnanswered] = useState<UnansweredQuestion[]>(initialUnanswered);
+  const [lowQuality, setLowQuality] = useState<LowQualityQuestion[]>(initialLowQuality);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
@@ -335,6 +347,37 @@ export function QueueClient({
     });
   }, [unanswered, router]);
 
+  // ── Regenerate one low-quality question ───────────────────────────
+
+  const handleRegenerateOne = useCallback(
+    (questionId: number) => {
+      startTransition(async () => {
+        const result = await enqueueRegenerationAction(questionId);
+        if (result.ok) {
+          setLowQuality((prev) => prev.filter((q) => q.id !== questionId));
+          router.refresh();
+        }
+      });
+    },
+    [router],
+  );
+
+  // ── Bulk regenerate all low-quality questions ───────────────────────
+
+  const handleRegenerateAll = useCallback(() => {
+    startTransition(async () => {
+      const ids = lowQuality.map((q) => q.id);
+      const result = await enqueueRegenerationBatchAction(ids);
+      setLowQuality([]);
+      setStatusMsg(
+        result.skipped > 0
+          ? `הוספו ${result.enqueued} משימות חילול מחדש (${result.skipped} דולגו — כבר בתור)`
+          : `הוספו ${result.enqueued} משימות חילול מחדש`,
+      );
+      router.refresh();
+    });
+  }, [lowQuality, router]);
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -390,6 +433,95 @@ export function QueueClient({
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Low-quality answers panel */}
+      {lowQuality.length > 0 && (
+        <div className="rounded border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/30 p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-rose-800 dark:text-rose-300">
+              {lowQuality.length} שאלות עם תשובה באיכות נמוכה (ללא משימה פתוחה)
+            </p>
+            <button
+              onClick={handleRegenerateAll}
+              className="rounded bg-rose-600 px-3 py-1.5 text-sm text-white hover:bg-rose-700"
+            >
+              חולל מחדש הכל ({lowQuality.length})
+            </button>
+          </div>
+          <p className="text-xs text-rose-700/80 dark:text-rose-300/80">
+            תשובות עם ביטחון נמוך מ־70%, סומנו Escalated, או שהמודל הצהיר על ראיות חסרות.
+          </p>
+          <div className="rounded border overflow-x-auto bg-white dark:bg-background">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-3 py-2 text-right font-medium">שאלה</th>
+                  <th className="w-20 px-3 py-2 text-center font-medium">פרק</th>
+                  <th className="w-44 px-3 py-2 text-center font-medium">סיבה</th>
+                  <th className="w-28 px-3 py-2 text-center font-medium">פעולה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lowQuality.map((q) => {
+                  const pct = q.confidence === null ? null : Math.round(q.confidence * 100);
+                  return (
+                    <tr key={q.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="px-3 py-2 max-w-xs">
+                        <Link
+                          href={`/admin/questions/${q.id}`}
+                          className="text-primary hover:underline font-medium line-clamp-2"
+                          title={q.stem}
+                        >
+                          {q.stem.length > 90 ? q.stem.slice(0, 90) + "…" : q.stem}
+                        </Link>
+                        {q.source && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{q.source}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs text-muted-foreground">
+                        {q.chapterNumber}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex flex-wrap justify-center gap-1">
+                          {pct !== null && pct < 70 && (
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-xs font-mono ${
+                                pct < 50
+                                  ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                                  : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                              }`}
+                            >
+                              {pct}%
+                            </span>
+                          )}
+                          {q.escalated && (
+                            <span className="rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-xs text-amber-800 dark:text-amber-300">
+                              Escalated
+                            </span>
+                          )}
+                          {q.insufficientEvidence && (
+                            <span className="rounded bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 text-xs text-red-800 dark:text-red-300">
+                              ראיות חסרות
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => handleRegenerateOne(q.id)}
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted"
+                        >
+                          + חולל מחדש
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -13,6 +13,10 @@ export type QuestionRow = {
   createdAt: string;
   chapterNumber: number;
   hasExplanation: boolean;
+  /** Confidence in [0,1] from the GeminiAnswer, or null when no answer exists. */
+  confidence: number | null;
+  escalated: boolean | null;
+  insufficientEvidence: boolean | null;
   /** Number of EN translation fields already cached (question + answer combined) */
   translationCount: number;
   attemptCount: number;
@@ -20,7 +24,7 @@ export type QuestionRow = {
   percentCorrect: number | null;
 };
 
-type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "translationCount" | "attemptCount" | "percentCorrect" | "createdAt";
+type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "confidence" | "escalated" | "insufficientEvidence" | "translationCount" | "attemptCount" | "percentCorrect" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
@@ -34,6 +38,9 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   source: "asc",
   chapter: "asc",
   hasExplanation: "desc",
+  confidence: "asc",
+  escalated: "desc",
+  insufficientEvidence: "desc",
   translationCount: "desc",
   attemptCount: "desc",
   percentCorrect: "desc",
@@ -343,6 +350,9 @@ export function QuestionsTable({
               <SortHeader field="source" label="מקור" />
               <SortHeader field="chapter" label="פרק" align="center" />
               <SortHeader field="hasExplanation" label="הסבר" align="center" />
+              <SortHeader field="confidence" label="ביטחון" align="center" />
+              <SortHeader field="escalated" label="Escalated" align="center" />
+              <SortHeader field="insufficientEvidence" label="ראיות חסרות" align="center" />
               <SortHeader field="translationCount" label="תרגום EN" align="center" />
               <SortHeader field="attemptCount" label="ניסיונות" align="center" />
               <SortHeader field="percentCorrect" label="% נכונות" align="center" />
@@ -386,6 +396,42 @@ export function QuestionsTable({
                   >
                     {q.hasExplanation ? "יש" : "אין"}
                   </span>
+                </td>
+                <td className="p-2 text-center whitespace-nowrap">
+                  {q.confidence === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : (() => {
+                    const pct = Math.round(q.confidence * 100);
+                    const cls =
+                      pct >= 70
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                        : pct >= 50
+                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300";
+                    return <span className={`text-xs rounded px-2 py-0.5 font-mono ${cls}`}>{pct}%</span>;
+                  })()}
+                </td>
+                <td className="p-2 text-center">
+                  {q.escalated === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : q.escalated ? (
+                    <span className="text-xs rounded px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
+                      כן
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground/60">לא</span>
+                  )}
+                </td>
+                <td className="p-2 text-center">
+                  {q.insufficientEvidence === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : q.insufficientEvidence ? (
+                    <span className="text-xs rounded px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                      כן
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground/60">לא</span>
+                  )}
                 </td>
                 <td className="p-2 text-center">
                   {(() => {

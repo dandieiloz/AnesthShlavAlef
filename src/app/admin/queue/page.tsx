@@ -1,9 +1,19 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { QueueClient, type QueueJobRow, type UnansweredQuestion } from "./QueueClient";
-import type { JobStatus } from "@prisma/client";
+import { QueueClient, type QueueJobRow, type UnansweredQuestion, type LowQualityQuestion } from "./QueueClient";
+import type { JobStatus, Prisma } from "@prisma/client";
 import { AdminNav } from "../AdminNav";
+
+const LOW_CONFIDENCE_THRESHOLD = 0.7;
+
+const LOW_QUALITY_ANSWER: Prisma.GeminiAnswerWhereInput = {
+  OR: [
+    { escalated: true },
+    { insufficientEvidence: true },
+    { confidence: { lt: LOW_CONFIDENCE_THRESHOLD } },
+  ],
+};
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   PENDING: "ממתין",
@@ -30,12 +40,13 @@ export default async function QueuePage({
   const { filter } = await searchParams;
 
   // Determine which statuses to show
+  const isLowQualityTab = filter === "low-quality";
   const activeStatuses: JobStatus[] =
     filter === "done"
       ? ["DONE"]
       : filter === "cancelled"
       ? ["CANCELLED"]
-      : filter === "all"
+      : filter === "all" || isLowQualityTab
       ? ["PENDING", "PROCESSING", "FAILED", "DONE", "CANCELLED"]
       : ["PENDING", "PROCESSING", "FAILED"];
 
@@ -55,7 +66,12 @@ export default async function QueuePage({
 
   // Active job list with question stem preview
   const jobs = await db.answerGenerationJob.findMany({
-    where: { status: { in: activeStatuses } },
+    where: {
+      status: { in: activeStatuses },
+      ...(isLowQualityTab
+        ? { question: { geminiAnswer: { is: LOW_QUALITY_ANSWER } } }
+        : {}),
+    },
     orderBy: [{ queuedAt: "asc" }],
     include: {
       question: {
@@ -129,6 +145,39 @@ export default async function QueuePage({
         }))
       : [];
 
+  // On the active tab only: find questions whose existing answer is low-quality and have no open job
+  const lowQualityQuestions: LowQualityQuestion[] =
+    !filter || filter === "active"
+      ? (await db.question.findMany({
+          where: {
+            geminiAnswer: { is: LOW_QUALITY_ANSWER },
+            generationJobs: {
+              none: { status: { in: ["PENDING", "PROCESSING", "FAILED"] } },
+            },
+          },
+          select: {
+            id: true,
+            stem: true,
+            source: true,
+            chapter: { select: { number: true, title: true } },
+            geminiAnswer: {
+              select: { confidence: true, escalated: true, insufficientEvidence: true },
+            },
+          },
+          orderBy: [{ geminiAnswer: { confidence: "asc" } }, { id: "asc" }],
+          take: 200,
+        })).map((q) => ({
+          id: q.id,
+          stem: q.stem,
+          source: q.source ?? null,
+          chapterNumber: q.chapter.number,
+          chapterTitle: q.chapter.title,
+          confidence: q.geminiAnswer?.confidence ?? null,
+          escalated: q.geminiAnswer?.escalated ?? false,
+          insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? false,
+        }))
+      : [];
+
   return (
     <div className="space-y-6">
       <AdminNav />
@@ -154,6 +203,11 @@ export default async function QueuePage({
             ללא הסבר (ללא משימה): {unansweredQuestions.length}
           </span>
         )}
+        {(!filter || filter === "active") && lowQualityQuestions.length > 0 && (
+          <span className="rounded-full px-3 py-1 text-xs font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300">
+            איכות נמוכה: {lowQualityQuestions.length}
+          </span>
+        )}
       </div>
 
       {/* Filter tabs */}
@@ -162,6 +216,7 @@ export default async function QueuePage({
           { label: "פעיל (ממתין + נכשל)", value: undefined },
           { label: "הושלם", value: "done" },
           { label: "בוטל", value: "cancelled" },
+          { label: "איכות נמוכה", value: "low-quality" },
           { label: "הכל", value: "all" },
         ].map(({ label, value }) => {
           const href = value ? `/admin/queue?filter=${value}` : "/admin/queue";
@@ -178,7 +233,7 @@ export default async function QueuePage({
         })}
       </div>
 
-      <QueueClient rows={rows} unansweredQuestions={unansweredQuestions} />
+      <QueueClient rows={rows} unansweredQuestions={unansweredQuestions} lowQualityQuestions={lowQualityQuestions} />
     </div>
   );
 }

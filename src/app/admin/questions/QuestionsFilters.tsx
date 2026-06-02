@@ -104,6 +104,49 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
         </select>
       </div>
 
+      {/* Confidence range */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">ביטחון</label>
+        <select
+          name="confidence"
+          defaultValue={params.get("confidence") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="lt50">{"< 50%"}</option>
+          <option value="lt70">{"< 70%"}</option>
+          <option value="gte70">{"≥ 70%"}</option>
+        </select>
+      </div>
+
+      {/* Escalated */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">Escalated</label>
+        <select
+          name="escalated"
+          defaultValue={params.get("escalated") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="yes">כן</option>
+          <option value="no">לא</option>
+        </select>
+      </div>
+
+      {/* Insufficient evidence */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">ראיות חסרות</label>
+        <select
+          name="insufficient"
+          defaultValue={params.get("insufficient") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="yes">כן</option>
+          <option value="no">לא</option>
+        </select>
+      </div>
+
       <div className="flex gap-2">
         <button
           type="submit"

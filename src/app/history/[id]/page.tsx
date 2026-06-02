@@ -4,10 +4,14 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
+import { CommentItem } from "@/components/CommentItem";
+import { SubmitButton } from "@/components/SubmitButton";
+import { postCommentAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, BookOpen, CheckCircle2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowRight, BookOpen, CheckCircle2, MessageSquare } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
@@ -42,7 +46,7 @@ export default async function HistoryQuestionPage({
   const t = dict.review;
   const letters = t.labels[contentLocale] ?? ["A", "B", "C", "D"];
 
-  const [question, attempts, highlightRows, pendingReportCount] = await Promise.all([
+  const [question, attempts, highlightRows, pendingReportCount, comments] = await Promise.all([
     db.question.findUnique({
       where: { id: questionId },
       include: {
@@ -60,6 +64,11 @@ export default async function HistoryQuestionPage({
       select: { id: true, questionId: true, section: true, sentenceIndex: true, colorId: true, sentenceHash: true, note: true },
     }),
     db.answerReport.count({ where: { questionId, status: "OPEN" } }),
+    db.comment.findMany({
+      where: { questionId },
+      include: { user: { select: { name: true, image: true, hospitalName: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   if (!question) notFound();
@@ -178,6 +187,45 @@ export default async function HistoryQuestionPage({
               }}
             />
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-2">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+            {dict.quiz.comments}
+            {comments.length > 0 && (
+              <span className="ms-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
+                {comments.length}
+              </span>
+            )}
+          </h2>
+          {comments.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{dict.quiz.noComments}</p>
+          ) : (
+            <ul className="space-y-2">
+              {comments.map((c) => (
+                <li key={c.id}>
+                  <CommentItem comment={c} meId={me.id} meRole={me.role} locale={uiLocale} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={postCommentAction} className="space-y-2 pt-2">
+            <input type="hidden" name="questionId" value={question.id} />
+            <Textarea
+              name="body"
+              required
+              rows={2}
+              placeholder={dict.quiz.writeComment}
+              className="text-sm"
+            />
+            <SubmitButton variant="secondary" size="sm" className="gap-2">
+              <ArrowRight className="h-3.5 w-3.5" />
+              {dict.quiz.postComment}
+            </SubmitButton>
+          </form>
         </CardContent>
       </Card>
 

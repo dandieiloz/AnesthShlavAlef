@@ -7,7 +7,7 @@ import { AdminNav } from "../AdminNav";
 
 const LIMIT = 100;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
-const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "translationCount", "attemptCount", "percentCorrect", "createdAt"] as const;
+const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "confidence", "escalated", "insufficientEvidence", "translationCount", "attemptCount", "percentCorrect", "createdAt"] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
@@ -25,6 +25,9 @@ export default async function AdminQuestionsPage({
     year?: string;
     hasExplanation?: string;
     chapter?: string;
+    confidence?: string;
+    escalated?: string;
+    insufficient?: string;
     sort?: string;
     order?: string;
   }>;
@@ -55,10 +58,22 @@ export default async function AdminQuestionsPage({
     where.source = { endsWith: ` ${yearFilter}` };
   }
 
-  if (sp.hasExplanation === "yes") {
-    where.geminiAnswer = { isNot: null };
-  } else if (sp.hasExplanation === "no") {
+  // Quality predicates on the related GeminiAnswer.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const answerIs: any = {};
+  if (sp.confidence === "lt50") answerIs.confidence = { lt: 0.5 };
+  else if (sp.confidence === "lt70") answerIs.confidence = { lt: 0.7 };
+  else if (sp.confidence === "gte70") answerIs.confidence = { gte: 0.7 };
+  if (sp.escalated === "yes") answerIs.escalated = true;
+  else if (sp.escalated === "no") answerIs.escalated = false;
+  if (sp.insufficient === "yes") answerIs.insufficientEvidence = true;
+  else if (sp.insufficient === "no") answerIs.insufficientEvidence = false;
+  const hasAnswerFilter = Object.keys(answerIs).length > 0;
+
+  if (sp.hasExplanation === "no") {
     where.geminiAnswer = { is: null };
+  } else if (sp.hasExplanation === "yes" || hasAnswerFilter) {
+    where.geminiAnswer = hasAnswerFilter ? { is: answerIs } : { isNot: null };
   }
 
   if (sp.chapter?.trim()) {
@@ -85,7 +100,13 @@ export default async function AdminQuestionsPage({
             ? [{ chapter: { number: order } }, { id: "desc" as const }]
             : sort === "hasExplanation"
               ? [{ geminiAnswer: { id: order } }, { id: "desc" as const }]
-              : /* translationCount, attemptCount, percentCorrect, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
+              : sort === "confidence"
+                ? [{ geminiAnswer: { confidence: order } }, { id: "desc" as const }]
+                : sort === "escalated"
+                  ? [{ geminiAnswer: { escalated: order } }, { id: "desc" as const }]
+                  : sort === "insufficientEvidence"
+                    ? [{ geminiAnswer: { insufficientEvidence: order } }, { id: "desc" as const }]
+                    : /* translationCount, attemptCount, percentCorrect, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
 
   const [questions, total, chapters] = await Promise.all([
     db.question.findMany({
@@ -96,7 +117,14 @@ export default async function AdminQuestionsPage({
         source: true,
         createdAt: true,
         chapter: { select: { number: true } },
-        geminiAnswer: { select: { id: true } },
+        geminiAnswer: {
+          select: {
+            id: true,
+            confidence: true,
+            escalated: true,
+            insufficientEvidence: true,
+          },
+        },
       },
       orderBy,
       take: LIMIT,
@@ -175,6 +203,9 @@ export default async function AdminQuestionsPage({
       createdAt: q.createdAt.toISOString(),
       chapterNumber: q.chapter.number,
       hasExplanation: q.geminiAnswer !== null,
+      confidence: q.geminiAnswer?.confidence ?? null,
+      escalated: q.geminiAnswer?.escalated ?? null,
+      insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,
       translationCount: translationCountMap.get(q.id) ?? 0,
       attemptCount,
       correctCount,

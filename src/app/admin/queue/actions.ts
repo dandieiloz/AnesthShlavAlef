@@ -159,6 +159,29 @@ export async function enqueueRegenerationAction(
   return { ok: true, jobId: job.id };
 }
 
+/** Bulk-enqueue REGENERATE jobs for many questions. Skips any with an existing open job. */
+export async function enqueueRegenerationBatchAction(
+  questionIds: number[],
+): Promise<{ enqueued: number; skipped: number }> {
+  await requireAdmin();
+  if (questionIds.length === 0) return { enqueued: 0, skipped: 0 };
+
+  const existing = await db.answerGenerationJob.findMany({
+    where: { questionId: { in: questionIds }, status: { in: ["PENDING", "PROCESSING"] } },
+    select: { questionId: true },
+  });
+  const blocked = new Set(existing.map((e) => e.questionId));
+  const toCreate = questionIds.filter((id) => !blocked.has(id));
+
+  if (toCreate.length > 0) {
+    await db.answerGenerationJob.createMany({
+      data: toCreate.map((questionId) => ({ questionId, kind: "REGENERATE" as const })),
+    });
+  }
+  revalidatePath("/admin/queue");
+  return { enqueued: toCreate.length, skipped: blocked.size };
+}
+
 // ─── Delete DONE/CANCELLED jobs older than N days ─────────────────────────────
 
 export async function cleanupDoneJobsAction(olderThanDays = 7): Promise<number> {
