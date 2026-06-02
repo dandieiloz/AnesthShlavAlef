@@ -59,6 +59,16 @@ export default async function AdminQuestionPage({
     orderBy: { createdAt: "desc" },
   });
 
+  // Per-question attempt stats
+  const [attemptTotal, attemptCorrect, uniqueUsersGroup] = await Promise.all([
+    db.attempt.count({ where: { questionId: q.id } }),
+    db.attempt.count({ where: { questionId: q.id, isCorrect: true } }),
+    db.attempt.groupBy({ by: ["userId"], where: { questionId: q.id } }),
+  ]);
+  const uniqueUsers = uniqueUsersGroup.length;
+  const percentCorrect =
+    attemptTotal === 0 ? null : Math.round((attemptCorrect / attemptTotal) * 100);
+
   return (
     <div>
       <Link href={`/admin/chapters/${q.chapter.number}/questions`} className="text-sm text-primary hover:underline">
@@ -73,6 +83,39 @@ export default async function AdminQuestionPage({
           חולל הסבר נכשל: {error === "chapter-not-ingested" ? "הפרק עוד לא נטען עם תוכן" : decodeURIComponent(error)}
         </div>
       )}
+
+      <div className="mt-4 grid grid-cols-4 gap-3">
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono">{attemptTotal}</div>
+          <div className="text-xs text-muted-foreground mt-1">סה״כ ניסיונות</div>
+        </div>
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono">{uniqueUsers}</div>
+          <div className="text-xs text-muted-foreground mt-1">משתמשים ייחודיים</div>
+        </div>
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+            {attemptCorrect}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">תשובות נכונות</div>
+        </div>
+        <div className="rounded border bg-card p-3">
+          <div
+            className={`text-2xl font-bold font-mono ${
+              percentCorrect === null
+                ? ""
+                : percentCorrect >= 70
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : percentCorrect >= 50
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {percentCorrect === null ? "—" : `${percentCorrect}%`}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">אחוז הצלחה</div>
+        </div>
+      </div>
 
       <form action={saveQuestionAction} className="mt-4 space-y-2 rounded border bg-card p-4">
         <input type="hidden" name="id" value={q.id} />

@@ -106,6 +106,31 @@ export default async function QuizReviewPage({
   });
   const pendingReportSet = new Set(pendingReportRows.map((r) => r.questionId));
 
+  // Community-wide stats (all users) per question — total attempts and correct attempts.
+  const reviewedIds = [...attemptMap.keys()];
+  const [communityTotalRows, communityCorrectRows] = await Promise.all([
+    reviewedIds.length
+      ? db.attempt.groupBy({
+          by: ["questionId"],
+          where: { questionId: { in: reviewedIds } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+    reviewedIds.length
+      ? db.attempt.groupBy({
+          by: ["questionId"],
+          where: { questionId: { in: reviewedIds }, isCorrect: true },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+  ]);
+  const communityTotalMap = new Map<number, number>(
+    communityTotalRows.map((r) => [r.questionId, r._count._all]),
+  );
+  const communityCorrectMap = new Map<number, number>(
+    communityCorrectRows.map((r) => [r.questionId, r._count._all]),
+  );
+
   if (questions.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground">
@@ -231,6 +256,10 @@ export default async function QuizReviewPage({
             const displayIndex = showWrongOnly ? questions.indexOf(q) + 1 : i + 1;
             const qT = tQuestion.get(q.id)!;
             const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
+            const communityTotal = communityTotalMap.get(q.id) ?? 0;
+            const communityCorrect = communityCorrectMap.get(q.id) ?? 0;
+            const communityPercent =
+              communityTotal === 0 ? null : Math.round((communityCorrect / communityTotal) * 100);
 
             return (
               <Card
@@ -259,6 +288,20 @@ export default async function QuizReviewPage({
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {communityPercent !== null && (
+                        <span
+                          className={`text-xs rounded px-2 py-0.5 font-mono ${
+                            communityPercent >= 70
+                              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300"
+                              : communityPercent >= 50
+                                ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                                : "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
+                          }`}
+                          title={`${communityCorrect} מתוך ${communityTotal} ניסיונות במערכת`}
+                        >
+                          {communityPercent}% כלל
+                        </span>
+                      )}
                       {attempt.isCorrect ? (
                         <span className="flex items-center gap-1 text-xs font-semibold text-success">
                           <CheckCircle2 className="h-4 w-4" />

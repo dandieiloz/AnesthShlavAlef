@@ -15,9 +15,12 @@ export type QuestionRow = {
   hasExplanation: boolean;
   /** Number of EN translation fields already cached (question + answer combined) */
   translationCount: number;
+  attemptCount: number;
+  correctCount: number;
+  percentCorrect: number | null;
 };
 
-type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "translationCount" | "createdAt";
+type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "translationCount" | "attemptCount" | "percentCorrect" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
@@ -32,6 +35,8 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   chapter: "asc",
   hasExplanation: "desc",
   translationCount: "desc",
+  attemptCount: "desc",
+  percentCorrect: "desc",
   createdAt: "desc",
 };
 
@@ -339,6 +344,8 @@ export function QuestionsTable({
               <SortHeader field="chapter" label="פרק" align="center" />
               <SortHeader field="hasExplanation" label="הסבר" align="center" />
               <SortHeader field="translationCount" label="תרגום EN" align="center" />
+              <SortHeader field="attemptCount" label="ניסיונות" align="center" />
+              <SortHeader field="percentCorrect" label="% נכונות" align="center" />
               <SortHeader field="createdAt" label="תאריך הוספה" />
             </tr>
           </thead>
@@ -399,6 +406,27 @@ export function QuestionsTable({
                       </span>
                     );
                   })()}
+                </td>
+                <td className="p-2 text-center text-muted-foreground font-mono whitespace-nowrap">
+                  {q.attemptCount === 0 ? <span className="italic text-muted-foreground/50">—</span> : q.attemptCount}
+                </td>
+                <td className="p-2 text-center whitespace-nowrap">
+                  {q.percentCorrect === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : (
+                    <span
+                      className={`text-xs rounded px-2 py-0.5 font-mono ${
+                        q.percentCorrect >= 70
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                          : q.percentCorrect >= 50
+                            ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                            : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                      }`}
+                      title={`${q.correctCount} מתוך ${q.attemptCount}`}
+                    >
+                      {q.percentCorrect}%
+                    </span>
+                  )}
                 </td>
                 <td className="p-2 text-muted-foreground whitespace-nowrap">
                   {DATE_FORMATTER.format(new Date(q.createdAt))}

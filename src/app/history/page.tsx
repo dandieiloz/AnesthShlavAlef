@@ -8,7 +8,7 @@ import { HistoryTable, type HistoryRow } from "./HistoryTable";
 
 const LIMIT = 200;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
-const SORT_FIELDS = ["stem", "source", "chapter", "attempts", "lastSeen", "lastResult"] as const;
+const SORT_FIELDS = ["stem", "source", "chapter", "attempts", "lastSeen", "lastResult", "communityPercent"] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
@@ -99,6 +99,30 @@ export default async function HistoryPage({
   const countMap = new Map<number, number>();
   for (const c of counts) countMap.set(c.questionId, c._count._all);
 
+  // Community-wide stats (across all users) per question — total + correct.
+  const [communityTotalRows, communityCorrectRows] = await Promise.all([
+    questionIds.length
+      ? db.attempt.groupBy({
+          by: ["questionId"],
+          where: { questionId: { in: questionIds } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+    questionIds.length
+      ? db.attempt.groupBy({
+          by: ["questionId"],
+          where: { questionId: { in: questionIds }, isCorrect: true },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+  ]);
+  const communityTotalMap = new Map<number, number>(
+    communityTotalRows.map((r) => [r.questionId, r._count._all]),
+  );
+  const communityCorrectMap = new Map<number, number>(
+    communityCorrectRows.map((r) => [r.questionId, r._count._all]),
+  );
+
   // Bookmarks the user has on these questions.
   const bookmarks = await db.bookmark.findMany({
     where: { userId: me.id, questionId: { in: questionIds } },
@@ -125,6 +149,8 @@ export default async function HistoryPage({
     .map((q) => {
       const latest = latestMap.get(q.id);
       if (!latest) return null;
+      const communityTotal = communityTotalMap.get(q.id) ?? 0;
+      const communityCorrect = communityCorrectMap.get(q.id) ?? 0;
       return {
         id: q.id,
         stem: q.stem,
@@ -137,6 +163,9 @@ export default async function HistoryPage({
         lastCorrect: latest.isCorrect,
         lastQuizId: latest.quizId,
         bookmarked: bookmarkSet.has(q.id),
+        communityAttempts: communityTotal,
+        communityPercentCorrect:
+          communityTotal === 0 ? null : Math.round((communityCorrect / communityTotal) * 100),
       } satisfies HistoryRow;
     })
     .filter((r): r is HistoryRow => r !== null);
@@ -161,6 +190,14 @@ export default async function HistoryPage({
         return (a.attempts - b.attempts) * dir;
       case "lastResult":
         return ((a.lastCorrect ? 1 : 0) - (b.lastCorrect ? 1 : 0)) * dir;
+      case "communityPercent": {
+        const av = a.communityPercentCorrect;
+        const bv = b.communityPercentCorrect;
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        return (av - bv) * dir;
+      }
       case "lastSeen":
       default:
         return (

@@ -17,9 +17,11 @@ export type HistoryRow = {
   lastCorrect: boolean;
   lastQuizId: number | null;
   bookmarked: boolean;
+  communityAttempts: number;
+  communityPercentCorrect: number | null;
 };
 
-type SortField = "stem" | "source" | "chapter" | "attempts" | "lastSeen" | "lastResult";
+type SortField = "stem" | "source" | "chapter" | "attempts" | "lastSeen" | "lastResult" | "communityPercent";
 type SortOrder = "asc" | "desc";
 
 const STEM_PREVIEW_CHARS = 140;
@@ -35,6 +37,7 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   attempts: "desc",
   lastSeen: "desc",
   lastResult: "desc",
+  communityPercent: "desc",
 };
 
 function truncate(text: string, max: number) {
@@ -168,6 +171,7 @@ export function HistoryTable({
           <col className="w-16" />
           <col className="w-32" />
           <col className="w-20" />
+          <col className="w-24" />
           <col className="w-36" />
           <col className="w-32" />
         </colgroup>
@@ -185,6 +189,7 @@ export function HistoryTable({
             <SortHeader field="chapter" label="פרק" align="center" />
             <SortHeader field="source" label="מקור" />
             <SortHeader field="attempts" label="ניסיונות" align="center" />
+            <SortHeader field="communityPercent" label="% כלל" align="center" />
             <SortHeader field="lastSeen" label="נצפה לאחרונה" align="center" />
             <SortHeader field="lastResult" label="תוצאה אחרונה" align="center" />
           </tr>
@@ -192,7 +197,7 @@ export function HistoryTable({
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={7} className="p-6 text-center text-muted-foreground">
+              <td colSpan={8} className="p-6 text-center text-muted-foreground">
                 לא נמצאו שאלות התואמות את הסינון.
               </td>
             </tr>
@@ -239,6 +244,24 @@ export function HistoryTable({
                   {r.source ?? "—"}
                 </td>
                 <td className="p-2 text-center font-mono">{r.attempts}</td>
+                <td className="p-2 text-center whitespace-nowrap">
+                  {r.communityPercentCorrect === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : (
+                    <span
+                      className={`text-xs rounded px-2 py-0.5 font-mono ${
+                        r.communityPercentCorrect >= 70
+                          ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300"
+                          : r.communityPercentCorrect >= 50
+                            ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                            : "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
+                      }`}
+                      title={`${r.communityAttempts} ניסיונות במערכת`}
+                    >
+                      {r.communityPercentCorrect}%
+                    </span>
+                  )}
+                </td>
                 <td className="p-2 text-center whitespace-nowrap text-muted-foreground">
                   {DATE_FORMATTER.format(new Date(r.lastSeenAt))}
                 </td>

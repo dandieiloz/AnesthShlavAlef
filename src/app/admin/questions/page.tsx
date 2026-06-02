@@ -7,7 +7,7 @@ import { AdminNav } from "../AdminNav";
 
 const LIMIT = 100;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
-const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "translationCount", "createdAt"] as const;
+const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "translationCount", "attemptCount", "percentCorrect", "createdAt"] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
@@ -85,7 +85,7 @@ export default async function AdminQuestionsPage({
             ? [{ chapter: { number: order } }, { id: "desc" as const }]
             : sort === "hasExplanation"
               ? [{ geminiAnswer: { id: order } }, { id: "desc" as const }]
-              : /* translationCount, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
+              : /* translationCount, attemptCount, percentCorrect, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
 
   const [questions, total, chapters] = await Promise.all([
     db.question.findMany({
@@ -141,15 +141,64 @@ export default async function AdminQuestionsPage({
     translationCountMap.set(qId, (translationCountMap.get(qId) ?? 0) + row._count.field);
   }
 
-  const rows: QuestionRow[] = questions.map((q) => ({
-    id: q.id,
-    stem: q.stem,
-    source: q.source,
-    createdAt: q.createdAt.toISOString(),
-    chapterNumber: q.chapter.number,
-    hasExplanation: q.geminiAnswer !== null,
-    translationCount: translationCountMap.get(q.id) ?? 0,
-  }));
+  // Per-question attempt stats: total attempts and correct attempts.
+  const [attemptTotalRows, attemptCorrectRows] = await Promise.all([
+    questionIds.length
+      ? db.attempt.groupBy({
+          by: ["questionId"],
+          where: { questionId: { in: questionIds } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+    questionIds.length
+      ? db.attempt.groupBy({
+          by: ["questionId"],
+          where: { questionId: { in: questionIds }, isCorrect: true },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+  ]);
+  const attemptCountMap = new Map<number, number>(
+    attemptTotalRows.map((r) => [r.questionId, r._count._all]),
+  );
+  const correctCountMap = new Map<number, number>(
+    attemptCorrectRows.map((r) => [r.questionId, r._count._all]),
+  );
+
+  let rows: QuestionRow[] = questions.map((q) => {
+    const attemptCount = attemptCountMap.get(q.id) ?? 0;
+    const correctCount = correctCountMap.get(q.id) ?? 0;
+    return {
+      id: q.id,
+      stem: q.stem,
+      source: q.source,
+      createdAt: q.createdAt.toISOString(),
+      chapterNumber: q.chapter.number,
+      hasExplanation: q.geminiAnswer !== null,
+      translationCount: translationCountMap.get(q.id) ?? 0,
+      attemptCount,
+      correctCount,
+      percentCorrect: attemptCount === 0 ? null : Math.round((correctCount / attemptCount) * 100),
+    };
+  });
+
+  // attemptCount / percentCorrect can't be ordered in the DB query — sort the
+  // current page in memory. Other sorts already came back ordered from Prisma.
+  if (sort === "attemptCount" || sort === "percentCorrect") {
+    const dir = order === "asc" ? 1 : -1;
+    rows = [...rows].sort((a, b) => {
+      if (sort === "attemptCount") {
+        return (a.attemptCount - b.attemptCount) * dir || (b.id - a.id);
+      }
+      // null percentCorrect (no attempts) sorts to the end regardless of direction
+      const av = a.percentCorrect;
+      const bv = b.percentCorrect;
+      if (av === null && bv === null) return b.id - a.id;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return (av - bv) * dir || (b.id - a.id);
+    });
+  }
 
   return (
     <div className="space-y-4">
