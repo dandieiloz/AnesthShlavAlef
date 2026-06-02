@@ -24,6 +24,7 @@ export type QuestionPayload = {
     insufficientEvidence: boolean;
   };
   bookmarked: boolean;
+  hasPendingReport: boolean;
   highlights: HighlightRecord[];
 };
 
@@ -93,7 +94,7 @@ export async function loadQuizBatch(args: {
 
   const ids = batch.map((q) => q.id);
 
-  const [bookmarkRows, highlightRows] = await Promise.all([
+  const [bookmarkRows, highlightRows, pendingReportRows] = await Promise.all([
     db.bookmark.findMany({
       where: { userId: args.user.id, questionId: { in: ids } },
       select: { questionId: true },
@@ -110,9 +111,15 @@ export async function loadQuizBatch(args: {
         note: true,
       },
     }),
+    db.answerReport.findMany({
+      where: { questionId: { in: ids }, status: "OPEN" },
+      select: { questionId: true },
+      distinct: ["questionId"],
+    }),
   ]);
 
   const bookmarkedSet = new Set(bookmarkRows.map((b) => b.questionId));
+  const pendingReportSet = new Set(pendingReportRows.map((r) => r.questionId));
   const highlightsByQ = new Map<number, HighlightRecord[]>();
   for (const h of highlightRows) {
     const list = highlightsByQ.get(h.questionId) ?? [];
@@ -161,6 +168,7 @@ export async function loadQuizBatch(args: {
           insufficientEvidence: g.insufficientEvidence,
         },
         bookmarked: bookmarkedSet.has(q.id),
+        hasPendingReport: pendingReportSet.has(q.id),
         highlights: highlightsByQ.get(q.id) ?? [],
       };
     }),

@@ -42,7 +42,7 @@ export default async function HistoryQuestionPage({
   const t = dict.review;
   const letters = t.labels[contentLocale] ?? ["A", "B", "C", "D"];
 
-  const [question, attempts, highlightRows] = await Promise.all([
+  const [question, attempts, highlightRows, pendingReportCount] = await Promise.all([
     db.question.findUnique({
       where: { id: questionId },
       include: {
@@ -59,6 +59,7 @@ export default async function HistoryQuestionPage({
       where: { userId: me.id, locale: contentLocale, questionId },
       select: { id: true, questionId: true, section: true, sentenceIndex: true, colorId: true, sentenceHash: true, note: true },
     }),
+    db.answerReport.count({ where: { questionId, status: "OPEN" } }),
   ]);
 
   if (!question) notFound();
@@ -164,6 +165,7 @@ export default async function HistoryQuestionPage({
           {question.geminiAnswer && (
             <ReportAnswerForm
               questionId={question.id}
+              hasPendingReport={pendingReportCount > 0}
               labels={{
                 reportButton: t.reportButton,
                 reportHint: t.reportHint,
@@ -171,6 +173,8 @@ export default async function HistoryQuestionPage({
                 reportPlaceholder: t.reportPlaceholder,
                 reportMinHint: t.reportMinHint,
                 sendReport: t.sendReport,
+                reportThanks: t.reportThanks,
+                pendingReport: t.pendingReport,
               }}
             />
           )}

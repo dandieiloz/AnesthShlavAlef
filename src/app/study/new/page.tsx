@@ -2,9 +2,8 @@ import { db } from "@/lib/db";
 import { requireCompletedProfile } from "@/lib/auth";
 import { createQuizAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { QuizConfigSection } from "./QuizConfigSection";
-import { PlusCircle, ArrowRight, ArrowLeft } from "lucide-react";
+import { ArrowRight, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -194,11 +193,6 @@ export default async function NewQuizPage({
               initialInstitute={inst ?? null}
               initialYear={year ?? null}
             />
-
-            <Button type="submit" className="w-full gap-2" size="lg">
-              <PlusCircle className="h-4 w-4" />
-              {t.createQuiz}
-            </Button>
           </form>
         </CardContent>
       </Card>

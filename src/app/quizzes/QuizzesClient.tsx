@@ -46,8 +46,9 @@ function relativeDate(iso: string | null, locale: "he" | "en", t: QuizzesT): str
 
 function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: string; t: QuizzesT }) {
   const [open, setOpen] = useState(false);
+  const [resetQuestions, setResetQuestions] = useState(false);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setResetQuestions(false); }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10">
           <Trash2 className="h-3.5 w-3.5" />
@@ -60,6 +61,15 @@ function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: strin
             {t.deleteDesc.replace("{name}", quizName)}
           </DialogDescription>
         </DialogHeader>
+        <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 accent-destructive"
+            checked={resetQuestions}
+            onChange={(e) => setResetQuestions(e.target.checked)}
+          />
+          <span className="text-muted-foreground">{t.resetQuestionsLabel}</span>
+        </label>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>{t.cancel}</Button>
           <form
@@ -67,6 +77,7 @@ function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: strin
             onSubmit={() => setOpen(false)}
           >
             <input type="hidden" name="quizId" value={quizId} />
+            {resetQuestions && <input type="hidden" name="resetQuestions" value="on" />}
             <Button variant="destructive" type="submit">{t.delete}</Button>
           </form>
         </DialogFooter>

@@ -6,6 +6,7 @@ import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/An
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import { toggleBookmarkAction, postCommentAction } from "@/app/(user)/actions";
 import { CommentItem } from "@/components/CommentItem";
+import { SubmitButton } from "@/components/SubmitButton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,13 @@ export default async function QuizReviewPage({
     arr.push(h);
     highlightsByQ.set(h.questionId, arr);
   }
+
+  const pendingReportRows = await db.answerReport.findMany({
+    where: { questionId: { in: [...attemptMap.keys()] }, status: "OPEN" },
+    select: { questionId: true },
+    distinct: ["questionId"],
+  });
+  const pendingReportSet = new Set(pendingReportRows.map((r) => r.questionId));
 
   if (questions.length === 0) {
     return (
@@ -364,6 +372,7 @@ export default async function QuizReviewPage({
                       </details>
                       <ReportAnswerForm
                         questionId={q.id}
+                        hasPendingReport={pendingReportSet.has(q.id)}
                         labels={{
                           reportButton: t.reportButton,
                           reportHint: t.reportHint,
@@ -371,6 +380,8 @@ export default async function QuizReviewPage({
                           reportPlaceholder: t.reportPlaceholder,
                           reportMinHint: t.reportMinHint,
                           sendReport: t.sendReport,
+                          reportThanks: t.reportThanks,
+                          pendingReport: t.pendingReport,
                         }}
                       />
                     </>
@@ -409,10 +420,10 @@ export default async function QuizReviewPage({
                           placeholder={dict.quiz.writeComment}
                           className="text-sm"
                         />
-                        <Button variant="secondary" size="sm" type="submit" className="gap-2">
+                        <SubmitButton variant="secondary" size="sm" className="gap-2">
                           <ArrowRight className="h-3.5 w-3.5" />
                           {dict.quiz.postComment}
-                        </Button>
+                        </SubmitButton>
                       </form>
                     </div>
                   </details>

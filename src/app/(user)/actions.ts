@@ -221,6 +221,79 @@ export async function recordAttemptAction(input: {
 }
 
 /**
+ * Bulk-finalize a "full" mode quiz: client buffers answers locally during the
+ * run, then submits the whole batch here. We compute correctness against
+ * GeminiAnswer and insert one Attempt row per question, skipping any question
+ * the user already has an attempt for in this quiz (idempotent against
+ * accidental double-submits).
+ */
+const SubmitFullQuizSchema = z.object({
+  quizId: z.number().int(),
+  answers: z
+    .array(
+      z.object({
+        questionId: z.number().int(),
+        chosen: z.enum(["A", "B", "C", "D"]),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+export async function submitFullQuizAction(input: {
+  quizId: number;
+  answers: { questionId: number; chosen: "A" | "B" | "C" | "D" }[];
+}): Promise<{ ok: true; recorded: number; correct: number }> {
+  const me = await requireUser();
+  const data = SubmitFullQuizSchema.parse(input);
+
+  const quiz = await db.quiz.findFirst({
+    where: { id: data.quizId, userId: me.id },
+    select: { id: true },
+  });
+  if (!quiz) throw new Error("Quiz not found");
+
+  const questionIds = data.answers.map((a) => a.questionId);
+  const [questions, existing] = await Promise.all([
+    db.question.findMany({
+      where: { id: { in: questionIds } },
+      select: { id: true, geminiAnswer: { select: { correctAnswer: true } } },
+    }),
+    db.attempt.findMany({
+      where: { userId: me.id, quizId: quiz.id, questionId: { in: questionIds } },
+      select: { questionId: true },
+    }),
+  ]);
+
+  const correctById = new Map<number, Choice>();
+  for (const q of questions) {
+    if (q.geminiAnswer) correctById.set(q.id, q.geminiAnswer.correctAnswer);
+  }
+  const alreadyRecorded = new Set(existing.map((a) => a.questionId));
+
+  const rows: { userId: string; quizId: number; questionId: number; chosen: Choice; isCorrect: boolean }[] = [];
+  let correctCount = 0;
+  for (const a of data.answers) {
+    if (alreadyRecorded.has(a.questionId)) continue;
+    const correct = correctById.get(a.questionId);
+    if (!correct) continue;
+    const isCorrect = a.chosen === correct;
+    if (isCorrect) correctCount++;
+    rows.push({
+      userId: me.id,
+      quizId: quiz.id,
+      questionId: a.questionId,
+      chosen: a.chosen as Choice,
+      isCorrect,
+    });
+  }
+
+  if (rows.length > 0) {
+    await db.attempt.createMany({ data: rows });
+  }
+  return { ok: true, recorded: rows.length, correct: correctCount };
+}
+
+/**
  * Fetch the next batch of unanswered questions for an active quiz. Used by
  * the client runner to refill its in-memory queue in the background while the
  * user is still on the current question.
@@ -314,7 +387,7 @@ export async function postCommentAction(formData: FormData) {
   await db.comment.create({
     data: { userId: me.id, questionId: data.questionId, body: data.body },
   });
-  revalidatePath(`/quiz`);
+  revalidatePath("/quiz/[id]/review", "page");
 }
 
 const EditCommentSchema = z.object({
@@ -338,7 +411,7 @@ export async function editCommentAction(formData: FormData) {
     where: { id: data.commentId },
     data: { body: data.body, editedAt: new Date() },
   });
-  revalidatePath("/quiz");
+  revalidatePath("/quiz/[id]/review", "page");
 }
 
 const DeleteCommentSchema = z.object({ commentId: z.coerce.number() });
@@ -348,7 +421,7 @@ export async function deleteCommentAction(formData: FormData) {
   if (me.role !== "ADMIN") return;
   const { commentId } = DeleteCommentSchema.parse({ commentId: formData.get("commentId") });
   await db.comment.delete({ where: { id: commentId } });
-  revalidatePath("/quiz");
+  revalidatePath("/quiz/[id]/review", "page");
 }
 
 const ReportSchema = z.object({
@@ -365,7 +438,6 @@ export async function reportAnswerAction(formData: FormData) {
   await db.answerReport.create({
     data: { userId: me.id, questionId: data.questionId, explanation: data.explanation },
   });
-  revalidatePath(`/quiz`);
 }
 
 // ── Bookmarks ────────────────────────────────────────────────────────────────
@@ -413,14 +485,33 @@ export async function toggleBookmarkValueAction(questionId: number): Promise<{ b
 
 // ── Quizzes ───────────────────────────────────────────────────────────────────
 
-const DeleteQuizSchema = z.object({ quizId: z.coerce.number() });
+const DeleteQuizSchema = z.object({
+  quizId: z.coerce.number(),
+  resetQuestions: z
+    .union([z.literal("on"), z.literal("true"), z.literal("1")])
+    .optional()
+    .transform((v) => v != null),
+});
 
 export async function deleteQuizAction(formData: FormData) {
   const me = await requireUser();
-  const { quizId } = DeleteQuizSchema.parse({ quizId: formData.get("quizId") });
+  const { quizId, resetQuestions } = DeleteQuizSchema.parse({
+    quizId: formData.get("quizId"),
+    resetQuestions: formData.get("resetQuestions") ?? undefined,
+  });
   // Verify ownership before deleting
-  const quiz = await db.quiz.findFirst({ where: { id: quizId, userId: me.id }, select: { id: true } });
+  const quiz = await db.quiz.findFirst({
+    where: { id: quizId, userId: me.id },
+    select: { id: true, questionIds: true },
+  });
   if (!quiz) return; // silently ignore if not owned by user
+  if (resetQuestions && quiz.questionIds.length > 0) {
+    await db.attempt.deleteMany({
+      where: { userId: me.id, questionId: { in: quiz.questionIds } },
+    });
+  }
   await db.quiz.delete({ where: { id: quizId } });
   revalidatePath("/study");
+  revalidatePath("/history");
+  revalidatePath("/dashboard");
 }

@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ChapterPicker } from "./ChapterPicker";
 import { QuestionLimitPicker } from "./QuestionLimitPicker";
@@ -387,6 +389,11 @@ export function QuizConfigSection({
           dir={dir}
         />
       </div>
+
+      <Button type="submit" className="w-full gap-2" size="lg" disabled={availableCount === 0}>
+        <PlusCircle className="h-4 w-4" />
+        {t.createQuiz}
+      </Button>
     </>
   );
 }

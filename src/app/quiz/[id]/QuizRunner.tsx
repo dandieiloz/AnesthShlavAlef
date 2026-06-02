@@ -15,6 +15,7 @@ import {
   BookmarkCheck,
   CheckCircle2,
   ClipboardList,
+  HelpCircle,
   Loader2,
   RotateCcw,
   X,
@@ -25,6 +26,7 @@ import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import {
   loadQuizBatchAction,
   recordAttemptAction,
+  submitFullQuizAction,
   toggleBookmarkValueAction,
 } from "@/app/(user)/actions";
 import { getDictionary } from "@/lib/i18n";
@@ -62,6 +64,11 @@ export function QuizRunner(props: Props) {
 
   const [chosen, setChosen] = useState<Choice | null>(null);
   const [revealed, setRevealed] = useState(false);
+  // Identity guard: the question id whose answer was just revealed via
+  // submit. Live-question reveal is gated on this matching the current
+  // question's id, so any stale `revealed=true` from a prior live question
+  // cannot leak the correct answer after navigation.
+  const [revealedQuestionId, setRevealedQuestionId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<AnswerMode>("immediate");
   // Stack of previously-visited questions. `chosen` is null when the user
@@ -77,6 +84,13 @@ export function QuizRunner(props: Props) {
   // selectable). Cleared per question on successful submit; preserved across
   // skip/back navigation otherwise.
   const [eliminated, setEliminated] = useState<Record<number, Choice[]>>({});
+  // Session-only set of question ids the user marked "unsure". Survives the
+  // quiz session but is not persisted to the DB.
+  const [unsureIds, setUnsureIds] = useState<Set<number>>(() => new Set());
+  // Full-mode draft buffer: answers chosen during the run but NOT yet
+  // recorded server-side. Bulk-submitted via submitFullQuizAction at finalize.
+  const [draftAnswers, setDraftAnswers] = useState<Map<number, Choice>>(() => new Map());
+  const [finalizing, setFinalizing] = useState(false);
   const [, startTransition] = useTransition();
   const refillInFlight = useRef(false);
   // Synchronous guards: state-based `submitting` is read from a stale closure
@@ -153,83 +167,193 @@ export function QuizRunner(props: Props) {
 
   // ── Finished ────────────────────────────────────────────────────────────
   if (queue.length === 0 && !hasMore && !refillInFlight.current) {
-    const pendingSkipped = past.filter((p) => p.chosen === null).map((p) => p.question);
-    // If there are skipped questions, give the user a chance to answer them
-    // before showing the finish screen or jumping to /review.
-    if (pendingSkipped.length > 0 && !finishConfirmed) {
+    const skippedQs = past.filter((p) => p.chosen === null).map((p) => p.question);
+    const answeredEntries = past.filter((p) => p.chosen !== null);
+    const unsureQs = past
+      .filter((p) => unsureIds.has(p.question.id))
+      .map((p) => p.question);
+    const hasNothingToReview = skippedQs.length === 0 && unsureQs.length === 0;
+
+    // For immediate mode: if nothing pending and the user already saw all
+    // answers inline, jump straight to the celebratory finished screen
+    // (existing behavior preserved).
+    if (mode === "immediate" && (finishConfirmed || hasNothingToReview)) {
+      const accuracyPct = answered > 0 ? Math.round((correct / answered) * 100) : 0;
       return (
-        <div className="mx-auto max-w-2xl animate-fade-in py-10">
-          <div className="text-center">
-            <h1 className="font-display text-2xl font-bold">{t.unansweredTitle}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t.unansweredIntro(pendingSkipped.length)}
-            </p>
+        <div className="mx-auto max-w-lg animate-fade-in py-16 text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+            <CheckCircle2 className="h-8 w-8 text-success" />
           </div>
+          <h1 className="font-display text-3xl font-bold">{t.finishedTitle}</h1>
+          <p className="mt-3 text-muted-foreground">
+            {t.finishedSummary(correct, answered, accuracyPct)}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button asChild size="lg">
+              <Link href={`/quiz/${props.quizId}/review`} className="gap-2">
+                <ClipboardList className="h-4 w-4" />
+                {t.reviewAnswers}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/study" className="gap-2">
+                <BarChart2 className="h-4 w-4" />
+                {t.backToStats}
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="lg">
+              <Link href="/study/new">{t.newQuiz}</Link>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // Unified pre-finish summary: skipped + unsure + (full mode) all answers.
+    return (
+      <div className="mx-auto max-w-2xl animate-fade-in py-10">
+        <div className="text-center">
+          <h1 className="font-display text-2xl font-bold">{t.summaryTitle}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t.summaryIntro}</p>
+        </div>
+
+        {skippedQs.length > 0 && (
           <Card className="mt-6">
             <CardContent className="pt-5 pb-5">
+              <p className="mb-3 text-sm font-semibold">
+                {t.summarySkippedSection} ({skippedQs.length})
+              </p>
               <ul className="divide-y">
-                {pendingSkipped.map((q) => (
-                  <li key={q.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                {skippedQs.map((q) => (
+                  <li
+                    key={q.id}
+                    className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                  >
                     <Badge variant="secondary" className="shrink-0 text-xs">
                       {common.chapter} {q.chapter.number}
                     </Badge>
-                    <span className="line-clamp-2 text-sm leading-snug">{q.stem}</span>
+                    <span className="line-clamp-2 flex-1 text-sm leading-snug">
+                      {q.stem}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => requeueSkipped([q])}
+                    >
+                      {t.answerSkipped}
+                    </Button>
                   </li>
                 ))}
               </ul>
             </CardContent>
           </Card>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button size="lg" onClick={() => requeueSkipped(pendingSkipped)}>
-              {t.answerSkipped}
-            </Button>
+        )}
+
+        {unsureQs.length > 0 && (
+          <Card className="mt-4">
+            <CardContent className="pt-5 pb-5">
+              <p className="mb-3 text-sm font-semibold">
+                {t.summaryUnsureSection} ({unsureQs.length})
+              </p>
+              <ul className="divide-y">
+                {unsureQs.map((q) => {
+                  const isAnswered = past.some(
+                    (p) => p.question.id === q.id && p.chosen !== null,
+                  );
+                  return (
+                    <li
+                      key={q.id}
+                      className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        {common.chapter} {q.chapter.number}
+                      </Badge>
+                      <span className="line-clamp-2 flex-1 text-sm leading-snug">
+                        {q.stem}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          isAnswered
+                            ? mode === "full"
+                              ? requeueAnswered(q.id)
+                              : jumpToPast(q.id)
+                            : requeueSkipped([q])
+                        }
+                      >
+                        {mode === "full" && isAnswered
+                          ? t.changeAnswer
+                          : isAnswered
+                          ? t.reviewQuestion
+                          : t.answerSkipped}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {mode === "full" && answeredEntries.length > 0 && (
+          <details className="mt-4">
+            <summary className="cursor-pointer rounded-md bg-muted/40 px-4 py-2 text-sm font-medium">
+              {t.summaryAnsweredSection} ({answeredEntries.length})
+            </summary>
+            <Card className="mt-2">
+              <CardContent className="pt-5 pb-5">
+                <ul className="divide-y">
+                  {answeredEntries.map((entry) => (
+                    <li
+                      key={entry.question.id}
+                      className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        {common.chapter} {entry.question.chapter.number}
+                      </Badge>
+                      <span className="line-clamp-2 flex-1 text-sm leading-snug">
+                        {entry.question.stem}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => requeueAnswered(entry.question.id)}
+                      >
+                        {t.changeAnswer}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </details>
+        )}
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          {mode === "full" ? (
             <Button
-              variant="outline"
               size="lg"
-              onClick={() => setFinishConfirmed(true)}
+              onClick={finalizeFullQuiz}
+              disabled={finalizing || answeredEntries.length === 0}
             >
+              {finalizing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t.submittingQuiz}
+                </>
+              ) : (
+                t.submitQuiz
+              )}
+            </Button>
+          ) : (
+            <Button size="lg" onClick={() => setFinishConfirmed(true)}>
               {t.finishAnyway}
             </Button>
-          </div>
-        </div>
-      );
-    }
-    if (mode === "full") {
-      // Skip the inline summary and jump straight to סקירה.
-      router.replace(`/quiz/${props.quizId}/review`);
-      return (
-        <div className="mx-auto max-w-3xl py-20 text-center text-muted-foreground">
-          <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
-          <p className="text-sm">{t.loadingNext}</p>
-        </div>
-      );
-    }
-    const accuracyPct = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-    return (
-      <div className="mx-auto max-w-lg animate-fade-in py-16 text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-          <CheckCircle2 className="h-8 w-8 text-success" />
-        </div>
-        <h1 className="font-display text-3xl font-bold">{t.finishedTitle}</h1>
-        <p className="mt-3 text-muted-foreground">
-          {t.finishedSummary(correct, answered, accuracyPct)}
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button asChild size="lg">
-            <Link href={`/quiz/${props.quizId}/review`} className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              {t.reviewAnswers}
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/study" className="gap-2">
-              <BarChart2 className="h-4 w-4" />
-              {t.backToStats}
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="lg">
-            <Link href="/study/new">{t.newQuiz}</Link>
-          </Button>
+          )}
         </div>
       </div>
     );
@@ -271,23 +395,35 @@ export function QuizRunner(props: Props) {
 
     if (mode === "immediate") {
       setRevealed(true);
+      setRevealedQuestionId(questionId);
+      const payload = { quizId: props.quizId, questionId, chosen };
+      startTransition(() => {
+        recordAttemptAction(payload)
+          .catch((err) => console.error("[quiz] failed to record attempt", err))
+          .finally(() => {
+            submittingRef.current = false;
+            setSubmitting(false);
+          });
+      });
     } else {
-      // Full-quiz mode: silently advance without revealing.
+      // Full-quiz mode: buffer the answer locally and silently advance.
+      // Recording is deferred to submitFullQuizAction at finalize so the user
+      // can revisit and change any answer (including ones marked "unsure")
+      // before the quiz is committed.
+      setDraftAnswers((prev) => {
+        const next = new Map(prev);
+        next.set(questionId, chosen!);
+        return next;
+      });
       setPast((prev) => [...prev, { question: current!, chosen: chosen! }]);
       setQueue((prev) => prev.slice(1));
       setChosen(null);
       setRevealed(false);
+      setRevealedQuestionId(null);
+      submittingRef.current = false;
+      setSubmitting(false);
+      lastRecordedQuestionId.current = null;
     }
-
-    const payload = { quizId: props.quizId, questionId, chosen };
-    startTransition(() => {
-      recordAttemptAction(payload)
-        .catch((err) => console.error("[quiz] failed to record attempt", err))
-        .finally(() => {
-          submittingRef.current = false;
-          setSubmitting(false);
-        });
-    });
   }
 
   function handleNext() {
@@ -306,6 +442,7 @@ export function QuizRunner(props: Props) {
     setQueue((prev) => prev.slice(1));
     setChosen(null);
     setRevealed(false);
+    setRevealedQuestionId(null);
     // Allow the next question to be recorded.
     lastRecordedQuestionId.current = null;
   }
@@ -327,6 +464,7 @@ export function QuizRunner(props: Props) {
     setQueue((prev) => prev.slice(1));
     setChosen(null);
     setRevealed(false);
+    setRevealedQuestionId(null);
     setViewingIndex(-1);
     lastRecordedQuestionId.current = null;
   }
@@ -355,7 +493,96 @@ export function QuizRunner(props: Props) {
     setViewingIndex(-1);
     setChosen(null);
     setRevealed(false);
+    setRevealedQuestionId(null);
     lastRecordedQuestionId.current = null;
+  }
+
+  // Pop a previously-answered question (full mode only) so the user can
+  // change their answer before final submission. Removes the past entry,
+  // drops the draft, decrements optimistic counters, prepends to the queue.
+  function requeueAnswered(questionId: number) {
+    const entry = past.find((p) => p.question.id === questionId && p.chosen !== null);
+    if (!entry) return;
+    const wasCorrect = entry.chosen === entry.question.answer.correctAnswer;
+    setPast((prev) => prev.filter((p) => p !== entry));
+    setDraftAnswers((prev) => {
+      if (!prev.has(questionId)) return prev;
+      const next = new Map(prev);
+      next.delete(questionId);
+      return next;
+    });
+    setAnswered((n) => Math.max(0, n - 1));
+    if (wasCorrect) setCorrect((n) => Math.max(0, n - 1));
+    setQueue((prev) => [entry.question, ...prev]);
+    setViewingIndex(-1);
+    setChosen(null);
+    setRevealed(false);
+    setRevealedQuestionId(null);
+    lastRecordedQuestionId.current = null;
+  }
+
+  function toggleUnsure(questionId: number) {
+    setUnsureIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
+  }
+
+  // Jump to a previously-answered question in immediate mode (read-only
+  // review of the recorded answer).
+  function jumpToPast(questionId: number) {
+    const idx = past.findIndex((p) => p.question.id === questionId);
+    if (idx === -1) return;
+    setViewingIndex(idx);
+  }
+
+  // Full-mode in-place answer change while viewing a past answered question.
+  // Updates both the past entry and the draft buffer; recomputes optimistic
+  // counters when correctness flips.
+  function changePastAnswer(questionId: number, choice: Choice) {
+    let prevChosen: Choice | null = null;
+    let correctAnswer: Choice | null = null;
+    setPast((prev) => {
+      const idx = prev.findIndex((p) => p.question.id === questionId);
+      if (idx === -1) return prev;
+      prevChosen = prev[idx].chosen;
+      correctAnswer = prev[idx].question.answer.correctAnswer;
+      if (prevChosen === choice) return prev;
+      const next = prev.slice();
+      next[idx] = { ...next[idx], chosen: choice };
+      return next;
+    });
+    setDraftAnswers((prev) => {
+      if (prev.get(questionId) === choice) return prev;
+      const next = new Map(prev);
+      next.set(questionId, choice);
+      return next;
+    });
+    if (correctAnswer && prevChosen !== choice) {
+      const wasCorrect = prevChosen === correctAnswer;
+      const isCorrect = choice === correctAnswer;
+      if (wasCorrect && !isCorrect) setCorrect((n) => Math.max(0, n - 1));
+      else if (!wasCorrect && isCorrect) setCorrect((n) => n + 1);
+    }
+  }
+
+  async function finalizeFullQuiz() {
+    if (finalizing) return;
+    const answers = Array.from(draftAnswers.entries()).map(([questionId, chosen]) => ({
+      questionId,
+      chosen,
+    }));
+    if (answers.length === 0) return;
+    setFinalizing(true);
+    try {
+      await submitFullQuizAction({ quizId: props.quizId, answers });
+      router.replace(`/quiz/${props.quizId}/review`);
+    } catch (err) {
+      console.error("[quiz] failed to submit full quiz", err);
+      setFinalizing(false);
+    }
   }
 
   const isViewingPast = viewingIndex !== -1;
@@ -363,7 +590,13 @@ export function QuizRunner(props: Props) {
   const isViewingSkipped = pastEntry !== null && pastEntry.chosen === null;
   const display = pastEntry ? pastEntry.question : current;
   const displayChosen: Choice | null = pastEntry ? pastEntry.chosen : chosen;
-  const displayRevealed = pastEntry ? pastEntry.chosen !== null : revealed;
+  // In full mode we never expose correctness — even when revisiting a past
+  // answered question via Prev. The user can still see their own choice
+  // (highlighted) but no green/red colors and no explanation card.
+  const displayRevealed =
+    pastEntry
+      ? mode === "immediate" && pastEntry.chosen !== null
+      : revealed && revealedQuestionId !== null && current?.id === revealedQuestionId;
   const correctChoice = display.answer.correctAnswer;
   const isCorrectChoice = displayRevealed && displayChosen === correctChoice;
   const showReveal = displayRevealed && (isViewingPast || mode === "immediate");
@@ -418,12 +651,24 @@ export function QuizRunner(props: Props) {
           </button>
         </div>
 
-        {/* Chapter pill + bookmark */}
+        {/* Chapter pill + bookmark + unsure */}
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {common.chapter} {display.chapter.number}
           </Badge>
           <span className="text-xs text-muted-foreground flex-1">{display.chapter.title}</span>
+          {mode === "full" && (
+            <UnsureToggle
+              marked={unsureIds.has(display.id)}
+              onToggle={() => toggleUnsure(display.id)}
+              labels={{
+                mark: t.markUnsure,
+                unmark: t.unmarkUnsure,
+                marked: t.unsureMarked,
+                label: t.unsureLabel,
+              }}
+            />
+          )}
           <BookmarkToggle
             questionId={display.id}
             initialBookmarked={display.bookmarked}
@@ -458,6 +703,15 @@ export function QuizRunner(props: Props) {
                 const isEliminated =
                   !displayRevealed && (eliminated[display.id]?.includes(k) ?? false);
                 const canEliminate = !displayRevealed && !isViewingPast;
+                // In full mode while viewing a past answered question, allow
+                // the user to switch their answer in place (no reveal).
+                const canEditPast =
+                  isViewingPast &&
+                  mode === "full" &&
+                  pastEntry !== null &&
+                  pastEntry.chosen !== null;
+                const isInteractive =
+                  !displayRevealed && !isEliminated && (!isViewingPast || canEditPast);
                 const optionText = display[`option${k}` as "optionA" | "optionB" | "optionC" | "optionD"];
                 return (
                   <label
@@ -493,10 +747,12 @@ export function QuizRunner(props: Props) {
                       name="chosen"
                       value={k}
                       checked={isChosen}
-                      onChange={() =>
-                        !displayRevealed && !isViewingPast && !isEliminated && setChosen(k)
-                      }
-                      disabled={displayRevealed || isViewingPast || isEliminated}
+                      onChange={() => {
+                        if (!isInteractive) return;
+                        if (canEditPast) changePastAnswer(display.id, k);
+                        else setChosen(k);
+                      }}
+                      disabled={!isInteractive}
                       required
                       className="sr-only"
                     />
@@ -575,6 +831,26 @@ export function QuizRunner(props: Props) {
                       onClick={() => requeueSkipped([pastEntry!.question])}
                     >
                       {t.answerSkipped}
+                    </Button>
+                  );
+                } else if (isViewingPast && pastEntry && pastEntry.chosen !== null) {
+                  // Full mode reviewing an already-answered past question:
+                  // walk forward through history (or back to the live queue)
+                  // without exposing correctness.
+                  mainBtn = (
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      size="lg"
+                      onClick={() => {
+                        if (viewingIndex < past.length - 1) {
+                          setViewingIndex(viewingIndex + 1);
+                        } else {
+                          setViewingIndex(-1);
+                        }
+                      }}
+                    >
+                      {t.nextQuestion}
                     </Button>
                   );
                 } else {
@@ -662,10 +938,13 @@ export function QuizRunner(props: Props) {
 
               <ReportAnswerForm
                 questionId={display.id}
+                hasPendingReport={display.hasPendingReport}
                 labels={{
                   reportButton: t.reportButton,
                   reportPlaceholder: t.reportPlaceholder,
                   sendReport: t.sendReport,
+                  reportThanks: t.reportThanks,
+                  pendingReport: t.pendingReport,
                 }}
               />
             </CardContent>
@@ -727,6 +1006,33 @@ function BookmarkToggle({
     >
       {bookmarked ? <BookmarkCheck className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
       {bookmarked ? labels.bookmarked : labels.bookmark}
+    </button>
+  );
+}
+
+function UnsureToggle({
+  marked,
+  onToggle,
+  labels,
+}: {
+  marked: boolean;
+  onToggle: () => void;
+  labels: { mark: string; unmark: string; marked: string; label: string };
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={marked ? labels.unmark : labels.mark}
+      aria-pressed={marked}
+      className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors ${
+        marked
+          ? "text-orange-500 hover:text-orange-600"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <HelpCircle className="h-3.5 w-3.5" />
+      {marked ? labels.marked : labels.label}
     </button>
   );
 }
