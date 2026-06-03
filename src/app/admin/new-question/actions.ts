@@ -192,6 +192,8 @@ export async function saveWizardQuestionAction(formData: FormData) {
       throw new Error(`העלאת התמונה נכשלה: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+  const videoUrlRaw = String(formData.get("videoUrl") ?? "").trim();
+  const videoUrl = videoUrlRaw ? validateVideoUrl(videoUrlRaw) : null;
 
   // Placeholder chapter — RAG will overwrite chapterId/chapterIds from evidence
   const chapter = await db.chapter.findFirst({ orderBy: { number: "asc" } });
@@ -211,6 +213,7 @@ export async function saveWizardQuestionAction(formData: FormData) {
       imageUrl,
       imagePath,
       imageAlt,
+      videoUrl,
       createdById: me.id,
     },
   });

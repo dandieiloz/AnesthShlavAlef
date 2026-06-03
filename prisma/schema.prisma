@@ -163,6 +163,7 @@ model Question {
   imageUrl          String?       // public URL for an attached image (Firebase Storage)
   imagePath         String?       // storage object path, used to delete/replace
   imageAlt          String?       // optional alt text for accessibility
+  videoUrl          String?       // external video URL (YouTube, Vimeo, or direct mp4)
   createdById       String?
   createdAt         DateTime      @default(now())
 
