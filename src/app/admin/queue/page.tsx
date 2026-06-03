@@ -4,16 +4,7 @@ import Link from "next/link";
 import { QueueClient, type QueueJobRow, type UnansweredQuestion, type LowQualityQuestion } from "./QueueClient";
 import type { JobStatus, Prisma } from "@prisma/client";
 import { AdminNav } from "../AdminNav";
-
-const LOW_CONFIDENCE_THRESHOLD = 0.7;
-
-const LOW_QUALITY_ANSWER: Prisma.GeminiAnswerWhereInput = {
-  OR: [
-    { escalated: true },
-    { insufficientEvidence: true },
-    { confidence: { lt: LOW_CONFIDENCE_THRESHOLD } },
-  ],
-};
+import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   PENDING: "ממתין",
@@ -38,6 +29,15 @@ export default async function QueuePage({
 }) {
   await requireAdmin();
   const { filter } = await searchParams;
+
+  const lowConfidenceThreshold = await getPublishConfidenceThreshold();
+  const LOW_QUALITY_ANSWER: Prisma.GeminiAnswerWhereInput = {
+    OR: [
+      { escalated: true },
+      { insufficientEvidence: true },
+      { confidence: { lt: lowConfidenceThreshold } },
+    ],
+  };
 
   // Determine which statuses to show
   const isLowQualityTab = filter === "low-quality";

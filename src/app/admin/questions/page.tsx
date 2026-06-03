@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { QuestionsFilters } from "./QuestionsFilters";
 import { QuestionsTable, type QuestionRow } from "./QuestionsTable";
+import { PublishThresholdControl } from "./PublishThresholdControl";
+import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
 import { Suspense } from "react";
 import { AdminNav } from "../AdminNav";
 
@@ -243,6 +245,8 @@ export default async function AdminQuestionsPage({
     <div className="space-y-4">
       <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול שאלות</h1>
+
+      <PublishThresholdControl initialThreshold={await getPublishConfidenceThreshold()} />
 
       <Suspense>
         <QuestionsFilters chapters={chapters} />

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getTranslatedFields } from "@/lib/translate";
+import { setPublishConfidenceThreshold } from "@/lib/publish-threshold";
 
 export async function batchUpdateSourceAction(ids: number[], source: string | null) {
   await requireAdmin();
@@ -36,6 +37,21 @@ export async function setQuestionDisabledAction(id: number, disabled: boolean) {
   await db.question.update({ where: { id }, data: { disabled } });
   revalidatePath("/admin/questions");
   revalidatePath(`/admin/questions/${id}`);
+}
+
+export async function setQuestionAdminApprovedAction(id: number, approved: boolean) {
+  await requireAdmin();
+  await db.question.update({ where: { id }, data: { adminApproved: approved } });
+  revalidatePath("/admin/questions");
+  revalidatePath(`/admin/questions/${id}`);
+}
+
+export async function setPublishConfidenceThresholdAction(value: number) {
+  await requireAdmin();
+  const v = Number(value);
+  if (!Number.isFinite(v)) throw new Error("Invalid threshold");
+  await setPublishConfidenceThreshold(v);
+  revalidatePath("/admin/questions");
 }
 
 /**

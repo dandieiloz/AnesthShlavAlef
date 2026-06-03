@@ -17,12 +17,14 @@ import {
 } from "@/app/admin/queue/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
 import { DisableQuestionButton } from "./DisableQuestionButton";
+import { ApproveQuestionButton } from "./ApproveQuestionButton";
 import { EditableGeminiAnswer } from "./EditableGeminiAnswer";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
 import { updateQuestionImageAction, updateQuestionVideoAction } from "@/app/admin/new-question/actions";
+import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
 
 export default async function AdminQuestionPage({
   params,
@@ -73,6 +75,14 @@ export default async function AdminQuestionPage({
   const percentCorrect =
     attemptTotal === 0 ? null : Math.round((attemptCorrect / attemptTotal) * 100);
 
+  const publishThreshold = await getPublishConfidenceThreshold();
+  const answerConfidence = q.geminiAnswer?.confidence ?? null;
+  const meetsThreshold = answerConfidence !== null && answerConfidence >= publishThreshold;
+  // Show the approve toggle only when manual approval matters: either the answer is
+  // below threshold (and admin can publish it), or it is already manually approved (so
+  // admin can revoke). If the answer already meets the threshold, the button is hidden.
+  const showApproveButton = q.adminApproved || !meetsThreshold;
+
   return (
     <div>
       <Link href={`/admin/chapters/${q.chapter.number}/questions`} className="text-sm text-primary hover:underline">
@@ -86,6 +96,18 @@ export default async function AdminQuestionPage({
               מושבתת
             </span>
           ) : null}
+          {q.adminApproved ? (
+            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+              מאושרת ידנית
+            </span>
+          ) : null}
+          {showApproveButton && (
+            <ApproveQuestionButton
+              questionId={q.id}
+              approved={q.adminApproved}
+              insufficientEvidence={q.geminiAnswer?.insufficientEvidence ?? false}
+            />
+          )}
           <DisableQuestionButton questionId={q.id} disabled={q.disabled} />
           <DeleteQuestionButton questionId={q.id} chapterNumber={q.chapter.number} />
         </div>

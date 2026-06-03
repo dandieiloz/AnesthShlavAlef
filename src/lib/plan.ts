@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
+import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
 
 const NULL_SOURCE_SENTINEL = "__NULL__";
 
@@ -37,7 +38,17 @@ export async function questionAccessWhere(user: PlanGatedUser) {
   if (user.role === "ADMIN") return {};
   // Non-admin users never see disabled questions.
   const baseGate: Record<string, unknown> = { disabled: false };
-  if (user.plan === "PAID") return baseGate;
+  // Publish gate: confidence >= configured threshold OR admin manually approved the answer.
+  const threshold = await getPublishConfidenceThreshold();
+  const publishGate: Record<string, unknown> = {
+    OR: [
+      { adminApproved: true },
+      { geminiAnswer: { is: { confidence: { gte: threshold } } } },
+    ],
+  };
+  if (user.plan === "PAID") {
+    return { ...baseGate, AND: [publishGate] };
+  }
   const { sources, allowNullSource } = await getDemoAllowedSources();
   if (sources.length === 0 && !allowNullSource) {
     return { id: -1 };
@@ -46,7 +57,7 @@ export async function questionAccessWhere(user: PlanGatedUser) {
   if (sources.length > 0) or.push({ source: { in: sources } });
   if (allowNullSource) or.push({ source: null });
   const sourceGate = or.length === 1 ? or[0] : { OR: or };
-  return { ...baseGate, ...sourceGate };
+  return { ...baseGate, ...sourceGate, AND: [publishGate] };
 }
 
 /**
@@ -72,10 +83,21 @@ export async function assertCanAccessQuestion(user: PlanGatedUser, questionId: n
   if (user.role === "ADMIN") return;
   const q = await db.question.findUnique({
     where: { id: questionId },
-    select: { source: true, disabled: true },
+    select: {
+      source: true,
+      disabled: true,
+      adminApproved: true,
+      geminiAnswer: { select: { confidence: true } },
+    },
   });
   if (!q) notFound();
   if (q.disabled) notFound();
+  // Publish gate: must be admin-approved OR have an answer at/above threshold.
+  if (!q.adminApproved) {
+    const threshold = await getPublishConfidenceThreshold();
+    const conf = q.geminiAnswer?.confidence ?? null;
+    if (conf === null || conf < threshold) notFound();
+  }
   if (user.plan === "PAID") return;
   const { sources, allowNullSource } = await getDemoAllowedSources();
   if (q.source === null) {

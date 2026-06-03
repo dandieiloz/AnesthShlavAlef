@@ -160,6 +160,7 @@ model Question {
   correctAnswer     Choice?
   source            String?
   disabled          Boolean       @default(false)  // when true, question is hidden from learners; admin still sees it
+  adminApproved     Boolean       @default(false)  // when true, bypasses the publish-confidence threshold gate (admin manually verified the answer)
   imageUrl          String?       // public URL for an attached image (Firebase Storage)
   imagePath         String?       // storage object path, used to delete/replace
   imageAlt          String?       // optional alt text for accessibility
