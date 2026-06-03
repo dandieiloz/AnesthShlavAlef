@@ -10,6 +10,7 @@ import { toggleBookmarkAction } from "@/app/(user)/actions";
 import { removeHighlightByIdAction } from "@/app/(user)/highlight-actions";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { QuestionImage } from "@/components/QuestionImage";
+import { QuestionVideo } from "@/components/QuestionVideo";
 import { Bookmark, BookmarkX, BookOpen, CheckCircle2, Highlighter, StickyNote, Trash2 } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -70,6 +71,7 @@ export default async function BookmarksPage() {
             optionD: true,
             imageUrl: true,
             imageAlt: true,
+            videoUrl: true,
             chapter: { select: { number: true, title: true } },
             geminiAnswer: true,
           },
@@ -233,6 +235,7 @@ export default async function BookmarksPage() {
                       </div>
 
                       <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
+                      <QuestionVideo url={q.videoUrl} />
 
                       {/* Answer options */}
                       <div className="space-y-1.5">

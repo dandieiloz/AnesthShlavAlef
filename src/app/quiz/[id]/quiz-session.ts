@@ -18,6 +18,7 @@ export type QuestionPayload = {
   optionD: string;
   imageUrl: string | null;
   imageAlt: string | null;
+  videoUrl: string | null;
   answer: {
     correctAnswer: Choice;
     explanation: string;
@@ -164,6 +165,7 @@ export async function loadQuizBatch(args: {
         optionD: qFields.optionD,
         imageUrl: q.imageUrl,
         imageAlt: q.imageAlt,
+        videoUrl: q.videoUrl,
         answer: {
           correctAnswer: g.correctAnswer as Choice,
           explanation: ansFields.explanation || g.explanation,

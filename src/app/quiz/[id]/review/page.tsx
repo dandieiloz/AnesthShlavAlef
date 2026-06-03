@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import { QuestionImage } from "@/components/QuestionImage";
+import { QuestionVideo } from "@/components/QuestionVideo";
 import { toggleBookmarkAction, postCommentAction } from "@/app/(user)/actions";
 import { CommentItem } from "@/components/CommentItem";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -341,6 +342,7 @@ export default async function QuizReviewPage({
                   {/* Question stem */}
                   <p className="font-display text-base leading-relaxed">{qT.stem}</p>
                   <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
+                  <QuestionVideo url={q.videoUrl} />
 
                   {/* Answer options */}
                   <div className="space-y-2">

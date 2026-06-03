@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import { QuestionImage } from "@/components/QuestionImage";
+import { QuestionVideo } from "@/components/QuestionVideo";
 import { CommentItem } from "@/components/CommentItem";
 import { SubmitButton } from "@/components/SubmitButton";
 import { postCommentAction } from "@/app/(user)/actions";
@@ -119,6 +120,7 @@ export default async function HistoryQuestionPage({
           </p>
 
           <QuestionImage url={question.imageUrl} alt={question.imageAlt} />
+          <QuestionVideo url={question.videoUrl} />
 
           <div className="space-y-1.5">
             {OPTION_KEYS.map((k, idx) => {

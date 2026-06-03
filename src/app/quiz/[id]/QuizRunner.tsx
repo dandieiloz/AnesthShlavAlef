@@ -24,6 +24,7 @@ import {
 import { AnswerExplanation } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
 import { QuestionImage } from "@/components/QuestionImage";
+import { QuestionVideo } from "@/components/QuestionVideo";
 import {
   loadQuizBatchAction,
   recordAttemptAction,
@@ -691,6 +692,7 @@ export function QuizRunner(props: Props) {
           <CardContent className="pt-6 space-y-5">
             <p className="font-display text-lg leading-relaxed">{display.stem}</p>
             <QuestionImage url={display.imageUrl} alt={display.imageAlt} />
+            <QuestionVideo url={display.videoUrl} />
             {display.source && (
               <p className="text-xs text-muted-foreground">
                 {t.source}: {display.source}

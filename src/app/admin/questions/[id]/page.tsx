@@ -21,7 +21,8 @@ import { EditableGeminiAnswer } from "./EditableGeminiAnswer";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { QuestionImage } from "@/components/QuestionImage";
-import { updateQuestionImageAction } from "@/app/admin/new-question/actions";
+import { QuestionVideo } from "@/components/QuestionVideo";
+import { updateQuestionImageAction, updateQuestionVideoAction } from "@/app/admin/new-question/actions";
 
 export default async function AdminQuestionPage({
   params,
@@ -241,6 +242,53 @@ export default async function AdminQuestionPage({
                 className="rounded border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
               >
                 הסר תמונה
+              </button>
+            )}
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-4 rounded border bg-card p-4">
+        <h2 className="text-base font-semibold">סרטון מצורף</h2>
+        {q.videoUrl ? (
+          <div className="mt-2">
+            <QuestionVideo url={q.videoUrl} />
+            <p className="mt-1 text-[11px] text-muted-foreground break-all" dir="ltr">{q.videoUrl}</p>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">אין סרטון מצורף.</p>
+        )}
+        <form action={updateQuestionVideoAction} className="mt-3 space-y-2">
+          <input type="hidden" name="questionId" value={q.id} />
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">קישור וידאו</label>
+            <input
+              type="url"
+              name="videoUrl"
+              defaultValue={q.videoUrl ?? ""}
+              placeholder="https://www.youtube.com/watch?v=... או https://vimeo.com/... או קובץ .mp4"
+              className="w-full rounded border p-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+              dir="ltr"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">YouTube, Vimeo, או קובץ mp4/webm. הסרטון יתנגן אוטומטית (מושתק).</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              name="intent"
+              value="save"
+              className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white"
+            >
+              שמור
+            </button>
+            {q.videoUrl && (
+              <button
+                type="submit"
+                name="intent"
+                value="remove"
+                className="rounded border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+              >
+                הסר סרטון
               </button>
             )}
           </div>
