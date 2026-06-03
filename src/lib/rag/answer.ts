@@ -1,9 +1,9 @@
 import { db } from "@/lib/db";
-import { FLASH_MODEL, GEN_MODEL, generateJson } from "@/lib/gemini";
+import { GEN_MODEL, generateJson } from "@/lib/gemini";
 import { Type } from "@google/genai";
 import type { Choice, Prisma } from "@prisma/client";
 import { retrieveCandidates } from "./retrieve";
-import { rerankWithFlashJudge } from "./rerank";
+import { rerankWithFlashJudge, pickDiverseTopN } from "./rerank";
 import { translateStemToEnglish } from "./translate";
 import { hashQuestion } from "./hash";
 import type { CachedAnswerPayload, EvidenceCitation, RetrievedChunk, StructuredAnswer } from "./types";
@@ -78,10 +78,16 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
-const TOP_K_PASS1 = 10;
-const TOP_K_PASS2 = 15;
+// Generation runs on Pro directly (no cheap pass-1). The reranker still picks
+// a wider candidate pool so we can enforce per-chapter diversity before
+// passing chunks to the generator — the dominant cause of wrong answers was
+// the top-K cluster being concentrated in a single chapter.
+const RERANK_POOL = 25;        // top-N kept from the Flash judge
+const TOP_K_GEN = 15;          // chunks actually sent to the generator
+const MAX_CHUNKS_PER_CHAPTER = 3;
+const RETRY_RERANK_POOL = 30;
+const RETRY_TOP_K_GEN = 18;
 const PER_QUERY_K = 30;
-const ESCALATION_CONFIDENCE_THRESHOLD = 0.7;
 
 function buildUserPrompt(opts: {
   stem: string;
@@ -291,25 +297,20 @@ export async function generateExplanationForQuestionV2(
     throw new Error("No chunks retrieved — make sure at least one chapter is ingested");
   }
 
-  // 4) Rerank --------------------------------------------------------------
-  const reranked = await rerankWithFlashJudge(question.stem, candidates, TOP_K_PASS1);
+  // 4) Rerank into a wider pool, then enforce per-chapter diversity -------
+  const rerankedPool = await rerankWithFlashJudge(question.stem, candidates, RERANK_POOL);
+  let finalChunks = pickDiverseTopN(rerankedPool, TOP_K_GEN, MAX_CHUNKS_PER_CHAPTER);
 
-  // 5) Pass 1: cheap model -------------------------------------------------
-  let structured = await runGenerationPass(FLASH_MODEL, reranked, question, hint);
-  let usedModel = FLASH_MODEL;
+  // 5) Generate with Pro directly (no Flash pass-1) -----------------------
+  const usedModel = GEN_MODEL;
+  let structured = await runGenerationPass(GEN_MODEL, finalChunks, question, hint);
   let escalated = false;
-  let finalChunks = reranked;
 
-  // 6) Escalate if low confidence / insufficient evidence -----------------
-  const topRerankScore = reranked[0]?.rerankScore ?? 0;
-  const shouldEscalate =
-    structured.insufficientEvidence ||
-    structured.confidence < ESCALATION_CONFIDENCE_THRESHOLD ||
-    topRerankScore < 4;
-
-  if (shouldEscalate) {
+  // 6) Last-resort retry: Pro reported insufficient evidence on this set.
+  //    Expand retrieval with entity hints from the first pass and try a
+  //    wider, still-diversified chunk set.
+  if (structured.insufficientEvidence) {
     escalated = true;
-    // Expand the query with entities the model surfaced in pass 1, then re-retrieve + rerank wider.
     const entityHints = [
       ...structured.evidence.map((e) => e.quote).slice(0, 3),
       structured.explanation.slice(0, 300),
@@ -323,9 +324,13 @@ export async function generateExplanationForQuestionV2(
       englishQuery: expandedEnglish,
       perQueryK: PER_QUERY_K + 10,
     });
-    finalChunks = await rerankWithFlashJudge(question.stem, expandedCandidates, TOP_K_PASS2);
+    const expandedPool = await rerankWithFlashJudge(
+      question.stem,
+      expandedCandidates,
+      RETRY_RERANK_POOL,
+    );
+    finalChunks = pickDiverseTopN(expandedPool, RETRY_TOP_K_GEN, MAX_CHUNKS_PER_CHAPTER);
     structured = await runGenerationPass(GEN_MODEL, finalChunks, question, hint);
-    usedModel = GEN_MODEL;
   }
 
   // 7) Persist + cache + observability ------------------------------------

@@ -5,29 +5,29 @@
  * and can be overridden via environment variables for recalibration.
  *
  * Pipeline per non-cached question (mirrors src/lib/rag/answer.ts):
- *   1. Embed Hebrew query         — gemini-embedding-001
- *   2. Translate stem → English   — gemini-2.5-flash  (skipped when stemEn exists)
- *   3. Embed English query        — gemini-embedding-001
- *   4. Flash judge rerank         — gemini-2.5-flash  (PER_QUERY_K candidates × ~800 chars)
- *   5. Pass-1 generation (flash)  — gemini-2.5-flash  (TOP_K_PASS1 chunks × AVG_CHUNK_CHARS)
- *   6. Escalation (prob ~30%)     — re-rerank + gemini-2.5-pro  (TOP_K_PASS2 chunks)
+ *   1. Embed Hebrew query              — gemini-embedding-001
+ *   2. Translate stem → English         — gemini-2.5-flash  (skipped when stemEn exists)
+ *   3. Embed English query             — gemini-embedding-001
+ *   4. Flash judge rerank              — gemini-2.5-flash  (PER_QUERY_K candidates × ~800 chars)
+ *   5. Primary generation              — gemini-2.5-pro    (TOP_K_GEN diversified chunks × AVG_CHUNK_CHARS)
+ *   6. Insufficient-evidence retry     — re-rerank + gemini-2.5-pro on a wider, diversified set (rare)
  *
  * Accuracy: ±25% due to Hebrew tokenisation heuristic and variable chunk sizes.
  */
 
 // ─── Pipeline constants (mirrors src/lib/rag/answer.ts constants) ────────────
-export const TOP_K_PASS1 = 10;
-export const TOP_K_PASS2 = 15;
+export const TOP_K_GEN = 15;
+export const RETRY_TOP_K_GEN = 18;
 export const PER_QUERY_K = 30;
 export const RERANK_CHUNK_CHARS = 800;  // truncation applied in rerank.ts
 export const AVG_CHUNK_CHARS = 1800;    // CHUNK_SIZE from scripts/lib/pdf-extract.ts
 export const SYSTEM_PROMPT_TOKENS = 300; // rough estimate of system prompt token count
 
-/** Default escalation probability — override via COST_ESCALATION_PROB env var. */
+/** Default insufficient-evidence retry probability — override via COST_ESCALATION_PROB env var. */
 export const ESCALATION_PROB =
   typeof process !== "undefined"
-    ? parseFloat(process.env.COST_ESCALATION_PROB ?? "0.30")
-    : 0.30;
+    ? parseFloat(process.env.COST_ESCALATION_PROB ?? "0.10")
+    : 0.10;
 
 /** Spending threshold (USD) above which a confirmation dialog is shown. */
 export const COST_CONFIRM_THRESHOLD =
@@ -106,7 +106,7 @@ export type StageBreakdown = {
   translate: number;
   embedEn: number;
   rerank: number;
-  flashGen: number;
+  primaryGen: number;
   escalation: number;
 };
 
@@ -121,7 +121,7 @@ const ZERO_STAGES: StageBreakdown = {
   translate: 0,
   embedEn: 0,
   rerank: 0,
-  flashGen: 0,
+  primaryGen: 0,
   escalation: 0,
 };
 
@@ -177,24 +177,23 @@ export function estimateJobCost(opts: {
   const rerankOutputTokens = Math.ceil((PER_QUERY_K * 12) / 4); // JSON scores array
   const rerank = tokenCost(FLASH_MODEL, rerankInputTokens, rerankOutputTokens);
 
-  // 5. Pass-1 generation (flash)
-  //    Input: system prompt + question + TOP_K_PASS1 chunks (English textbook, ~4 ch/tok)
-  //    Output: structured JSON answer in Hebrew, ~600 tokens
-  const flashGenInput =
-    SYSTEM_PROMPT_TOKENS + qTokens + Math.ceil((TOP_K_PASS1 * AVG_CHUNK_CHARS) / 4);
-  const flashGenOutput = 600;
-  const flashGen = tokenCost(FLASH_MODEL, flashGenInput, flashGenOutput);
+  // 5. Primary generation (Pro)
+  //    Input: system prompt + question + TOP_K_GEN diversified chunks (English textbook, ~4 ch/tok)
+  //    Output: structured JSON answer in Hebrew, ~700 tokens
+  const primaryGenInput =
+    SYSTEM_PROMPT_TOKENS + qTokens + Math.ceil((TOP_K_GEN * AVG_CHUNK_CHARS) / 4);
+  const primaryGenOutput = 700;
+  const primaryGen = tokenCost(PRO_MODEL, primaryGenInput, primaryGenOutput);
 
-  // 6. Escalation path (probabilistic)
-  //    Re-retrieve + re-rerank with a slightly wider window, then pro generation.
+  // 6. Insufficient-evidence retry (probabilistic)
+  //    Re-retrieve + re-rerank with a slightly wider window, then another Pro generation.
   const escRerankInputTokens =
     qTokens + Math.ceil(((PER_QUERY_K + 10) * RERANK_CHUNK_CHARS) / 4);
-  const proGenInput =
-    SYSTEM_PROMPT_TOKENS + qTokens + Math.ceil((TOP_K_PASS2 * AVG_CHUNK_CHARS) / 4);
-  const proGenOutput = 700;
+  const retryGenInput =
+    SYSTEM_PROMPT_TOKENS + qTokens + Math.ceil((RETRY_TOP_K_GEN * AVG_CHUNK_CHARS) / 4);
   const escalationFull =
     tokenCost(FLASH_MODEL, escRerankInputTokens, rerankOutputTokens) + // re-rerank
-    tokenCost(PRO_MODEL, proGenInput, proGenOutput); // pro generation
+    tokenCost(PRO_MODEL, retryGenInput, primaryGenOutput); // pro generation again
   const escalation = ep * escalationFull;
 
   const byStage: StageBreakdown = {
@@ -202,10 +201,10 @@ export function estimateJobCost(opts: {
     translate,
     embedEn,
     rerank,
-    flashGen,
+    primaryGen,
     escalation,
   };
-  const totalUsd = embedHe + translate + embedEn + rerank + flashGen + escalation;
+  const totalUsd = embedHe + translate + embedEn + rerank + primaryGen + escalation;
 
   return { totalUsd, cached: false, byStage };
 }

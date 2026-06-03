@@ -262,7 +262,7 @@ export async function estimateJobsCostAction(
     cachedCount: 0,
     jobCount: 0,
     escalationPct: Math.round(ESCALATION_PROB * 100),
-    byStage: { embedHe: 0, translate: 0, embedEn: 0, rerank: 0, flashGen: 0, escalation: 0 },
+    byStage: { embedHe: 0, translate: 0, embedEn: 0, rerank: 0, primaryGen: 0, escalation: 0 },
     jobs: [],
     confirmThreshold: COST_CONFIRM_THRESHOLD,
     avgLatencyMs,

@@ -76,3 +76,39 @@ export async function rerankWithFlashJudge(
     .sort((a, b) => (b.rerankScore ?? 0) - (a.rerankScore ?? 0))
     .slice(0, topN);
 }
+
+/**
+ * Pick top-N reranked chunks while enforcing a per-chapter cap, so the
+ * generator always sees evidence from multiple chapters when the recall
+ * pool spans them. Falls back to plain top-N if the cap would leave the
+ * result short (e.g. recall really only hit one chapter).
+ *
+ * Input must already be sorted by descending rerankScore.
+ */
+export function pickDiverseTopN(
+  ranked: RetrievedChunk[],
+  topN: number,
+  maxPerChapter: number,
+): RetrievedChunk[] {
+  if (ranked.length <= topN) return ranked;
+  const perChapter = new Map<number, number>();
+  const picked: RetrievedChunk[] = [];
+  const overflow: RetrievedChunk[] = [];
+  for (const c of ranked) {
+    const used = perChapter.get(c.chapterNumber) ?? 0;
+    if (used < maxPerChapter) {
+      picked.push(c);
+      perChapter.set(c.chapterNumber, used + 1);
+      if (picked.length === topN) return picked;
+    } else {
+      overflow.push(c);
+    }
+  }
+  // Cap was too tight (recall was concentrated in few chapters): backfill
+  // from the overflow in score order so we still hit topN.
+  for (const c of overflow) {
+    if (picked.length === topN) break;
+    picked.push(c);
+  }
+  return picked;
+}

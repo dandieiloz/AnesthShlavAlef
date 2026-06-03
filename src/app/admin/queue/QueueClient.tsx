@@ -588,9 +588,9 @@ export function QueueClient({
                 <span className="font-mono">${estimate.byStage.embedEn.toFixed(5)}</span>
                 <span>דירוג מחדש (Flash):</span>
                 <span className="font-mono">${estimate.byStage.rerank.toFixed(5)}</span>
-                <span>חילול ראשוני (Flash):</span>
-                <span className="font-mono">${estimate.byStage.flashGen.toFixed(5)}</span>
-                <span>הסלמה (~{estimate.escalationPct}% Pro):</span>
+                <span>חילול עיקרי (Pro):</span>
+                <span className="font-mono">${estimate.byStage.primaryGen.toFixed(5)}</span>
+                <span>ניסיון חוזר (~{estimate.escalationPct}% Pro):</span>
                 <span className="font-mono">${estimate.byStage.escalation.toFixed(5)}</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground opacity-70">
