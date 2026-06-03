@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { parseQuestion, parseMultipleQuestions, type ParsedQuestion } from "@/lib/wizard";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
+import { uploadQuestionImage, deleteQuestionImage, ImageValidationError } from "@/lib/question-image";
 
 export type WizardParseResult =
   | { ok: true; parsed: ParsedQuestion }
@@ -170,6 +171,28 @@ export async function saveWizardQuestionAction(formData: FormData) {
     throw new Error("All fields required");
   }
 
+  const sourceInstitution = String(formData.get("sourceInstitution") ?? "").trim();
+  const sourceYear = String(formData.get("sourceYear") ?? "").trim();
+  const sourceSuffix = String(formData.get("sourceSuffix") ?? "").trim();
+  const source = sourceInstitution && sourceYear
+    ? sourceSuffix ? `${sourceInstitution} ${sourceYear} ${sourceSuffix}` : `${sourceInstitution} ${sourceYear}`
+    : null;
+
+  const imageAlt = String(formData.get("imageAlt") ?? "").trim() || null;
+  const imageFile = formData.get("image");
+  let imageUrl: string | null = null;
+  let imagePath: string | null = null;
+  if (imageFile instanceof File && imageFile.size > 0) {
+    try {
+      const uploaded = await uploadQuestionImage(imageFile);
+      imageUrl = uploaded.url;
+      imagePath = uploaded.path;
+    } catch (e) {
+      if (e instanceof ImageValidationError) throw e;
+      throw new Error(`העלאת התמונה נכשלה: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   // Placeholder chapter — RAG will overwrite chapterId/chapterIds from evidence
   const chapter = await db.chapter.findFirst({ orderBy: { number: "asc" } });
   if (!chapter) throw new Error("No chapters in DB — run db:seed first");
@@ -184,6 +207,10 @@ export async function saveWizardQuestionAction(formData: FormData) {
       optionC,
       optionD,
       correctAnswer,
+      source,
+      imageUrl,
+      imagePath,
+      imageAlt,
       createdById: me.id,
     },
   });
@@ -194,5 +221,51 @@ export async function saveWizardQuestionAction(formData: FormData) {
   });
 
   redirect(`/admin/questions/${created.id}`);
+}
+
+export async function updateQuestionImageAction(formData: FormData) {
+  await requireAdmin();
+  const questionId = Number(formData.get("questionId"));
+  if (!Number.isFinite(questionId)) throw new Error("Invalid questionId");
+  const intent = String(formData.get("intent") ?? "save"); // "save" | "remove"
+  const imageAlt = String(formData.get("imageAlt") ?? "").trim() || null;
+
+  const existing = await db.question.findUnique({
+    where: { id: questionId },
+    select: { imagePath: true },
+  });
+  if (!existing) throw new Error("Question not found");
+
+  if (intent === "remove") {
+    if (existing.imagePath) await deleteQuestionImage(existing.imagePath);
+    await db.question.update({
+      where: { id: questionId },
+      data: { imageUrl: null, imagePath: null, imageAlt: null },
+    });
+    redirect(`/admin/questions/${questionId}`);
+  }
+
+  const imageFile = formData.get("image");
+  if (imageFile instanceof File && imageFile.size > 0) {
+    let uploaded;
+    try {
+      uploaded = await uploadQuestionImage(imageFile);
+    } catch (e) {
+      if (e instanceof ImageValidationError) throw e;
+      throw new Error(`העלאת התמונה נכשלה: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (existing.imagePath) await deleteQuestionImage(existing.imagePath);
+    await db.question.update({
+      where: { id: questionId },
+      data: { imageUrl: uploaded.url, imagePath: uploaded.path, imageAlt },
+    });
+  } else {
+    // Just alt-text update
+    await db.question.update({
+      where: { id: questionId },
+      data: { imageAlt },
+    });
+  }
+  redirect(`/admin/questions/${questionId}`);
 }
 

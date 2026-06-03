@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { AnswerExplanation } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
+import { QuestionImage } from "@/components/QuestionImage";
 import {
   loadQuizBatchAction,
   recordAttemptAction,
@@ -689,6 +690,7 @@ export function QuizRunner(props: Props) {
         <Card>
           <CardContent className="pt-6 space-y-5">
             <p className="font-display text-lg leading-relaxed">{display.stem}</p>
+            <QuestionImage url={display.imageUrl} alt={display.imageAlt} />
             {display.source && (
               <p className="text-xs text-muted-foreground">
                 {t.source}: {display.source}

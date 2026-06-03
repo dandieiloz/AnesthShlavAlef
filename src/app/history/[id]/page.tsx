@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
+import { QuestionImage } from "@/components/QuestionImage";
 import { CommentItem } from "@/components/CommentItem";
 import { SubmitButton } from "@/components/SubmitButton";
 import { postCommentAction } from "@/app/(user)/actions";
@@ -116,6 +117,8 @@ export default async function HistoryQuestionPage({
           <p dir="auto" className="text-base font-medium leading-relaxed [unicode-bidi:plaintext]">
             {qT.stem}
           </p>
+
+          <QuestionImage url={question.imageUrl} alt={question.imageAlt} />
 
           <div className="space-y-1.5">
             {OPTION_KEYS.map((k, idx) => {

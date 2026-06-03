@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { ReportAnswerForm } from "@/components/ReportAnswerForm";
+import { QuestionImage } from "@/components/QuestionImage";
 import { toggleBookmarkAction, postCommentAction } from "@/app/(user)/actions";
 import { CommentItem } from "@/components/CommentItem";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -339,6 +340,7 @@ export default async function QuizReviewPage({
                 <CardContent className="px-5 pb-5 space-y-4">
                   {/* Question stem */}
                   <p className="font-display text-base leading-relaxed">{qT.stem}</p>
+                  <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
 
                   {/* Answer options */}
                   <div className="space-y-2">

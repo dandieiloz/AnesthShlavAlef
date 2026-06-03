@@ -160,6 +160,9 @@ model Question {
   correctAnswer     Choice?
   source            String?
   disabled          Boolean       @default(false)  // when true, question is hidden from learners; admin still sees it
+  imageUrl          String?       // public URL for an attached image (Firebase Storage)
+  imagePath         String?       // storage object path, used to delete/replace
+  imageAlt          String?       // optional alt text for accessibility
   createdById       String?
   createdAt         DateTime      @default(now())
 

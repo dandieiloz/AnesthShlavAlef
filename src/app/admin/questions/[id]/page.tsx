@@ -20,6 +20,8 @@ import { DisableQuestionButton } from "./DisableQuestionButton";
 import { EditableGeminiAnswer } from "./EditableGeminiAnswer";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { QuestionImage } from "@/components/QuestionImage";
+import { updateQuestionImageAction } from "@/app/admin/new-question/actions";
 
 export default async function AdminQuestionPage({
   params,
@@ -189,6 +191,61 @@ export default async function AdminQuestionPage({
         </div>
         <button className="rounded bg-slate-900 px-4 py-2 text-white">שמור</button>
       </form>
+
+      <section className="mt-4 rounded border bg-card p-4">
+        <h2 className="text-base font-semibold">תמונה מצורפת</h2>
+        {q.imageUrl ? (
+          <div className="mt-2">
+            <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">אין תמונה מצורפת.</p>
+        )}
+        <form action={updateQuestionImageAction} className="mt-3 space-y-2">
+          <input type="hidden" name="questionId" value={q.id} />
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              {q.imageUrl ? "החלף תמונה" : "העלה תמונה"}
+            </label>
+            <input
+              type="file"
+              name="image"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="block text-sm"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">PNG / JPEG / WebP / GIF · עד 5MB</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">טקסט חלופי (alt)</label>
+            <input
+              type="text"
+              name="imageAlt"
+              defaultValue={q.imageAlt ?? ""}
+              className="w-full rounded border p-1.5 text-sm bg-background text-foreground"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              name="intent"
+              value="save"
+              className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white"
+            >
+              שמור
+            </button>
+            {q.imageUrl && (
+              <button
+                type="submit"
+                name="intent"
+                value="remove"
+                className="rounded border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+              >
+                הסר תמונה
+              </button>
+            )}
+          </div>
+        </form>
+      </section>
 
       <section className="mt-6">
         <h2 className="text-lg font-semibold">הסבר Gemini (מטמון)</h2>
