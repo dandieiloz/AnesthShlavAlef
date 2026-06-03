@@ -25,6 +25,7 @@ export function AnnouncementsRotator({
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   useEffect(() => {
     if (items.length <= 1 || paused) return;
@@ -41,6 +42,7 @@ export function AnnouncementsRotator({
 
   if (items.length === 0) return null;
   const current = items[Math.min(index, items.length - 1)];
+  const tutorialSrc = "https://www.youtube-nocookie.com/embed/padZfSZ10xM?autoplay=1&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0&iv_load_policy=3&disablekb=1&fs=0";
 
   return (
     <div
@@ -68,7 +70,7 @@ export function AnnouncementsRotator({
             {current.ctaLabel}
             <ArrowLeft
               className={`h-3 w-3 transition-transform group-hover:-translate-x-0.5 ${
-                isRtl ? "" : "rotate-180 group-hover:translate-x-0.5 group-hover:-translate-x-0"
+                isRtl ? "" : "rotate-180 group-hover:translate-x-0.5"
               }`}
             />
           </Link>
@@ -86,6 +88,30 @@ export function AnnouncementsRotator({
           ))}
         </div>
       ) : null}
+
+      <div className="mx-auto w-full max-w-6xl px-4 pb-2 pt-1">
+        <details
+          className="rounded-lg border border-primary/30 bg-background/70"
+          onToggle={(e) => setVideoOpen((e.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-foreground marker:content-none">
+            איך לפתוח ציטוטים ישירות מהספר
+          </summary>
+          <div className="border-t border-primary/20 p-2">
+            <div className="relative aspect-video overflow-hidden rounded-md bg-black">
+              {videoOpen ? (
+                <iframe
+                  src={tutorialSrc}
+                  title="איך לפתוח ציטוטים ישירות מהספר"
+                  className="absolute inset-0 h-full w-full"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen={false}
+                />
+              ) : null}
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
   );
 }
