@@ -149,6 +149,10 @@ function QuizCard({ q, locale, t }: { q: QuizRow; locale: "he" | "en"; t: Quizze
 
 export function QuizzesClient({ quizzes, locale }: { quizzes: QuizRow[]; locale: Locale }) {
   const t = getDictionary(locale).quizzes;
+  const DEFAULT_VISIBLE = 5;
+  const [expanded, setExpanded] = useState(false);
+  const expandLabel = locale === "he" ? "הצג עוד" : "Show more";
+  const collapseLabel = locale === "he" ? "הצג פחות" : "Show less";
   const all = quizzes;
   const inProgress = quizzes.filter((q) => !q.isComplete && q.answered > 0);
   const completed = quizzes.filter((q) => q.isComplete);
@@ -166,9 +170,20 @@ export function QuizzesClient({ quizzes, locale }: { quizzes: QuizRow[]; locale:
 
   function Grid({ items }: { items: QuizRow[] }) {
     if (items.length === 0) return <EmptyState />;
+    const visibleItems = expanded ? items : items.slice(0, DEFAULT_VISIBLE);
+    const canToggle = items.length > DEFAULT_VISIBLE;
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((q) => <QuizCard key={q.id} q={q} locale={locale} t={t} />)}
+      <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleItems.map((q) => <QuizCard key={q.id} q={q} locale={locale} t={t} />)}
+        </div>
+        {canToggle && (
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? collapseLabel : expandLabel}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

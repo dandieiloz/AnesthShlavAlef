@@ -48,12 +48,15 @@ interface RawItem {
   text: string;
   fontSize: number;
   page: number;
+  /** Printed (textbook) page number if detected from running header/footer. */
+  printedPage: number | null;
 }
 
 interface Block {
   text: string;
   fontSize: number;
   page: number;
+  printedPage: number | null;
   isHeading: boolean;
   headingLevel?: number;
 }
@@ -221,6 +224,27 @@ function isTwoColumnPage(items: PdfItem[], midX: number): boolean {
   return minor / total > 0.25;
 }
 
+/**
+ * Detect the printed page number from running header/footer items. Most
+ * textbooks place a 1–4 digit number alone (or together with the chapter
+ * number/title) in the top or bottom band. We collect every candidate that
+ * matches `^\d{1,4}$` inside those bands and return the largest — chapter
+ * numbers are typically much smaller than printed page numbers.
+ */
+function detectPrintedPage(items: PdfItem[], pageHeight: number): number | null {
+  const candidates: number[] = [];
+  for (const it of items) {
+    const inTopBand = it.y >= pageHeight - HEADER_FOOTER_BAND;
+    const inBottomBand = it.y <= HEADER_FOOTER_BAND;
+    if (!inTopBand && !inBottomBand) continue;
+    const trimmed = it.str.trim();
+    if (!/^\d{1,4}$/.test(trimmed)) continue;
+    candidates.push(Number(trimmed));
+  }
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates);
+}
+
 // ---------- sentence-aligned chunking ----------
 
 function findSentenceBreak(text: string, target: number, search: number): number {
@@ -276,6 +300,8 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
       page.cleanup();
       continue;
     }
+
+    const printedPage = detectPrintedPage(items, pageHeight);
 
     // Body font for this page
     const sizeWeights = new Map<number, number>();
@@ -395,6 +421,7 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
         text: ln.text,
         fontSize: Math.round(ln.size * 10) / 10,
         page: pageNum,
+        printedPage,
       });
     }
     page.cleanup();
@@ -435,6 +462,7 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
       text: r.text,
       fontSize: r.fontSize,
       page: r.page,
+      printedPage: r.printedPage,
       isHeading,
       headingLevel: level,
     };
@@ -537,16 +565,20 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
       if (!inReferences) {
         bodyLines.push(b.text);
         bufLen += b.text.length;
-        if (bufPageStart === 0) bufPageStart = b.page;
-        bufPageEnd = b.page;
+        const p = b.printedPage ?? b.page;
+        if (bufPageStart === 0) bufPageStart = p;
+        bufPageEnd = p;
       }
       continue;
     }
 
     if (inReferences) continue;
 
-    if (bufPageStart === 0) bufPageStart = b.page;
-    bufPageEnd = b.page;
+    {
+      const p = b.printedPage ?? b.page;
+      if (bufPageStart === 0) bufPageStart = p;
+      bufPageEnd = p;
+    }
     bodyLines.push(b.text);
     bufLen += b.text.length + 1;
     if (bufLen >= CHUNK_SIZE) flushChunk(true);

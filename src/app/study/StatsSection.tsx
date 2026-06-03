@@ -5,39 +5,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/lib/usefulness";
-import { getActivityHeatmap, getAccuracyOverTime, getCurrentStreak } from "@/lib/activity";
-import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
-import { AccuracyTrend } from "@/components/charts/AccuracyTrend";
-import { Target, CheckCircle2, TrendingUp, BookOpen, Flame, Bookmark, ArrowLeft } from "lucide-react";
+import { getActivityHeatmap, getCurrentStreak } from "@/lib/activity";
+import { Target, CheckCircle2, TrendingUp, BookOpen, Flame } from "lucide-react";
 import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
+import type { ReactNode } from "react";
 
-export async function StatsSection({ userId, locale }: { userId: string; locale: Locale }) {
+export async function StatsSection({ userId, locale, children }: { userId: string; locale: Locale; children?: ReactNode }) {
   const dict = getDictionary(locale);
   const t = dict.dashboard;
 
-  const [attempts, heatmapData, recentBookmarks] = await Promise.all([
+  const [attempts, heatmapData] = await Promise.all([
     db.attempt.findMany({
       where: { userId },
       include: { question: { include: { chapter: true } } },
       orderBy: { createdAt: "desc" },
     }),
     getActivityHeatmap(userId, 120),
-    db.bookmark.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: {
-        question: {
-          select: {
-            id: true,
-            stem: true,
-            chapter: { select: { number: true, title: true } },
-          },
-        },
-      },
-    }),
   ]);
 
   const total = attempts.length;
@@ -63,22 +48,11 @@ export async function StatsSection({ userId, locale }: { userId: string; locale:
 
   const chaptersAttempted = byChapter.size;
   const streak = getCurrentStreak(heatmapData);
-  const trendData = getAccuracyOverTime(heatmapData);
 
   const chapterEntries = [...byChapter.entries()].sort((a, b) => a[0] - b[0]);
   const chapterTitleTranslations = await Promise.all(
     chapterEntries.map(([num, r]) =>
       getTranslatedFields("Chapter", `n:${num}`, { title: r.title }, locale),
-    ),
-  );
-  const bookmarkTranslations = await Promise.all(
-    recentBookmarks.map((b) =>
-      getTranslatedFields(
-        "Question",
-        String(b.question.id),
-        { stem: b.question.stem, chapterTitle: b.question.chapter.title },
-        locale,
-      ),
     ),
   );
 
@@ -108,85 +82,7 @@ export async function StatsSection({ userId, locale }: { userId: string; locale:
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Activity heatmap */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{t.activity120}</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            {heatmapData.some((d) => d.count > 0) ? (
-              <ActivityHeatmap data={heatmapData} />
-            ) : (
-              <p className="text-xs text-muted-foreground py-4 text-center">
-                {t.noActivity} <Link href="/study/new" className="text-primary hover:underline">{t.startQuiz}</Link>
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Bookmarks panel */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <Bookmark className="h-3.5 w-3.5" />
-                {t.bookmarksHeader}
-              </span>
-              {recentBookmarks.length > 0 && (
-                <Link href="/bookmarks" className="flex items-center gap-1 text-xs hover:text-foreground transition-colors">
-                  {t.allBookmarks}
-                  <ArrowLeft className="h-3 w-3" />
-                </Link>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentBookmarks.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                {t.bookmarksHint}
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {recentBookmarks.map((b, i) => (
-                  <li key={b.id}>
-                    <Link href={`/quiz`} className="block rounded-md px-2 py-1.5 text-xs hover:bg-muted transition-colors">
-                      <p className="font-medium line-clamp-2">{bookmarkTranslations[i].stem}</p>
-                      <p className="text-muted-foreground mt-0.5">
-                        {dict.common.chapter} {b.question.chapter.number} — {bookmarkTranslations[i].chapterTitle}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Accuracy trend */}
-      {trendData.length >= 2 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t.rollingAccuracy}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AccuracyTrend data={trendData} />
-            <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-4 border-t border-dashed border-success/60" />
-                {t.target70}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-4 border-t border-dashed border-warning/60" />
-                50%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {children}
 
       {/* Per-chapter table */}
       <div className="space-y-3">

@@ -4,31 +4,16 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { getQuizProgressMany } from "@/lib/quiz-progress";
-import { usefulnessTone, TONE_DOT_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/lib/usefulness";
-import { getLocale, getContentLocale } from "@/lib/locale";
+import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
-import { getTranslatedFields } from "@/lib/translate";
 import { StatsSection } from "./StatsSection";
 import { QuizzesClient, type QuizRow } from "@/app/quizzes/QuizzesClient";
 import {
   PlusCircle,
-  Clock,
   ListChecks,
-  Layers,
-  Play,
   Bug,
 } from "lucide-react";
-
-function relativeDate(date: Date, locale: "he" | "en", t: { today: string; yesterday: string }): string {
-  const diffDays = Math.floor(
-    (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  if (diffDays === 0) return t.today;
-  if (diffDays === 1) return t.yesterday;
-  return date.toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
-}
 
 function residencyLabel(year: number | null, t: { yearLabels: Record<number, string>; yearLabel: (n: number) => string }): string {
   if (!year) return "";
@@ -37,10 +22,10 @@ function residencyLabel(year: number | null, t: { yearLabels: Record<number, str
 
 export default async function StudyPage() {
   const me = await requireCompletedProfile();
-  const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
+  const locale = await getLocale();
   const t = getDictionary(locale).study;
 
-  const [allQuizzes, dbUser, topChapters] = await Promise.all([
+  const [allQuizzes, dbUser] = await Promise.all([
     db.quiz.findMany({
       where: { userId: me.id },
       orderBy: { createdAt: "desc" },
@@ -49,30 +34,9 @@ export default async function StudyPage() {
       where: { id: me.id },
       select: { residencyYear: true },
     }),
-    db.chapter.findMany({
-      orderBy: [
-        { learningUsefulnessIndex: { sort: "asc", nulls: "last" } },
-        { number: "asc" },
-      ],
-      take: 5,
-      include: {
-        _count: { select: { questions: { where: { geminiAnswer: { isNot: null } } } } },
-      },
-    }),
   ]);
 
   const progressMap = await getQuizProgressMany(allQuizzes);
-
-  const topChapterTitles = await Promise.all(
-    topChapters.map((c) =>
-      getTranslatedFields("Chapter", String(c.id), { title: c.title }, contentLocale),
-    ),
-  );
-
-  const inProgress = allQuizzes.filter((q) => {
-    const p = progressMap.get(q.id);
-    return p && !p.isComplete && p.answered > 0;
-  });
 
   const quizRows: QuizRow[] = allQuizzes.map((q) => {
     const p = progressMap.get(q.id)!;
@@ -108,115 +72,32 @@ export default async function StudyPage() {
         )}
       </div>
 
-      {/* In-progress quizzes */}
-      {inProgress.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-            <Play className="h-4 w-4 text-primary" />
-            {t.continueQuiz}
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {inProgress.map((q) => {
-              const p = progressMap.get(q.id)!;
-              return (
-                <Link key={q.id} href={`/quiz/${q.id}`}>
-                  <Card className="group transition-all hover:shadow-md hover:-translate-y-0.5">
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-sm group-hover:text-primary transition-colors line-clamp-1">
-                          {q.name}
-                        </p>
-                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {p.answered}/{p.total}
-                        </span>
-                      </div>
-                      <Progress value={(p.answered / p.total) * 100} className="h-1.5" />
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {p.lastActivityAt ? relativeDate(p.lastActivityAt, locale, t) : ""}
-                        </span>
-                        <span className="text-primary font-medium">{t.continue}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Start new quiz */}
-      <section className="space-y-4">
-        <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-          <PlusCircle className="h-4 w-4 text-primary" />
-          {t.newQuiz}
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-5">
-          <Link href="/study/new" className="sm:col-span-2">
-            <Card className="group h-full transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5 bg-primary/5">
-              <CardContent className="flex flex-col items-center justify-center gap-3 p-8 text-center h-full">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <Layers className="h-7 w-7 text-primary" />
-                </div>
-                <div>
-                  <p className="font-display font-bold text-base">{t.buildCustom}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{t.buildCustomHint}</p>
-                </div>
-                <Button size="sm" className="mt-1 gap-1.5">
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  {t.start}
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
-          <div className="sm:col-span-3 grid gap-2">
-            {topChapters.map((c, i) => {
-              const tone = usefulnessTone(c.learningUsefulnessIndex);
-              return (
-                <Link key={c.id} href={`/study/new?chapter=${c.number}`}>
-                  <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm transition-all hover:shadow-sm hover:border-primary/30 hover:-translate-y-0.5">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT_CLASS[tone]}`} />
-                    <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">{c.number}</span>
-                    <span className="flex-1 font-medium line-clamp-1">{topChapterTitles[i].title}</span>
-                    <Badge variant="secondary" className="shrink-0 text-xs">{c._count.questions}</Badge>
-                    <Badge className={`shrink-0 text-xs ${TONE_BADGE_CLASS[tone]}`}>{toneLabel(tone, locale)}</Badge>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Stats */}
+      {/* Stats + My quizzes */}
       <section>
-        <StatsSection userId={me.id} locale={locale} />
-      </section>
-
-      {/* My quizzes (tabbed) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-primary" />
-              {tQuizzes.title}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {quizRows.length === 0 ? tQuizzes.empty : tQuizzes.countSuffix(quizRows.length)}
-            </p>
+        <StatsSection userId={me.id} locale={locale}>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-primary" />
+                  {tQuizzes.title}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {quizRows.length === 0 ? tQuizzes.empty : tQuizzes.countSuffix(quizRows.length)}
+                </p>
+              </div>
+              <Button asChild size="sm" className="gap-1.5">
+                <Link href="/study/new">
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  {tQuizzes.newQuiz}
+                </Link>
+              </Button>
+            </div>
+            {quizRows.length > 0 && (
+              <QuizzesClient quizzes={quizRows} locale={locale} />
+            )}
           </div>
-          <Button asChild size="sm" className="gap-1.5">
-            <Link href="/study/new">
-              <PlusCircle className="h-3.5 w-3.5" />
-              {tQuizzes.newQuiz}
-            </Link>
-          </Button>
-        </div>
-        {quizRows.length > 0 && (
-          <QuizzesClient quizzes={quizRows} locale={locale} />
-        )}
+        </StatsSection>
       </section>
 
       {/* Report an issue */}
