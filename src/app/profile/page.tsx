@@ -13,6 +13,7 @@ import { UserCircle } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { LanguageSettingsCard } from "@/components/LanguageSettingsCard";
+import { LocalPdfSettingsCard } from "@/components/LocalPdfSettingsCard";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -111,6 +112,22 @@ export default async function ProfilePage() {
           langHebrew: t.langHebrew,
           langEnglish: t.langEnglish,
           adminOnlyNotice: t.adminOnlyNotice,
+        }}
+      />
+
+      <LocalPdfSettingsCard
+        t={{
+          title: t.localPdfTitle,
+          description: t.localPdfDesc,
+          noneSet: t.localPdfNoneSet,
+          currentLabel: t.localPdfCurrent,
+          choose: t.localPdfChoose,
+          replace: t.localPdfReplace,
+          clear: t.localPdfClear,
+          fallbackNotice: t.localPdfFallbackNotice,
+          errorPick: t.localPdfErrorPick,
+          offsetLabel: t.localPdfOffsetLabel,
+          offsetHelp: t.localPdfOffsetHelp,
         }}
       />
     </div>

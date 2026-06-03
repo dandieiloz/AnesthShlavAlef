@@ -1,5 +1,6 @@
 import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
+import { CitationPageLink } from "@/components/CitationPageLink";
 import { Lightbulb, BookMarked, XCircle, AlertTriangle } from "lucide-react";
 
 const HEBREW_LETTERS: Record<string, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
@@ -51,6 +52,9 @@ const UI = {
     chapter: "פרק",
     page: "עמ׳",
     pages: "עמ׳׳",
+    citationNotConfigured: "לא הוגדר PDF",
+    citationPermissionDenied: "גישה נדחתה",
+    citationNotFound: "הקובץ לא נמצא",
   },
   en: {
     insufficient: "The textbook evidence is insufficient for a definitive proof. The explanation is based on general guidelines.",
@@ -60,6 +64,9 @@ const UI = {
     chapter: "Chapter",
     page: "p.",
     pages: "pp.",
+    citationNotConfigured: "No PDF set",
+    citationPermissionDenied: "Access denied",
+    citationNotFound: "File not found",
   },
 };
 
@@ -227,9 +234,16 @@ export function AnswerExplanation({
                       {e.pageStart != null && (
                         <span className="text-muted-foreground/60 [unicode-bidi:isolate]">
                           {" · "}
-                          {e.pageEnd != null && e.pageEnd !== e.pageStart
-                            ? `${ui.pages} ${e.pageStart}–${e.pageEnd}`
-                            : `${ui.page} ${e.pageStart}`}
+                          <CitationPageLink
+                            page={e.pageStart}
+                            notConfiguredLabel={ui.citationNotConfigured}
+                            permissionDeniedLabel={ui.citationPermissionDenied}
+                            notFoundLabel={ui.citationNotFound}
+                          >
+                            {e.pageEnd != null && e.pageEnd !== e.pageStart
+                              ? `${ui.pages} ${e.pageStart}–${e.pageEnd}`
+                              : `${ui.page} ${e.pageStart}`}
+                          </CitationPageLink>
                         </span>
                       )}
                     </p>
