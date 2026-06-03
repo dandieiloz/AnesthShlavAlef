@@ -225,24 +225,61 @@ function isTwoColumnPage(items: PdfItem[], midX: number): boolean {
 }
 
 /**
- * Detect the printed page number from running header/footer items. Most
- * textbooks place a 1–4 digit number alone (or together with the chapter
- * number/title) in the top or bottom band. We collect every candidate that
- * matches `^\d{1,4}$` inside those bands and return the largest — chapter
- * numbers are typically much smaller than printed page numbers.
+ * Collect every plausible printed-page-number candidate from a single PDF
+ * page's running header/footer band. We don't pick a single value here —
+ * after all pages are scanned, `pickChapterOffset` deduces the chapter-wide
+ * offset (printed = pdf + offset) by majority vote, which is robust to
+ * decoy numbers like figure refs ("FIGURE 10-396") or footnote superscripts.
  */
-function detectPrintedPage(items: PdfItem[], pageHeight: number): number | null {
-  const candidates: number[] = [];
+function collectPrintedPageCandidates(items: PdfItem[], pageHeight: number): number[] {
+  const out: number[] = [];
   for (const it of items) {
     const inTopBand = it.y >= pageHeight - HEADER_FOOTER_BAND;
     const inBottomBand = it.y <= HEADER_FOOTER_BAND;
     if (!inTopBand && !inBottomBand) continue;
     const trimmed = it.str.trim();
     if (!/^\d{1,4}$/.test(trimmed)) continue;
-    candidates.push(Number(trimmed));
+    const n = Number(trimmed);
+    if (n <= 0 || n > 9999) continue;
+    out.push(n);
   }
-  if (candidates.length === 0) return null;
-  return Math.max(...candidates);
+  return out;
+}
+
+/**
+ * Given per-PDF-page candidate sets, deduce the offset such that
+ * `printedPage = pdfPage + offset` agrees with the most pages. Returns null
+ * when no offset wins on enough pages — callers should then fall back to
+ * the raw PDF page index.
+ */
+function pickChapterOffset(
+  candidatesByPdfPage: Map<number, number[]>,
+  totalPages: number,
+): number | null {
+  const votes = new Map<number, number>();
+  for (const [pdfPage, cands] of candidatesByPdfPage) {
+    const seen = new Set<number>();
+    for (const v of cands) {
+      const offset = v - pdfPage;
+      if (offset < 0) continue; // textbook page never precedes pdf page within a chapter PDF
+      if (seen.has(offset)) continue;
+      seen.add(offset);
+      votes.set(offset, (votes.get(offset) ?? 0) + 1);
+    }
+  }
+  let bestOffset: number | null = null;
+  let bestVotes = 0;
+  for (const [o, v] of votes) {
+    if (v > bestVotes) {
+      bestVotes = v;
+      bestOffset = o;
+    }
+  }
+  // Need consistent agreement across the chapter: at least 3 pages and at
+  // least ~30% of pages with detected candidates voting the same offset.
+  const minVotes = Math.max(3, Math.ceil(totalPages * 0.3));
+  if (bestVotes < minVotes) return null;
+  return bestOffset;
 }
 
 // ---------- sentence-aligned chunking ----------
@@ -275,6 +312,9 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
 
   // Pass 1: per-page → ordered lines.
   const rawItems: RawItem[] = [];
+  // Track the (pdfPage, candidate-set) pairs to deduce a single chapter-wide
+  // printed-page offset after all pages are processed.
+  const printedPageCandidates = new Map<number, number[]>();
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({ scale: 1 });
@@ -301,7 +341,8 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
       continue;
     }
 
-    const printedPage = detectPrintedPage(items, pageHeight);
+    const pageCands = collectPrintedPageCandidates(items, pageHeight);
+    if (pageCands.length > 0) printedPageCandidates.set(pageNum, pageCands);
 
     // Body font for this page
     const sizeWeights = new Map<number, number>();
@@ -421,13 +462,21 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
         text: ln.text,
         fontSize: Math.round(ln.size * 10) / 10,
         page: pageNum,
-        printedPage,
+        printedPage: null, // assigned after the loop using chapter-wide offset
       });
     }
     page.cleanup();
   }
 
   if (rawItems.length === 0) return [];
+
+  // Deduce the chapter-wide printed-page offset and apply it.
+  const chapterOffset = pickChapterOffset(printedPageCandidates, pdf.numPages);
+  if (chapterOffset !== null) {
+    for (const r of rawItems) {
+      r.printedPage = r.page + chapterOffset;
+    }
+  }
 
   // Body font across the document.
   const weights = new Map<number, number>();
@@ -454,6 +503,21 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
   const blocks: Block[] = rawItems.map((r) => {
     let level = sizeToLevel.get(r.fontSize);
     let isHeading = level !== undefined;
+    // Guard against body sentences that happen to match a heading font size
+    // (drop caps, pull quotes, oversized inline math, etc.). Real headings
+    // are short, start with a capital/digit, and don't contain mid-sentence
+    // punctuation followed by more words.
+    if (isHeading) {
+      const t = r.text.trim();
+      const tooLong = t.length > 80;
+      const startsLower = /^[a-z]/.test(t);
+      const midSentence = /[.?!]\s+\S/.test(t);
+      const endsMidSentence = /[,;:]$/.test(t);
+      if (tooLong || startsLower || midSentence || endsMidSentence) {
+        isHeading = false;
+        level = undefined;
+      }
+    }
     if (!isHeading && /^KEY\s+POINTS\b/i.test(r.text) && r.text.length < 30) {
       isHeading = true;
       level = keyPointsLevel;
@@ -477,6 +541,10 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
   let bufPageEnd = 0;
   let bufHeadingLevel: number | null = null;
   let inReferences = false;
+  // Tracks the level of the most recently set heading so a wrapped title
+  // (two consecutive heading lines at the same font size) is merged into
+  // the previous stack slot instead of overwriting it.
+  let lastHeadingLevel: number | null = null;
 
   const currentSectionPath = (): string | null => {
     const parts = sectionStack.filter((s): s is string => !!s);
@@ -553,18 +621,46 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
         inReferences = true;
         sectionStack[b.headingLevel - 1] = b.text;
         for (let i = b.headingLevel; i < MAX_HEADING_LEVELS; i++) sectionStack[i] = undefined;
+        lastHeadingLevel = b.headingLevel;
         continue;
       }
       // A new H1 (chapter restart) re-enables emission.
       if (b.headingLevel === 1) inReferences = false;
 
-      sectionStack[b.headingLevel - 1] = b.text;
-      for (let i = b.headingLevel; i < MAX_HEADING_LEVELS; i++) sectionStack[i] = undefined;
+      // Wrapped heading: same level back-to-back with no body in between
+      // means the title spilled to a second line. Merge instead of replacing.
+      if (
+        lastHeadingLevel === b.headingLevel &&
+        sectionStack[b.headingLevel - 1] &&
+        bodyLines.length <= 1
+      ) {
+        const prev = sectionStack[b.headingLevel - 1] as string;
+        const merged =
+          /[a-z]-$/.test(prev) ? prev.slice(0, -1) + b.text : `${prev} ${b.text}`.replace(/\s+/g, " ");
+        sectionStack[b.headingLevel - 1] = merged;
+        // Replace the just-pushed prev heading line in bodyLines with the merged form.
+        if (bodyLines.length === 1 && bodyLines[0] === prev) {
+          bodyLines[0] = merged;
+          bufLen = merged.length;
+        }
+      } else {
+        sectionStack[b.headingLevel - 1] = b.text;
+        for (let i = b.headingLevel; i < MAX_HEADING_LEVELS; i++) sectionStack[i] = undefined;
+      }
+      lastHeadingLevel = b.headingLevel;
 
       bufHeadingLevel = b.headingLevel;
       if (!inReferences) {
-        bodyLines.push(b.text);
-        bufLen += b.text.length;
+        // For a merged wrap, the prev line was already adjusted above; just
+        // update page bounds. Otherwise push the new heading line.
+        const isMergeContinuation =
+          lastHeadingLevel === b.headingLevel &&
+          bodyLines.length === 1 &&
+          sectionStack[b.headingLevel - 1] === bodyLines[0];
+        if (!isMergeContinuation) {
+          bodyLines.push(b.text);
+          bufLen += b.text.length;
+        }
         const p = b.printedPage ?? b.page;
         if (bufPageStart === 0) bufPageStart = p;
         bufPageEnd = p;
@@ -574,6 +670,8 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
 
     if (inReferences) continue;
 
+    // Any non-heading block ends the consecutive-heading run.
+    lastHeadingLevel = null;
     {
       const p = b.printedPage ?? b.page;
       if (bufPageStart === 0) bufPageStart = p;
