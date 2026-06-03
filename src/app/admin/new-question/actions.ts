@@ -323,7 +323,9 @@ export async function createSingleQuestionAction(formData: FormData): Promise<Cr
   });
 
   return { ok: true, id: created.id };
-}(formData: FormData) {
+}
+
+export async function updateQuestionImageAction(formData: FormData) {
   await requireAdmin();
   const questionId = Number(formData.get("questionId"));
   if (!Number.isFinite(questionId)) throw new Error("Invalid questionId");
