@@ -253,7 +253,77 @@ export async function saveWizardQuestionAction(formData: FormData) {
   redirect(`/admin/questions/${created.id}`);
 }
 
-export async function updateQuestionImageAction(formData: FormData) {
+export type CreateSingleResult =
+  | { ok: true; id: number }
+  | { ok: false; error: string };
+
+/** Same as saveWizardQuestionAction but returns the new question id instead of redirecting. */
+export async function createSingleQuestionAction(formData: FormData): Promise<CreateSingleResult> {
+  const me = await requireAdmin();
+  const stem = String(formData.get("stem") ?? "").trim();
+  const optionA = String(formData.get("optionA") ?? "").trim();
+  const optionB = String(formData.get("optionB") ?? "").trim();
+  const optionC = String(formData.get("optionC") ?? "").trim();
+  const optionD = String(formData.get("optionD") ?? "").trim();
+  const rawCorrectAnswer = formData.get("correctAnswer");
+  const correctAnswer =
+    rawCorrectAnswer === "A" || rawCorrectAnswer === "B" || rawCorrectAnswer === "C" || rawCorrectAnswer === "D"
+      ? rawCorrectAnswer
+      : null;
+
+  if (!stem || !optionA || !optionB || !optionC || !optionD) {
+    return { ok: false, error: "כל השדות חובה" };
+  }
+
+  const sourceInstitution = String(formData.get("sourceInstitution") ?? "").trim();
+  const sourceYear = String(formData.get("sourceYear") ?? "").trim();
+  const sourceSuffix = String(formData.get("sourceSuffix") ?? "").trim();
+  const source = sourceInstitution && sourceYear
+    ? sourceSuffix ? `${sourceInstitution} ${sourceYear} ${sourceSuffix}` : `${sourceInstitution} ${sourceYear}`
+    : null;
+
+  const imageAlt = String(formData.get("imageAlt") ?? "").trim() || null;
+  const imageFile = formData.get("image");
+  let imageUrl: string | null = null;
+  let imagePath: string | null = null;
+  if (imageFile instanceof File && imageFile.size > 0) {
+    try {
+      const uploaded = await uploadQuestionImage(imageFile);
+      imageUrl = uploaded.url;
+      imagePath = uploaded.path;
+    } catch (e) {
+      if (e instanceof ImageValidationError) return { ok: false, error: `העלאת התמונה נכשלה: ${e instanceof Error ? e.message : String(e)}` };
+      return { ok: false, error: `העלאת התמונה נכשלה: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
+  const videoUrlRaw = String(formData.get("videoUrl") ?? "").trim();
+  let videoUrl: string | null = null;
+  try {
+    videoUrl = videoUrlRaw ? validateVideoUrl(videoUrlRaw) : null;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
+  const chapter = await db.chapter.findFirst({ orderBy: { number: "asc" } });
+  if (!chapter) return { ok: false, error: "No chapters in DB" };
+
+  const created = await db.question.create({
+    data: {
+      chapterId: chapter.id,
+      chapterIds: [chapter.id],
+      stem, optionA, optionB, optionC, optionD,
+      correctAnswer, source,
+      imageUrl, imagePath, imageAlt, videoUrl,
+      createdById: me.id,
+    },
+  });
+
+  await db.answerGenerationJob.create({
+    data: { questionId: created.id, kind: "INITIAL", createdById: me.id },
+  });
+
+  return { ok: true, id: created.id };
+}(formData: FormData) {
   await requireAdmin();
   const questionId = Number(formData.get("questionId"));
   if (!Number.isFinite(questionId)) throw new Error("Invalid questionId");
