@@ -213,6 +213,18 @@ export function SingleQuestionForm() {
           </div>
         </div>
 
+        <div className="rounded border bg-muted/20 p-3 space-y-2">
+          <label className="block text-xs font-medium">קישור וידאו (אופציונלי)</label>
+          <input
+            name="videoUrl"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=... או https://vimeo.com/... או קובץ .mp4"
+            className="w-full rounded border p-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+            dir="ltr"
+          />
+          <p className="text-[11px] text-muted-foreground">YouTube, Vimeo, או קובץ mp4/webm. הסרטון יתנגן אוטומטית (מושתק) בעת צפייה בשאלה.</p>
+        </div>
+
         <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-sm text-white">
           שמור שאלה
         </button>

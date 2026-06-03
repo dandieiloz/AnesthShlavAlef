@@ -5,6 +5,33 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { uploadQuestionImage, deleteQuestionImage, ImageValidationError } from "@/lib/question-image";
 
+const ALLOWED_VIDEO_HOSTS = new Set([
+  "youtube.com",
+  "m.youtube.com",
+  "youtu.be",
+  "youtube-nocookie.com",
+  "vimeo.com",
+  "player.vimeo.com",
+]);
+
+function validateVideoUrl(raw: string): string {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new Error("כתובת וידאו לא חוקית");
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") {
+    throw new Error("כתובת וידאו חייבת להתחיל ב-http(s)");
+  }
+  const host = u.hostname.replace(/^www\./, "");
+  const isDirect = /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(u.pathname);
+  if (!ALLOWED_VIDEO_HOSTS.has(host) && !isDirect) {
+    throw new Error("רק קישורי YouTube, Vimeo או קובצי וידאו (mp4/webm) נתמכים");
+  }
+  return u.toString();
+}
+
 export type WizardParseResult =
   | { ok: true; parsed: ParsedQuestion }
   | { ok: false; error: string };
@@ -269,6 +296,23 @@ export async function updateQuestionImageAction(formData: FormData) {
       data: { imageAlt },
     });
   }
+  redirect(`/admin/questions/${questionId}`);
+}
+
+export async function updateQuestionVideoAction(formData: FormData) {
+  await requireAdmin();
+  const questionId = Number(formData.get("questionId"));
+  if (!Number.isFinite(questionId)) throw new Error("Invalid questionId");
+  const intent = String(formData.get("intent") ?? "save"); // "save" | "remove"
+
+  if (intent === "remove") {
+    await db.question.update({ where: { id: questionId }, data: { videoUrl: null } });
+    redirect(`/admin/questions/${questionId}`);
+  }
+
+  const raw = String(formData.get("videoUrl") ?? "").trim();
+  const videoUrl = raw ? validateVideoUrl(raw) : null;
+  await db.question.update({ where: { id: questionId }, data: { videoUrl } });
   redirect(`/admin/questions/${questionId}`);
 }
 
