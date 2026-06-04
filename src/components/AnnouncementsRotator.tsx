@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Megaphone, ArrowLeft } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Megaphone, ArrowLeft, X } from "lucide-react";
 
 export type AnnouncementItem = {
   id: string;
@@ -26,6 +26,24 @@ export function AnnouncementsRotator({
   const [visible, setVisible] = useState(true);
   const [paused, setPaused] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  const dismissKey = useMemo(
+    () => `announcements-dismissed:${items.map((i) => i.id).join(",")}`,
+    [items],
+  );
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && window.localStorage.getItem(dismissKey) === "1") {
+        setDismissed(true);
+      } else {
+        setDismissed(false);
+      }
+    } catch {
+      // ignore
+    }
+  }, [dismissKey]);
 
   useEffect(() => {
     if (items.length <= 1 || paused) return;
@@ -41,6 +59,7 @@ export function AnnouncementsRotator({
   }, [items.length, paused]);
 
   if (items.length === 0) return null;
+  if (dismissed) return null;
   const current = items[Math.min(index, items.length - 1)];
   const tutorialSrc = "https://www.youtube-nocookie.com/embed/padZfSZ10xM?autoplay=1&playsinline=1&rel=0&modestbranding=1&controls=0&showinfo=0&iv_load_policy=3&disablekb=1&fs=0";
 
@@ -50,6 +69,25 @@ export function AnnouncementsRotator({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
+      <button
+        type="button"
+        aria-label="סגור הודעות"
+        onClick={() => {
+          try {
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem(dismissKey, "1");
+            }
+          } catch {
+            // ignore
+          }
+          setDismissed(true);
+        }}
+        className={`absolute top-1.5 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground/60 hover:bg-primary/20 hover:text-foreground ${
+          isRtl ? "left-2" : "right-2"
+        }`}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-2 text-sm sm:justify-between">
         <div
           className="flex items-center gap-2 min-w-0 transition-opacity"

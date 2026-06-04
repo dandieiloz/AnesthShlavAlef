@@ -15,6 +15,7 @@ import {
   enqueueInitialJobAction,
   enqueueRegenerationAction,
 } from "@/app/admin/queue/actions";
+import { deleteCommentAction, postCommentAction } from "@/app/(user)/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
 import { DisableQuestionButton } from "./DisableQuestionButton";
 import { ApproveQuestionButton } from "./ApproveQuestionButton";
@@ -62,6 +63,12 @@ export default async function AdminQuestionPage({
   const adminNotes = await db.questionAdminNote.findMany({
     where: { questionId: q.id },
     include: { author: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const comments = await db.comment.findMany({
+    where: { questionId: q.id },
+    include: { user: { select: { name: true, email: true, hospitalName: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -458,6 +465,49 @@ export default async function AdminQuestionPage({
             </form>
           )}
         </details>
+      </section>
+
+      <section className="mt-8 rounded border bg-card p-4">
+        <h2 className="text-base font-semibold">תגובות קהילה ({comments.length})</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          תגובות שמשתמשים פרסמו על השאלה במסך הסבר התשובה.
+        </p>
+        <form action={postCommentAction} className="mt-3 space-y-2">
+          <input type="hidden" name="questionId" value={q.id} />
+          <textarea
+            name="body"
+            required
+            rows={3}
+            maxLength={2000}
+            placeholder="כתוב תגובה כמנהל..."
+            className="w-full rounded border p-2 text-sm bg-background text-foreground"
+            dir="rtl"
+          />
+          <button className="rounded bg-slate-900 px-3 py-1 text-xs text-white">פרסם תגובה</button>
+        </form>
+        <ul className="mt-4 space-y-2">
+          {comments.length === 0 && (
+            <li className="text-xs text-muted-foreground">אין תגובות.</li>
+          )}
+          {comments.map((c) => (
+            <li key={c.id} className="rounded border bg-background/60 p-2">
+              <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                <span>
+                  {c.user?.name ?? c.user?.email ?? "לא ידוע"}
+                  {c.user?.hospitalName ? ` · ${c.user.hospitalName}` : ""}
+                  {" · "}
+                  {c.createdAt.toLocaleString("he-IL")}
+                  {c.editedAt ? " · נערך" : ""}
+                </span>
+                <form action={deleteCommentAction}>
+                  <input type="hidden" name="commentId" value={c.id} />
+                  <button className="text-red-700 hover:underline">מחק</button>
+                </form>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm" dir="rtl">{c.body}</p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="mt-8 rounded border bg-card p-4">
