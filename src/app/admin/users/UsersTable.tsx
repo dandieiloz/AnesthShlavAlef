@@ -3,7 +3,8 @@ import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { setUserRoleAction, setUserPlanAction, deleteUserAction } from "./actions";
-import { formatRelativeTime, useRelativeNow } from "@/lib/format-time";
+import { formatRelativeTime } from "@/lib/format-time";
+import { useRelativeNow } from "@/lib/use-relative-now";
 
 export type UserRow = {
   id: string;

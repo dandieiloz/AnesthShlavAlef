@@ -19,7 +19,8 @@ import { deleteQuizAction } from "@/app/(user)/actions";
 import { CheckCircle2, Clock, Trash2, Play, BookOpen } from "lucide-react";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
-import { formatRelativeDay, useRelativeNow } from "@/lib/format-time";
+import { formatRelativeDay } from "@/lib/format-time";
+import { useRelativeNow } from "@/lib/use-relative-now";
 
 export interface QuizRow {
   id: number;
