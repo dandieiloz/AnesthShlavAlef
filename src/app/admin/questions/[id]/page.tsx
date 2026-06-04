@@ -49,6 +49,12 @@ export default async function AdminQuestionPage({
     select: { id: true, status: true, kind: true },
   });
 
+  // Pending regeneration candidate awaiting admin review
+  const pendingCandidate = await db.geminiAnswerCandidate.findUnique({
+    where: { questionId: q.id },
+    select: { generatedAt: true, correctAnswer: true, confidence: true },
+  });
+
   // Load metadata for chapters this question is tagged with (so we can display titles)
   const taggedChapters = await db.chapter.findMany({
     where: { id: { in: q.chapterIds.length > 0 ? q.chapterIds : [q.chapterId] } },
@@ -368,7 +374,7 @@ export default async function AdminQuestionPage({
               }}
               className="mt-2 space-y-2"
             >
-              {!openJob && (
+              {!openJob && !pendingCandidate && (
                 <details className="rounded border bg-muted/30 px-3 py-2 text-sm">
                   <summary className="cursor-pointer text-primary hover:underline">
                     הוסף הערה / רמז למודל (אופציונלי)
@@ -387,10 +393,37 @@ export default async function AdminQuestionPage({
                   />
                 </details>
               )}
-              <button className="rounded border px-3 py-1 text-sm hover:bg-muted">
-                {openJob ? "✓ ממתין בתור" : "חולל מחדש (+ לתור)"}
+              <button
+                disabled={!!pendingCandidate}
+                className="rounded border px-3 py-1 text-sm hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {pendingCandidate
+                  ? "מועמד ממתין לאישור"
+                  : openJob
+                  ? "✓ ממתין בתור"
+                  : "חולל מחדש (+ לתור)"}
               </button>
             </form>
+            {pendingCandidate && (
+              <div className="mt-3 rounded border-2 border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/30">
+                <div className="font-semibold text-amber-900 dark:text-amber-200">
+                  חילול חדש ממתין לאישור
+                </div>
+                <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                  נוצר {new Date(pendingCandidate.generatedAt).toLocaleString("he-IL")} · תשובה
+                  מוצעת: {pendingCandidate.correctAnswer}
+                  {pendingCandidate.confidence !== null
+                    ? ` (${Math.round(pendingCandidate.confidence * 100)}%)`
+                    : ""}
+                </p>
+                <Link
+                  href={`/admin/candidates#q-${q.id}`}
+                  className="mt-2 inline-block rounded bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                >
+                  השווה ובחר
+                </Link>
+              </div>
+            )}
           </>
         ) : (
           <form action={async () => { "use server"; await enqueueInitialJobAction(q.id); }} className="mt-2">

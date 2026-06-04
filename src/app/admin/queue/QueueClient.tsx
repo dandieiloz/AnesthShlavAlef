@@ -217,7 +217,9 @@ export function QueueClient({
     jobTimingsRef.current = [];
 
     const queue = runnable.map((r) => r.id);
+    const queueKinds = new Map(runnable.map((r) => [r.id, r.kind]));
     let doneCount = 0;
+    let regenDone = 0;
     let failCount = 0;
 
     for (let i = 0; i < queue.length; i++) {
@@ -235,6 +237,7 @@ export function QueueClient({
 
       if (result.ok) {
         doneCount++;
+        if (queueKinds.get(jobId) === "REGENERATE") regenDone++;
         jobTimingsRef.current.push(elapsed);
         updateRow(jobId, { status: "DONE", finishedAt: new Date().toISOString() });
       } else if (result.status === "FAILED") {
@@ -255,8 +258,10 @@ export function QueueClient({
     setRunning(false);
     setProgress(null);
     if (!stopRef.current) {
+      const regenSuffix =
+        regenDone > 0 ? ` · ${regenDone} מועמדי חילול ממתינים לאישור ב/admin/candidates` : "";
       setStatusMsg(
-        `סיים: ${doneCount} הושלמו${failCount > 0 ? `, ${failCount} נכשלו` : ""}`
+        `סיים: ${doneCount} הושלמו${failCount > 0 ? `, ${failCount} נכשלו` : ""}${regenSuffix}`
       );
     }
     // Refresh server data so stats bar / filter counts update

@@ -173,6 +173,7 @@ model Question {
   chapter       Chapter       @relation(fields: [chapterId], references: [id])
   createdBy     User?         @relation("QuestionAuthor", fields: [createdById], references: [id])
   geminiAnswer  GeminiAnswer?
+  geminiAnswerCandidate GeminiAnswerCandidate?
   attempts      Attempt[]
   comments        Comment[]
   reports         AnswerReport[]
@@ -220,6 +221,34 @@ model GeminiAnswer {
   generatedAt        DateTime @default(now())
 
   question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+/// Staged regeneration result. When an admin runs a REGENERATE job we write
+/// the new payload here instead of overwriting `GeminiAnswer`. Admins compare
+/// it against the live answer in /admin/candidates and either accept (which
+/// replaces the live answer) or discard.
+model GeminiAnswerCandidate {
+  id                   Int      @id @default(autoincrement())
+  questionId           Int      @unique
+  jobId                Int?     @unique
+  rawMarkdown          String   @db.Text
+  correctAnswer        Choice
+  evidence             String   @db.Text
+  explanation          String   @db.Text
+  whyOthersWrong       String   @db.Text
+  model                String
+  sourceChapters       Int[]    @default([])
+  evidenceCitations    Json?
+  confidence           Float?
+  escalated            Boolean  @default(false)
+  insufficientEvidence Boolean  @default(false)
+  // Proposed chapter retag (only applied to Question on accept, and only if chapterAutoTagged).
+  derivedChapterIds    Int[]    @default([])
+  primaryChapterId     Int?
+  generatedAt          DateTime @default(now())
+
+  question Question             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  job      AnswerGenerationJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
 }
 
 /// Cache of RAG results keyed by a hash of the normalized stem+options.
@@ -475,6 +504,7 @@ model AnswerGenerationJob {
 
   question    Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
   createdBy   User?      @relation("JobCreator", fields: [createdById], references: [id])
+  candidate   GeminiAnswerCandidate?
 
   @@index([status, queuedAt])
   @@index([questionId])

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const ADMIN_TABS = [
   { href: "/admin", label: "ניהול פרקים" },
   { href: "/admin/queue", label: "מרכז התור" },
+  { href: "/admin/candidates", label: "מועמדי חילול" },
   { href: "/admin/questions", label: "שאלות" },
   { href: "/admin/reports", label: "דיווחים" },
   { href: "/admin/debug-reports", label: "דיווחי באג" },

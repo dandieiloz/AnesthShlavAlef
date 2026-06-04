@@ -220,16 +220,20 @@ async function runGenerationPass(
 
 export async function generateExplanationForQuestionV2(
   questionId: number,
-  opts?: { hint?: string | null },
+  opts?: { hint?: string | null; mode?: "answer" | "candidate"; jobId?: number },
 ) {
   const startedAt = Date.now();
   const hint = opts?.hint?.trim() || undefined;
+  const mode = opts?.mode ?? "answer";
+  const jobId = opts?.jobId;
   const question = await db.question.findUnique({
     where: { id: questionId },
     include: { chapter: true, geminiAnswer: true },
   });
   if (!question) throw new Error("Question not found");
-  if (question.geminiAnswer) return question.geminiAnswer;
+  // For initial-mode runs, bail if an answer already exists (idempotency).
+  // Candidate-mode runs always produce fresh output — the live answer stays.
+  if (mode === "answer" && question.geminiAnswer) return question.geminiAnswer;
 
   // 1) Cache lookup ---------------------------------------------------------
   const hash = hashQuestion({
@@ -239,10 +243,12 @@ export async function generateExplanationForQuestionV2(
     optionC: question.optionC,
     optionD: question.optionD,
   });
-  // Skip cache entirely when an admin hint is in play — the hint changes the
-  // expected output, and we don't want the hint-specific result to become the
-  // default cached answer for this question fingerprint.
-  const cached = hint ? null : await db.questionQueryCache.findUnique({ where: { questionHash: hash } });
+  // Skip cache when an admin hint is in play (hint changes expected output)
+  // and when running in candidate mode (admin wants a fresh attempt).
+  const cached =
+    hint || mode === "candidate"
+      ? null
+      : await db.questionQueryCache.findUnique({ where: { questionHash: hash } });
   if (cached) {
     const payload = cached.payload as unknown as CachedAnswerPayload;
     await db.questionQueryCache.update({
@@ -253,6 +259,8 @@ export async function generateExplanationForQuestionV2(
       questionId,
       payload,
       autoTagged: question.chapterAutoTagged,
+      target: mode,
+      jobId,
     });
     await db.ragRun.create({
       data: {
@@ -346,12 +354,20 @@ export async function generateExplanationForQuestionV2(
     primaryChapterId,
   };
 
-  const answer = await persistAnswer({ questionId, payload, autoTagged: question.chapterAutoTagged, escalated });
+  const answer = await persistAnswer({
+    questionId,
+    payload,
+    autoTagged: question.chapterAutoTagged,
+    escalated,
+    target: mode,
+    jobId,
+  });
 
   // Best-effort cache write (a race here just keeps the earlier entry).
-  // Skip when a hint was supplied so hint-specific output never becomes the
-  // default cached answer.
-  if (!hint) {
+  // Skip when a hint was supplied (hint-specific output) and when staging a
+  // candidate (the admin explicitly wants a fresh attempt; the cache should
+  // continue to mirror the live answer).
+  if (!hint && mode === "answer") {
     await db.questionQueryCache.upsert({
       where: { questionHash: hash },
       create: { questionHash: hash, payload: payload as unknown as Prisma.InputJsonValue },
@@ -375,18 +391,64 @@ export async function generateExplanationForQuestionV2(
   return answer;
 }
 
-/** Write the structured answer to GeminiAnswer + (optionally) update the question's chapter tags. */
+/**
+ * Write the structured answer either to `GeminiAnswer` (live, the default) or
+ * to `GeminiAnswerCandidate` (staged for admin review). Live writes also
+ * update the question's chapter tags when auto-tag is on; candidate writes
+ * defer the retag — the proposed chapter ids ride along on the candidate row
+ * and only apply when the admin accepts.
+ */
 async function persistAnswer(opts: {
   questionId: number;
   payload: CachedAnswerPayload;
   autoTagged: boolean;
   escalated?: boolean;
+  target?: "answer" | "candidate";
+  jobId?: number;
 }) {
   const { questionId, payload, autoTagged } = opts;
   const escalated = opts.escalated ?? false;
+  const target = opts.target ?? "answer";
   const { structured } = payload;
 
-  // Only update question's chapter tags if admin hasn't overridden the auto-tag.
+  const evidenceCitations: EvidenceCitation[] = structured.evidence;
+  const evidenceText = structured.evidence
+    .map((e) => {
+      const pages = formatPageRange(e.pageStart, e.pageEnd);
+      const pp = pages ? ` (${pages})` : "";
+      return `[פרק ${e.chapterNumber} — ${e.chapterTitle}${pp}] "${e.quote}"`;
+    })
+    .join("\n\n");
+  const whyOthersWrongText = Object.entries(structured.whyOthersWrong)
+    .filter(([k]) => k !== structured.correctAnswer)
+    .map(([k, v]) => `${k}. ${v}`)
+    .join("\n\n");
+
+  if (target === "candidate") {
+    // Replace any prior candidate so latest run wins (one-per-question).
+    await db.geminiAnswerCandidate.deleteMany({ where: { questionId } });
+    return db.geminiAnswerCandidate.create({
+      data: {
+        questionId,
+        jobId: opts.jobId ?? null,
+        rawMarkdown: payload.rawMarkdown,
+        correctAnswer: structured.correctAnswer,
+        evidence: evidenceText,
+        explanation: structured.explanation,
+        whyOthersWrong: whyOthersWrongText,
+        model: payload.model,
+        sourceChapters: payload.sourceChapters,
+        evidenceCitations: evidenceCitations as unknown as Prisma.InputJsonValue,
+        confidence: structured.confidence,
+        escalated,
+        insufficientEvidence: structured.insufficientEvidence,
+        derivedChapterIds: payload.derivedChapterIds,
+        primaryChapterId: payload.primaryChapterId,
+      },
+    });
+  }
+
+  // target === "answer": live write, applies chapter retag immediately.
   if (autoTagged && payload.derivedChapterIds.length > 0) {
     await db.question.update({
       where: { id: questionId },
@@ -397,24 +459,14 @@ async function persistAnswer(opts: {
     });
   }
 
-  const evidenceCitations: EvidenceCitation[] = structured.evidence;
   return db.geminiAnswer.create({
     data: {
       questionId,
       rawMarkdown: payload.rawMarkdown,
       correctAnswer: structured.correctAnswer,
-      evidence: structured.evidence
-        .map((e) => {
-          const pages = formatPageRange(e.pageStart, e.pageEnd);
-          const pp = pages ? ` (${pages})` : "";
-          return `[פרק ${e.chapterNumber} — ${e.chapterTitle}${pp}] "${e.quote}"`;
-        })
-        .join("\n\n"),
+      evidence: evidenceText,
       explanation: structured.explanation,
-      whyOthersWrong: Object.entries(structured.whyOthersWrong)
-        .filter(([k]) => k !== structured.correctAnswer)
-        .map(([k, v]) => `${k}. ${v}`)
-        .join("\n\n"),
+      whyOthersWrong: whyOthersWrongText,
       model: payload.model,
       sourceChapters: payload.sourceChapters,
       evidenceCitations: evidenceCitations as unknown as Prisma.InputJsonValue,

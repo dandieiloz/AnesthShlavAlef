@@ -12,7 +12,6 @@ import {
   type BatchCostEstimate,
 } from "@/lib/pricing";
 import { hashQuestion } from "@/lib/rag/hash";
-import { invalidateTranslations } from "@/lib/translate";
 
 // ─── Types returned to the client ───────────────────────────────────────────
 
@@ -42,33 +41,18 @@ export async function runJobAction(jobId: number): Promise<RunJobResult> {
   const job = await db.answerGenerationJob.findUnique({ where: { id: jobId } });
   if (!job) return { ok: false, jobId, status: "NOT_CLAIMABLE", error: "Job not found" };
 
-  // For REGENERATE jobs: delete the existing GeminiAnswer so generation runs fresh
+  // REGENERATE jobs stage their output as a GeminiAnswerCandidate; the live
+  // GeminiAnswer is preserved until an admin accepts the candidate from
+  // /admin/candidates. Wipe any prior candidate so the latest run wins.
   if (job.kind === "REGENERATE") {
-    // Invalidate translations of the old answer (their entityId becomes orphaned
-    // when a new GeminiAnswer row is inserted with a different autoincrement id).
-    const old = await db.geminiAnswer.findUnique({
-      where: { questionId: job.questionId },
-      select: { id: true },
-    });
-    if (old) {
-      await invalidateTranslations("GeminiAnswer", String(old.id));
-    }
-    await db.geminiAnswer.deleteMany({ where: { questionId: job.questionId } });
-
-    // Also drop the cached structured payload — otherwise generateExplanationForQuestion
-    // short-circuits on the cache hit and re-persists the stale (possibly corrupted) answer.
-    const q = await db.question.findUnique({
-      where: { id: job.questionId },
-      select: { stem: true, optionA: true, optionB: true, optionC: true, optionD: true },
-    });
-    if (q) {
-      await db.questionQueryCache.deleteMany({ where: { questionHash: hashQuestion(q) } });
-    }
+    await db.geminiAnswerCandidate.deleteMany({ where: { questionId: job.questionId } });
   }
 
   try {
     await generateExplanationForQuestion(job.questionId, {
       hint: job.kind === "REGENERATE" ? job.regenerationHint ?? undefined : undefined,
+      mode: job.kind === "REGENERATE" ? "candidate" : "answer",
+      jobId: job.id,
     });
     await db.answerGenerationJob.update({
       where: { id: jobId },

@@ -3,7 +3,9 @@
  * the LaTeX-corruption signature (TAB/BS/FF chars from JSON-escape collapse).
  *
  * Skips questions that already have an open PENDING/PROCESSING job.
- * Run the actual generation from /admin/queue.
+ * Run the actual generation from /admin/queue. Each completed REGENERATE job
+ * stages a candidate at /admin/candidates for admin review/accept; live
+ * answers remain unchanged until accepted.
  */
 import { PrismaClient } from "@prisma/client";
 
