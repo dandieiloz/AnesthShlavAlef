@@ -27,7 +27,7 @@ export type QuestionPayload = {
     insufficientEvidence: boolean;
   };
   bookmarked: boolean;
-  hasPendingReport: boolean;
+  latestReport: { status: "OPEN" | "RESOLVED" | "REJECTED"; adminResponse: string | null } | null;
   highlights: HighlightRecord[];
 };
 
@@ -97,7 +97,7 @@ export async function loadQuizBatch(args: {
 
   const ids = batch.map((q) => q.id);
 
-  const [bookmarkRows, highlightRows, pendingReportRows] = await Promise.all([
+  const [bookmarkRows, highlightRows, userReportRows] = await Promise.all([
     db.bookmark.findMany({
       where: { userId: args.user.id, questionId: { in: ids } },
       select: { questionId: true },
@@ -115,14 +115,19 @@ export async function loadQuizBatch(args: {
       },
     }),
     db.answerReport.findMany({
-      where: { questionId: { in: ids }, status: "OPEN" },
-      select: { questionId: true },
-      distinct: ["questionId"],
+      where: { userId: args.user.id, questionId: { in: ids } },
+      orderBy: { createdAt: "desc" },
+      select: { questionId: true, status: true, adminResponse: true, createdAt: true },
     }),
   ]);
 
   const bookmarkedSet = new Set(bookmarkRows.map((b) => b.questionId));
-  const pendingReportSet = new Set(pendingReportRows.map((r) => r.questionId));
+  const latestReportByQ = new Map<number, { status: "OPEN" | "RESOLVED" | "REJECTED"; adminResponse: string | null }>();
+  for (const r of userReportRows) {
+    if (!latestReportByQ.has(r.questionId)) {
+      latestReportByQ.set(r.questionId, { status: r.status, adminResponse: r.adminResponse });
+    }
+  }
   const highlightsByQ = new Map<number, HighlightRecord[]>();
   for (const h of highlightRows) {
     const list = highlightsByQ.get(h.questionId) ?? [];
@@ -174,7 +179,7 @@ export async function loadQuizBatch(args: {
           insufficientEvidence: g.insufficientEvidence,
         },
         bookmarked: bookmarkedSet.has(q.id),
-        hasPendingReport: pendingReportSet.has(q.id),
+        latestReport: latestReportByQ.get(q.id) ?? null,
         highlights: highlightsByQ.get(q.id) ?? [],
       };
     }),

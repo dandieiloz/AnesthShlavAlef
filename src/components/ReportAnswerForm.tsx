@@ -1,14 +1,21 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { Flag, CheckCircle2, AlertCircle } from "lucide-react";
+import { Flag, CheckCircle2, AlertCircle, MessageSquare } from "lucide-react";
 import { reportAnswerAction } from "@/app/(user)/actions";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/SubmitButton";
 
+export type LatestReportInfo = {
+  status: "OPEN" | "RESOLVED" | "REJECTED";
+  adminResponse: string | null;
+};
+
 type Props = {
   questionId: number;
+  /** @deprecated kept for backwards-compat — pass `latestReport` instead */
   hasPendingReport?: boolean;
+  latestReport?: LatestReportInfo | null;
   labels: {
     reportButton: string;
     reportHint?: string;
@@ -18,12 +25,15 @@ type Props = {
     sendReport: string;
     reportThanks: string;
     pendingReport: string;
+    reportRespondedBadge?: string;
+    reportClosedBadge?: string;
+    reportResponseHeader?: string;
   };
 };
 
 type State = { sent: boolean };
 
-export function ReportAnswerForm({ questionId, hasPendingReport, labels }: Props) {
+export function ReportAnswerForm({ questionId, hasPendingReport, latestReport, labels }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const [state, formAction] = useActionState<State, FormData>(
@@ -41,14 +51,34 @@ export function ReportAnswerForm({ questionId, hasPendingReport, labels }: Props
     }
   }, [state.sent]);
 
-  const showPendingBadge = hasPendingReport || state.sent;
+  const effectiveLatest: LatestReportInfo | null =
+    latestReport ?? (hasPendingReport ? { status: "OPEN", adminResponse: null } : null);
+
+  const showPendingBadge =
+    (effectiveLatest?.status === "OPEN") || state.sent;
+  const hasAdminResponse = !!effectiveLatest?.adminResponse;
+  const isClosedNoResponse =
+    effectiveLatest && (effectiveLatest.status === "RESOLVED" || effectiveLatest.status === "REJECTED") && !hasAdminResponse;
+
+  const respondedLabel = labels.reportRespondedBadge ?? "תגובה מהצוות";
+  const closedLabel = labels.reportClosedBadge ?? "הדיווח נסגר";
+  const responseHeader = labels.reportResponseHeader ?? "תגובת הצוות:";
 
   return (
-    <details ref={detailsRef} className="group">
+    <details ref={detailsRef} className="group" open={hasAdminResponse}>
       <summary className="flex cursor-pointer select-none items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-amber-700 transition-colors hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200 list-none">
         <Flag className="h-3.5 w-3.5 shrink-0" />
         <span>{labels.reportButton}</span>
-        {showPendingBadge && (
+        {hasAdminResponse && (
+          <span
+            className="ms-1 inline-flex items-center gap-1 rounded-full border border-emerald-400/60 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-900/40 dark:text-emerald-200 animate-pulse"
+            title={respondedLabel}
+          >
+            <MessageSquare className="h-3 w-3 shrink-0" />
+            {respondedLabel}
+          </span>
+        )}
+        {!hasAdminResponse && showPendingBadge && (
           <span
             className="ms-1 inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/40 dark:text-amber-200"
             title={labels.pendingReport}
@@ -57,8 +87,27 @@ export function ReportAnswerForm({ questionId, hasPendingReport, labels }: Props
             {labels.pendingReport}
           </span>
         )}
+        {!hasAdminResponse && !showPendingBadge && isClosedNoResponse && (
+          <span
+            className="ms-1 inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            title={closedLabel}
+          >
+            {closedLabel}
+          </span>
+        )}
       </summary>
       <div className="mt-3 w-full max-w-2xl rounded-lg border-2 border-amber-400/60 bg-amber-50/70 p-3 dark:border-amber-500/40 dark:bg-amber-950/20 open:p-4">
+        {hasAdminResponse && effectiveLatest?.adminResponse && (
+          <div className="mb-3 rounded-md border border-emerald-400/60 bg-emerald-50 p-3 text-sm dark:border-emerald-500/40 dark:bg-emerald-950/30">
+            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>{responseHeader}</span>
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">
+              {effectiveLatest.adminResponse}
+            </p>
+          </div>
+        )}
         {labels.reportHint && (
           <p className="text-xs leading-relaxed text-amber-900/80 dark:text-amber-200/80">
             {labels.reportHint}

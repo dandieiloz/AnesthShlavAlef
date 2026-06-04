@@ -955,13 +955,16 @@ export function QuizRunner(props: Props) {
 
               <ReportAnswerForm
                 questionId={display.id}
-                hasPendingReport={display.hasPendingReport}
+                latestReport={display.latestReport}
                 labels={{
                   reportButton: t.reportButton,
                   reportPlaceholder: t.reportPlaceholder,
                   sendReport: t.sendReport,
                   reportThanks: t.reportThanks,
                   pendingReport: t.pendingReport,
+                  reportRespondedBadge: t.reportRespondedBadge,
+                  reportClosedBadge: t.reportClosedBadge,
+                  reportResponseHeader: t.reportResponseHeader,
                 }}
               />
             </CardContent>

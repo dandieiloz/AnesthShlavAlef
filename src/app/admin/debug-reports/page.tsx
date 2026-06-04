@@ -2,7 +2,11 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { AdminNav } from "../AdminNav";
-import { resolveDebugReportAction } from "./actions";
+import {
+  resolveDebugReportAction,
+  reopenDebugReportAction,
+  updateDebugReportResponseAction,
+} from "./actions";
 import type { ReportStatus } from "@prisma/client";
 
 const STATUS_TABS: Array<{ value: ReportStatus; label: string }> = [
@@ -18,9 +22,9 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 const KIND_BADGE: Record<string, string> = {
-  BUG: "bg-red-100 text-red-700",
-  FEEDBACK: "bg-blue-100 text-blue-700",
-  TECHNICAL: "bg-amber-100 text-amber-700",
+  BUG: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  FEEDBACK: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  TECHNICAL: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
 };
 
 export default async function DebugReportsPage({
@@ -67,18 +71,18 @@ export default async function DebugReportsPage({
       </div>
 
       {reports.length === 0 && (
-        <p className="text-slate-500">אין דיווחים בקטגוריה זו.</p>
+        <p className="text-muted-foreground">אין דיווחים בקטגוריה זו.</p>
       )}
 
       <ul className="space-y-4">
         {reports.map((r) => (
-          <li key={r.id} className="rounded border bg-white p-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <li key={r.id} className="rounded border bg-card p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${KIND_BADGE[r.kind]}`}>
                 {KIND_LABEL[r.kind] ?? r.kind}
               </span>
               {r.category && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{r.category}</span>
+                <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs">{r.category}</span>
               )}
               <span>·</span>
               <span>{r.user.name ?? r.user.email}</span>
@@ -94,11 +98,11 @@ export default async function DebugReportsPage({
 
             <p className="whitespace-pre-wrap text-sm">{r.description}</p>
 
-            <div className="grid gap-1 text-xs text-slate-600 sm:grid-cols-2">
+            <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
               {r.contactEmail && (
                 <div>
                   <strong>צור קשר:</strong>{" "}
-                  <a href={`mailto:${r.contactEmail}`} className="text-blue-600 hover:underline">
+                  <a href={`mailto:${r.contactEmail}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                     {r.contactEmail}
                   </a>
                 </div>
@@ -110,7 +114,7 @@ export default async function DebugReportsPage({
                     href={r.pageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     {r.pageUrl}
                   </a>
@@ -121,7 +125,7 @@ export default async function DebugReportsPage({
                   <strong>שאלה:</strong>{" "}
                   <Link
                     href={`/admin/questions/${r.questionId}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     #{r.questionId}
                   </Link>
@@ -129,27 +133,63 @@ export default async function DebugReportsPage({
               )}
             </div>
 
-            {status === "OPEN" && (
-              <div className="flex gap-2">
-                <form
-                  action={async () => {
-                    "use server";
-                    await resolveDebugReportAction(r.id, "RESOLVED");
-                  }}
-                >
-                  <button className="rounded bg-green-600 px-3 py-1 text-sm text-white">
-                    סמן כטופל
+            {status === "OPEN" ? (
+              <form action={resolveDebugReportAction} className="space-y-2">
+                <input type="hidden" name="id" value={r.id} />
+                <label className="block text-xs font-medium text-slate-600">
+                  תגובה למשתמש (לא חובה — תוצג למשתמש שדיווח)
+                </label>
+                <textarea
+                  name="response"
+                  rows={3}
+                  placeholder="תגובה אופציונלית למשתמש (תודה, נטפל בקרוב, נסה כך וכך, וכו')"
+                  className="w-full rounded border bg-background p-2 text-sm"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    name="status"
+                    value="RESOLVED"
+                    className="rounded bg-green-600 px-3 py-1 text-sm text-white"
+                  >
+                    סמן כטופל ושלח תגובה
                   </button>
-                </form>
-                <form
-                  action={async () => {
-                    "use server";
-                    await resolveDebugReportAction(r.id, "REJECTED");
-                  }}
-                >
-                  <button className="rounded bg-slate-500 px-3 py-1 text-sm text-white">
+                  <button
+                    name="status"
+                    value="REJECTED"
+                    className="rounded bg-slate-600 dark:bg-slate-700 px-3 py-1 text-sm text-white"
+                  >
                     דחה
                   </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-2">
+                {r.adminResponse && (
+                  <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-sm dark:border-emerald-700 dark:bg-emerald-950/40">
+                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                      תגובת הצוות {r.adminResponseAt && `(${r.adminResponseAt.toLocaleString("he-IL")})`}
+                    </div>
+                    <p className="whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">{r.adminResponse}</p>
+                  </div>
+                )}
+                <form action={updateDebugReportResponseAction} className="space-y-2">
+                  <input type="hidden" name="id" value={r.id} />
+                  <textarea
+                    name="response"
+                    rows={2}
+                    defaultValue={r.adminResponse ?? ""}
+                    placeholder="ערוך תגובה למשתמש"
+                    className="w-full rounded border bg-background p-2 text-sm"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button className="rounded border bg-card px-3 py-1 text-sm hover:bg-muted">
+                      עדכן תגובה
+                    </button>
+                  </div>
+                </form>
+                <form action={reopenDebugReportAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <button className="rounded border px-3 py-1 text-sm hover:bg-muted">פתח מחדש</button>
                 </form>
               </div>
             )}

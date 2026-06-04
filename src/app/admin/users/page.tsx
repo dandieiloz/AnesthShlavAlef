@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { UsersTable, type UserRow } from "./UsersTable";
 import { UsersFilters } from "./UsersFilters";
 import { AdminNav } from "../AdminNav";
+import { AutoRefresh } from "./AutoRefresh";
 import { Suspense } from "react";
 
 const LIMIT = 200;
@@ -47,6 +48,10 @@ export default async function AdminUsersPage({
   const sp = await searchParams;
   const sort: SortField = isSortField(sp.sort) ? sp.sort : "createdAt";
   const order: SortOrder = sp.order === "asc" ? "asc" : "desc";
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
@@ -173,12 +178,12 @@ export default async function AdminUsersPage({
     lastActiveByUser = new Map();
   }
 
-  const [filteredTotal, totalUsers, adminCount, demoCount, noProfileCount] = await Promise.all([
+  const [filteredTotal, totalUsers, adminCount, demoCount, todayQuestionsDoneCount] = await Promise.all([
     db.user.count({ where }),
     db.user.count(),
     db.user.count({ where: { role: "ADMIN" } }),
     db.user.count({ where: { plan: "DEMO" } }),
-    db.user.count({ where: { residencyYear: null } }),
+    db.attempt.count({ where: { createdAt: { gte: todayStart, lt: tomorrowStart } } }),
   ]);
 
   // Fetch attempt counts (and last-active when not already computed) for the
@@ -220,6 +225,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-4">
+      <AutoRefresh />
       <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול משתמשים</h1>
 
@@ -238,8 +244,8 @@ export default async function AdminUsersPage({
           <div className="text-xs text-muted-foreground mt-1">משתמשי דמו</div>
         </div>
         <div className="rounded border bg-card p-3">
-          <div className="text-2xl font-bold font-mono text-orange-600 dark:text-orange-400">{noProfileCount}</div>
-          <div className="text-xs text-muted-foreground mt-1">פרופיל חסר</div>
+          <div className="text-2xl font-bold font-mono text-orange-600 dark:text-orange-400">{todayQuestionsDoneCount}</div>
+          <div className="text-xs text-muted-foreground mt-1">שאלות שבוצעו היום (00:00-23:59)</div>
         </div>
       </div>
 

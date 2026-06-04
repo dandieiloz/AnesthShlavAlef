@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeaderClient } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BetaBanner } from "@/components/BetaBanner";
+import { DailyPopupGate } from "@/components/DailyPopupGate";
 import { Toaster } from "@/components/ui/toaster";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -66,6 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <SiteFooter t={dict.footer} />
           <Toaster />
+          <DailyPopupGate />
         </ThemeProvider>
       </body>
     </html>

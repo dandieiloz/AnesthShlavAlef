@@ -67,6 +67,7 @@ model User {
   locale           String    @default("he")
   examDate         DateTime?
   questionsPerWeek Int?
+  lastDailyPopupAt DateTime?
 
   accounts      Account[]
   sessions      Session[]
@@ -82,6 +83,7 @@ model User {
   debugReports      DebugReport[]            @relation("DebugReportAuthor")
   resolvedDebugReports DebugReport[]         @relation("DebugReportResolver")
   adminNotes        QuestionAdminNote[]      @relation("AdminNoteAuthor")
+  dailyPopupAcks    DailyPopupAck[]
 }
 
 model Account {
@@ -260,6 +262,37 @@ model Announcement {
   @@index([enabled, createdAt])
 }
 
+/// Modal popups shown at most once per day per signed-in user.
+/// Users can permanently dismiss with the acknowledge button (DailyPopupAck);
+/// the X button only suppresses for the current day via User.lastDailyPopupAt.
+model DailyPopup {
+  id        String   @id @default(cuid())
+  title     String   @db.Text
+  body      String   @db.Text
+  ctaLabel  String?
+  ctaHref   String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  acks DailyPopupAck[]
+
+  @@index([enabled, createdAt])
+}
+
+/// Permanent acknowledgement of a DailyPopup by a user ("ראיתי, תודה").
+model DailyPopupAck {
+  userId         String
+  popupId        String
+  acknowledgedAt DateTime @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  popup DailyPopup @relation(fields: [popupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, popupId])
+  @@index([userId])
+}
+
 /// Observability log for every RAG generation invocation.
 model RagRun {
   id              Int      @id @default(autoincrement())
@@ -325,19 +358,22 @@ model Comment {
 }
 
 model AnswerReport {
-  id           Int          @id @default(autoincrement())
-  questionId   Int
-  userId       String
-  explanation  String       @db.Text
-  status       ReportStatus @default(OPEN)
-  createdAt    DateTime     @default(now())
-  resolvedById String?
+  id              Int          @id @default(autoincrement())
+  questionId      Int
+  userId          String
+  explanation     String       @db.Text
+  status          ReportStatus @default(OPEN)
+  createdAt       DateTime     @default(now())
+  resolvedById    String?
+  adminResponse   String?      @db.Text
+  adminResponseAt DateTime?
 
   question     Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
   user         User         @relation("ReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
   resolver     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
 
   @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 /// User-submitted debug / feedback / technical reports surfaced from /study/report.
@@ -355,6 +391,8 @@ model DebugReport {
   createdAt     DateTime        @default(now())
   resolvedById  String?
   resolvedAt    DateTime?
+  adminResponse   String?       @db.Text
+  adminResponseAt DateTime?
 
   user      User      @relation("DebugReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
   resolver  User?     @relation("DebugReportResolver", fields: [resolvedById], references: [id])

@@ -48,7 +48,7 @@ export default async function HistoryQuestionPage({
   const t = dict.review;
   const letters = t.labels[contentLocale] ?? ["A", "B", "C", "D"];
 
-  const [question, attempts, highlightRows, pendingReportCount, comments] = await Promise.all([
+  const [question, attempts, highlightRows, latestUserReport, comments] = await Promise.all([
     db.question.findUnique({
       where: { id: questionId },
       include: {
@@ -65,7 +65,11 @@ export default async function HistoryQuestionPage({
       where: { userId: me.id, locale: contentLocale, questionId },
       select: { id: true, questionId: true, section: true, sentenceIndex: true, colorId: true, sentenceHash: true, note: true },
     }),
-    db.answerReport.count({ where: { questionId, status: "OPEN" } }),
+    db.answerReport.findFirst({
+      where: { questionId, userId: me.id },
+      orderBy: { createdAt: "desc" },
+      select: { status: true, adminResponse: true },
+    }),
     db.comment.findMany({
       where: { questionId },
       include: { user: { select: { name: true, image: true, hospitalName: true } } },
@@ -179,7 +183,7 @@ export default async function HistoryQuestionPage({
           {question.geminiAnswer && (
             <ReportAnswerForm
               questionId={question.id}
-              hasPendingReport={pendingReportCount > 0}
+              latestReport={latestUserReport ? { status: latestUserReport.status, adminResponse: latestUserReport.adminResponse } : null}
               labels={{
                 reportButton: t.reportButton,
                 reportHint: t.reportHint,
@@ -189,6 +193,9 @@ export default async function HistoryQuestionPage({
                 sendReport: t.sendReport,
                 reportThanks: t.reportThanks,
                 pendingReport: t.pendingReport,
+                reportRespondedBadge: t.reportRespondedBadge,
+                reportClosedBadge: t.reportClosedBadge,
+                reportResponseHeader: t.reportResponseHeader,
               }}
             />
           )}

@@ -101,12 +101,17 @@ export default async function QuizReviewPage({
     highlightsByQ.set(h.questionId, arr);
   }
 
-  const pendingReportRows = await db.answerReport.findMany({
-    where: { questionId: { in: [...attemptMap.keys()] }, status: "OPEN" },
-    select: { questionId: true },
-    distinct: ["questionId"],
+  const userReportRows = await db.answerReport.findMany({
+    where: { questionId: { in: [...attemptMap.keys()] }, userId: me.id },
+    orderBy: { createdAt: "desc" },
+    select: { questionId: true, status: true, adminResponse: true },
   });
-  const pendingReportSet = new Set(pendingReportRows.map((r) => r.questionId));
+  const latestReportByQ = new Map<number, { status: "OPEN" | "RESOLVED" | "REJECTED"; adminResponse: string | null }>();
+  for (const r of userReportRows) {
+    if (!latestReportByQ.has(r.questionId)) {
+      latestReportByQ.set(r.questionId, { status: r.status, adminResponse: r.adminResponse });
+    }
+  }
 
   // Stats from other users (excluding current user) per question — total + correct.
   const reviewedIds = [...attemptMap.keys()];
@@ -419,7 +424,7 @@ export default async function QuizReviewPage({
                       </details>
                       <ReportAnswerForm
                         questionId={q.id}
-                        hasPendingReport={pendingReportSet.has(q.id)}
+                        latestReport={latestReportByQ.get(q.id) ?? null}
                         labels={{
                           reportButton: t.reportButton,
                           reportHint: t.reportHint,
@@ -429,6 +434,9 @@ export default async function QuizReviewPage({
                           sendReport: t.sendReport,
                           reportThanks: t.reportThanks,
                           pendingReport: t.pendingReport,
+                          reportRespondedBadge: t.reportRespondedBadge,
+                          reportClosedBadge: t.reportClosedBadge,
+                          reportResponseHeader: t.reportResponseHeader,
                         }}
                       />
                     </>

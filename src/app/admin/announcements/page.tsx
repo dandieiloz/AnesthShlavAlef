@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { AdminNav } from "../AdminNav";
+import { AnnouncementsSubNav } from "./AnnouncementsSubNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,7 @@ export default async function AdminAnnouncementsPage() {
     <div className="space-y-6">
       <AdminNav />
       <h1 className="font-display text-2xl font-bold">הודעות</h1>
+      <AnnouncementsSubNav />
 
       <Card>
         <CardHeader>
