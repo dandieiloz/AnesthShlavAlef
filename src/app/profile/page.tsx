@@ -237,6 +237,9 @@ export default async function ProfilePage({
             t={{
               title: t.localPdfTitle,
               description: t.localPdfDesc,
+              driveNotice: t.localPdfDriveNotice,
+              driveLinkLabel: t.localPdfDriveLinkLabel,
+              driveUrl: t.localPdfDriveUrl,
               noneSet: t.localPdfNoneSet,
               currentLabel: t.localPdfCurrent,
               choose: t.localPdfChoose,

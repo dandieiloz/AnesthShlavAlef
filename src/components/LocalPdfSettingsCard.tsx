@@ -19,6 +19,9 @@ import {
 type Strings = {
   title: string;
   description: string;
+  driveNotice: string;
+  driveLinkLabel: string;
+  driveUrl: string;
   noneSet: string;
   currentLabel: string;
   choose: string;
@@ -84,6 +87,17 @@ export function LocalPdfSettingsCard({ t }: { t: Strings }) {
         <CardDescription>{t.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+          <p>{t.driveNotice}</p>
+          <a
+            href={t.driveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block font-medium underline underline-offset-2"
+          >
+            {t.driveLinkLabel}
+          </a>
+        </div>
         <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2.5">
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
