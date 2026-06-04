@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { setUserRoleAction, setUserPlanAction, deleteUserAction } from "./actions";
+import { formatRelativeTime, useRelativeNow } from "@/lib/format-time";
 
 export type UserRow = {
   id: string;
@@ -34,23 +35,6 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("he-IL", {
   dateStyle: "short",
   timeStyle: "short",
 });
-const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat("he-IL", { numeric: "auto" });
-
-function formatRelative(iso: string, nowMs: number): string {
-  const then = new Date(iso).getTime();
-  const diffSec = Math.round((then - nowMs) / 1000);
-  const absSec = Math.abs(diffSec);
-  if (absSec < 60) return RELATIVE_FORMATTER.format(diffSec, "second");
-  const diffMin = Math.round(diffSec / 60);
-  if (Math.abs(diffMin) < 60) return RELATIVE_FORMATTER.format(diffMin, "minute");
-  const diffHr = Math.round(diffMin / 60);
-  if (Math.abs(diffHr) < 24) return RELATIVE_FORMATTER.format(diffHr, "hour");
-  const diffDay = Math.round(diffHr / 24);
-  if (Math.abs(diffDay) < 30) return RELATIVE_FORMATTER.format(diffDay, "day");
-  const diffMo = Math.round(diffDay / 30);
-  if (Math.abs(diffMo) < 12) return RELATIVE_FORMATTER.format(diffMo, "month");
-  return RELATIVE_FORMATTER.format(Math.round(diffMo / 12), "year");
-}
 
 const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   name: "asc",
@@ -77,14 +61,8 @@ export function UsersTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [relativeNowMs, setRelativeNowMs] = useState<number | null>(null);
+  const relativeNowMs = useRelativeNow();
   const [, startTransition] = useTransition();
-
-  // Avoid SSR/CSR hydration drift by rendering a stable fallback first,
-  // then enabling live relative timestamps on the client after mount.
-  useEffect(() => {
-    setRelativeNowMs(Date.now());
-  }, []);
 
   function toggleRole(userId: string, currentRole: "USER" | "ADMIN") {
     const newRole: "USER" | "ADMIN" = currentRole === "ADMIN" ? "USER" : "ADMIN";
@@ -265,7 +243,7 @@ export function UsersTable({
                   <span title={DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))}>
                     {relativeNowMs === null
                       ? DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))
-                      : formatRelative(u.lastActiveAt, relativeNowMs)}
+                      : formatRelativeTime(u.lastActiveAt, relativeNowMs, "he")}
                   </span>
                 ) : (
                   <span className="italic text-muted-foreground/50">—</span>

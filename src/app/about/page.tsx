@@ -88,13 +88,51 @@ export default async function AboutPage() {
             locale={locale}
             t={t}
           />
+        </div>
+      </section>
 
-          {/* Pearl / Perl note */}
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
-            <p className="text-xs text-primary/80 leading-relaxed">
-              {t.pearlNote}
+      {/* ── In Memoriam ──────────────────────────────────────── */}
+      <section className="rounded-2xl border border-zinc-300 dark:border-zinc-700 bg-gradient-to-b from-zinc-50 to-white dark:from-zinc-900/60 dark:to-zinc-950 shadow-sm overflow-hidden">
+        {/* Top accent bar — somber */}
+        <div className="h-1 w-full bg-gradient-to-l from-zinc-400/40 via-zinc-600 to-zinc-400/40 dark:from-zinc-600/40 dark:via-zinc-400 dark:to-zinc-600/40" />
+
+        <div className="p-8 space-y-6">
+          {/* Eyebrow */}
+          <div className="text-center space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500 dark:text-zinc-400">
+              {t.memorialEyebrow}
             </p>
           </div>
+
+          {/* Portrait + name */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-zinc-300/40 dark:bg-zinc-700/40 blur-md" aria-hidden="true" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://www.israelhayom.co.il/wp-content/uploads/2026/06/01/01/%D7%A8%D7%92%D7%99%D7%9C%D7%94-%D7%90%D7%95%D7%A8%D7%99-%D7%99%D7%95%D7%A1%D7%A3-%D7%A1%D7%99%D7%9C%D7%91%D7%A1%D7%98%D7%A8-1536x1536.jpg"
+                alt={t.memorialImageAlt}
+                className="relative h-40 w-40 rounded-full object-cover ring-4 ring-white dark:ring-zinc-900 shadow-lg grayscale"
+                loading="lazy"
+              />
+            </div>
+            <div className="text-center space-y-0.5">
+              <h2 className="font-display text-2xl font-bold text-foreground">
+                {t.memorialName}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t.memorialMeta}
+              </p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="mx-auto h-px w-24 bg-zinc-300 dark:bg-zinc-700" />
+
+          {/* Body */}
+          <p className="text-foreground/90 leading-loose text-[15px] whitespace-pre-line max-w-2xl mx-auto text-center">
+            {t.memorialBody}
+          </p>
         </div>
       </section>
 

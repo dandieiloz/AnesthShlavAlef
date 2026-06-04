@@ -19,6 +19,7 @@ import { deleteQuizAction } from "@/app/(user)/actions";
 import { CheckCircle2, Clock, Trash2, Play, BookOpen } from "lucide-react";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
+import { formatRelativeDay, useRelativeNow } from "@/lib/format-time";
 
 export interface QuizRow {
   id: number;
@@ -35,13 +36,19 @@ export interface QuizRow {
 
 export type QuizzesT = Dictionary["quizzes"];
 
-function relativeDate(iso: string | null, locale: "he" | "en", t: QuizzesT): string {
+function relativeDate(
+  iso: string | null,
+  locale: "he" | "en",
+  t: QuizzesT,
+  nowMs: number | null,
+): string {
   if (!iso) return "";
-  const date = new Date(iso);
-  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return t.today;
-  if (diffDays === 1) return t.yesterday;
-  return date.toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
+  // While SSR / pre-hydration, fall back to a stable absolute date to avoid
+  // hydration drift. After mount, switch to relative "today / yesterday".
+  if (nowMs === null) {
+    return new Date(iso).toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
+  }
+  return formatRelativeDay(iso, nowMs, locale, { today: t.today, yesterday: t.yesterday });
 }
 
 function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: string; t: QuizzesT }) {
@@ -86,7 +93,17 @@ function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: strin
   );
 }
 
-function QuizCard({ q, locale, t }: { q: QuizRow; locale: "he" | "en"; t: QuizzesT }) {
+function QuizCard({
+  q,
+  locale,
+  t,
+  nowMs,
+}: {
+  q: QuizRow;
+  locale: "he" | "en";
+  t: QuizzesT;
+  nowMs: number | null;
+}) {
   const progressPct = q.total > 0 ? Math.round((q.answered / q.total) * 100) : 0;
   return (
     <Card className="transition-all hover:shadow-sm">
@@ -96,7 +113,7 @@ function QuizCard({ q, locale, t }: { q: QuizRow; locale: "he" | "en"; t: Quizze
             <p className="font-medium text-sm line-clamp-1">{q.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 justify-end">
               <Clock className="h-3 w-3" />
-              {relativeDate(q.createdAt, locale, t)}
+              {relativeDate(q.createdAt, locale, t, nowMs)}
               {" \u00b7 "}
               {q.chapterCount} {q.chapterCount === 1 ? t.chapter : t.chapters}
             </p>
@@ -149,6 +166,7 @@ function QuizCard({ q, locale, t }: { q: QuizRow; locale: "he" | "en"; t: Quizze
 
 export function QuizzesClient({ quizzes, locale }: { quizzes: QuizRow[]; locale: Locale }) {
   const t = getDictionary(locale).quizzes;
+  const nowMs = useRelativeNow();
   const DEFAULT_VISIBLE = 5;
   const [expanded, setExpanded] = useState(false);
   const expandLabel = locale === "he" ? "הצג עוד" : "Show more";
@@ -175,7 +193,7 @@ export function QuizzesClient({ quizzes, locale }: { quizzes: QuizRow[]; locale:
     return (
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleItems.map((q) => <QuizCard key={q.id} q={q} locale={locale} t={t} />)}
+          {visibleItems.map((q) => <QuizCard key={q.id} q={q} locale={locale} t={t} nowMs={nowMs} />)}
         </div>
         {canToggle && (
           <div className="flex justify-center">
