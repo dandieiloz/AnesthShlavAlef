@@ -16,6 +16,8 @@ import { getDictionary } from "@/lib/i18n";
 import { LanguageSettingsCard } from "@/components/LanguageSettingsCard";
 import { LocalPdfSettingsCard } from "@/components/LocalPdfSettingsCard";
 import { markAdminResponsesSeen } from "@/lib/notifications";
+import { getUserProgress } from "@/lib/user-progress";
+import { ProgressBarFull } from "@/components/progress/ProgressBarFull";
 
 const DATE_FMT = new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" });
 
@@ -44,10 +46,13 @@ export default async function ProfilePage({
   if (!session?.user?.id) redirect("/");
 
   const sp = (await searchParams) ?? {};
-  const activeTab: "settings" | "messages" = sp.tab === "messages" ? "messages" : "settings";
+  const activeTab: "profile" | "settings" | "messages" =
+    sp.tab === "messages" ? "messages" : sp.tab === "settings" ? "settings" : "profile";
 
   const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const t = getDictionary(locale).profile;
+  const progressDict = getDictionary(locale).progress;
+  const progress = await getUserProgress(session.user.id);
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
@@ -108,32 +113,39 @@ export default async function ProfilePage({
   }
 
   const tabBtn = (active: boolean) =>
-    `relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-      active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+    `flex-1 sm:flex-initial relative rounded-md px-4 py-1.5 text-sm font-medium transition-colors text-center ${
+      active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 py-10 animate-fade-in">
-      {/* Identity header */}
-      <Card>
-        <CardContent className="flex items-center gap-4 pt-6">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
-            <UserCircle className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <p className="font-display text-lg font-semibold">{user.fullName ?? session.user.name ?? "—"}</p>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
-          </div>
-          {user.role === "ADMIN" && <Badge variant="secondary" className="me-auto ms-0">{t.adminBadge}</Badge>}
-        </CardContent>
-      </Card>
+    <div className="mx-auto max-w-3xl space-y-8 py-8 animate-fade-in">
+      {/* Identity strip */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <UserCircle className="h-6 w-6 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-base font-semibold leading-tight">
+            {user.fullName ?? session.user.name ?? "—"}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+        </div>
+        {user.role === "ADMIN" && <Badge variant="secondary">{t.adminBadge}</Badge>}
+      </div>
 
+      {/* Career progress hero */}
+      {progress && <ProgressBarFull progress={progress} t={progressDict} />}
+
+      {/* Tabs */}
       <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
-        <Link href="/profile" className={tabBtn(activeTab === "settings")}>
+        <Link href="/profile" className={tabBtn(activeTab === "profile")}>
+          פרטים אישיים
+        </Link>
+        <Link href="/profile?tab=settings" className={tabBtn(activeTab === "settings")}>
           הגדרות
         </Link>
         <Link href="/profile?tab=messages" className={tabBtn(activeTab === "messages")}>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center justify-center gap-1.5">
             <MessageSquare className="h-3.5 w-3.5" />
             הודעות מהצוות
             {unreadCount > 0 && activeTab !== "messages" && (
@@ -145,94 +157,98 @@ export default async function ProfilePage({
         </Link>
       </div>
 
+      {activeTab === "profile" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.updateTitle}</CardTitle>
+              <CardDescription>{t.updateDesc}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={updateProfileAction} className="space-y-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName">{t.fullName}</Label>
+                  <Input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    required
+                    minLength={2}
+                    defaultValue={user.fullName ?? ""}
+                    placeholder={t.fullNamePlaceholder}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="hospitalName">{t.hospitalName}</Label>
+                  <SearchableSelect
+                    id="hospitalName"
+                    name="hospitalName"
+                    required
+                    defaultValue={user.hospitalName ?? ""}
+                    options={HOSPITALS}
+                    placeholder={t.hospitalPlaceholder}
+                    searchPlaceholder={t.hospitalPlaceholder}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="residencyYear">{t.residencyYear}</Label>
+                  <select
+                    id="residencyYear"
+                    name="residencyYear"
+                    required
+                    defaultValue={user.residencyYear ?? ""}
+                    className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="" disabled>{t.yearPlaceholder}</option>
+                    {[1, 2, 3, 4, 5].map((y) => (
+                      <option key={y} value={y}>{t.yearLabels[y]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <Button type="submit" className="w-full sm:w-auto">{t.saveChanges}</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {activeTab === "settings" && (
-        <>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.updateTitle}</CardTitle>
-          <CardDescription>{t.updateDesc}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={updateProfileAction} className="space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="fullName">{t.fullName}</Label>
-              <Input
-                id="fullName"
-                name="fullName"
-                type="text"
-                required
-                minLength={2}
-                defaultValue={user.fullName ?? ""}
-                placeholder={t.fullNamePlaceholder}
-              />
-            </div>
+        <div className="space-y-6">
+          <LanguageSettingsCard
+            uiLocale={locale}
+            contentLocale={contentLocale}
+            isAdmin={user.role === "ADMIN"}
+            t={{
+              languageTitle: t.languageTitle,
+              uiLanguageLabel: t.uiLanguageLabel,
+              uiLanguageDesc: t.uiLanguageDesc,
+              contentLanguageLabel: t.contentLanguageLabel,
+              contentLanguageDesc: t.contentLanguageDesc,
+              langHebrew: t.langHebrew,
+              langEnglish: t.langEnglish,
+              adminOnlyNotice: t.adminOnlyNotice,
+            }}
+          />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="hospitalName">{t.hospitalName}</Label>
-              <SearchableSelect
-                id="hospitalName"
-                name="hospitalName"
-                required
-                defaultValue={user.hospitalName ?? ""}
-                options={HOSPITALS}
-                placeholder={t.hospitalPlaceholder}
-                searchPlaceholder={t.hospitalPlaceholder}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="residencyYear">{t.residencyYear}</Label>
-              <select
-                id="residencyYear"
-                name="residencyYear"
-                required
-                defaultValue={user.residencyYear ?? ""}
-                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="" disabled>{t.yearPlaceholder}</option>
-                {[1, 2, 3, 4, 5].map((y) => (
-                  <option key={y} value={y}>{t.yearLabels[y]}</option>
-                ))}
-              </select>
-            </div>
-
-            <Button type="submit" className="w-full">{t.saveChanges}</Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <LanguageSettingsCard
-        uiLocale={locale}
-        contentLocale={contentLocale}
-        isAdmin={user.role === "ADMIN"}
-        t={{
-          languageTitle: t.languageTitle,
-          uiLanguageLabel: t.uiLanguageLabel,
-          uiLanguageDesc: t.uiLanguageDesc,
-          contentLanguageLabel: t.contentLanguageLabel,
-          contentLanguageDesc: t.contentLanguageDesc,
-          langHebrew: t.langHebrew,
-          langEnglish: t.langEnglish,
-          adminOnlyNotice: t.adminOnlyNotice,
-        }}
-      />
-
-      <LocalPdfSettingsCard
-        t={{
-          title: t.localPdfTitle,
-          description: t.localPdfDesc,
-          noneSet: t.localPdfNoneSet,
-          currentLabel: t.localPdfCurrent,
-          choose: t.localPdfChoose,
-          replace: t.localPdfReplace,
-          clear: t.localPdfClear,
-          fallbackNotice: t.localPdfFallbackNotice,
-          errorPick: t.localPdfErrorPick,
-          offsetLabel: t.localPdfOffsetLabel,
-          offsetHelp: t.localPdfOffsetHelp,
-        }}
-      />
-        </>
+          <LocalPdfSettingsCard
+            t={{
+              title: t.localPdfTitle,
+              description: t.localPdfDesc,
+              noneSet: t.localPdfNoneSet,
+              currentLabel: t.localPdfCurrent,
+              choose: t.localPdfChoose,
+              replace: t.localPdfReplace,
+              clear: t.localPdfClear,
+              fallbackNotice: t.localPdfFallbackNotice,
+              errorPick: t.localPdfErrorPick,
+              offsetLabel: t.localPdfOffsetLabel,
+              offsetHelp: t.localPdfOffsetHelp,
+            }}
+          />
+        </div>
       )}
 
       {activeTab === "messages" && !hasMessages && (

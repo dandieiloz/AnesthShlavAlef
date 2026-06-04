@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { FontSizeToggle } from "@/components/font-size-toggle";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ProgressBarMini, type ProgressMiniViewModel } from "@/components/progress/ProgressBarMini";
 
 interface NavUser {
   name?: string | null;
@@ -30,6 +31,7 @@ interface SiteHeaderClientProps {
   unseenResponseCount?: number;
   signInAction: () => Promise<void>;
   signOutAction: () => Promise<void>;
+  progressMini?: ProgressMiniViewModel | null;
   nav: {
     study: string;
     myQuizzes: string;
@@ -81,7 +83,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, signOutAction, nav }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, signOutAction, nav, progressMini }: SiteHeaderClientProps) {
   const NAV_LINKS = buildNavLinks(nav);
   const hasUnseen = unseenResponseCount > 0;
   const responseTitle = nav.adminResponseTitle ?? "יש תגובה מהצוות לדיווח שלך";
@@ -109,6 +111,10 @@ export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, 
 
           <FontSizeToggle t={nav.fontSize} />
           <ThemeToggle />
+
+          {user && progressMini && (
+            <ProgressBarMini vm={progressMini} />
+          )}
 
           {user ? (
             <DropdownMenu>

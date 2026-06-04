@@ -11,6 +11,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { countUnseenAdminResponses } from "@/lib/notifications";
+import { getUserProgress } from "@/lib/user-progress";
+import { buildProgressMiniViewModel } from "@/components/progress/ProgressBarMini";
 
 const heebo = Heebo({ subsets: ["hebrew", "latin"], variable: "--font-heebo" });
 const frankRuhl = Frank_Ruhl_Libre({
@@ -42,7 +44,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = session?.user as { name?: string | null; image?: string | null; role?: string; plan?: string; id?: string } | undefined;
   const locale = await getLocale();
   const dict = getDictionary(locale);
-  const unseenResponseCount = user?.id ? await countUnseenAdminResponses(user.id) : 0;
+  const [unseenResponseCount, progress] = await Promise.all([
+    user?.id ? countUnseenAdminResponses(user.id) : Promise.resolve(0),
+    user?.id ? getUserProgress(user.id) : Promise.resolve(null),
+  ]);
+  const progressMini = progress ? buildProgressMiniViewModel(progress, dict.progress) : null;
 
   async function handleSignIn() {
     "use server";
@@ -64,7 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-screen font-sans flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <SiteHeaderClient user={user} unseenResponseCount={unseenResponseCount} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} />
+          <SiteHeaderClient user={user} unseenResponseCount={unseenResponseCount} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} progressMini={progressMini} />
           <BetaBanner t={dict.beta} locale={locale} />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <SiteFooter t={dict.footer} />
