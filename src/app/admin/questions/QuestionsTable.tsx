@@ -5,6 +5,7 @@ import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction, batchSetDisabledAction } from "./actions";
+import { enqueueRegenerationBatchAction } from "../queue/actions";
 
 export type QuestionRow = {
   id: number;
@@ -61,8 +62,9 @@ export function QuestionsTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [panel, setPanel] = useState<"source" | "delete" | "translate" | "disable" | "enable" | null>(null);
+  const [panel, setPanel] = useState<"source" | "delete" | "translate" | "disable" | "enable" | "regenerate" | null>(null);
   const [translateDone, setTranslateDone] = useState<number | null>(null);
+  const [regenDone, setRegenDone] = useState<{ enqueued: number; skipped: number } | null>(null);
 
   // Source edit form state
   const [institution, setInstitution] = useState("");
@@ -120,6 +122,16 @@ export function QuestionsTable({
     startTransition(async () => {
       const count = await batchTranslateMissingAction([...selected]);
       setTranslateDone(count);
+      setPanel(null);
+      router.refresh();
+    });
+  }
+
+  function handleRegenerate() {
+    startTransition(async () => {
+      const result = await enqueueRegenerationBatchAction([...selected]);
+      setRegenDone(result);
+      setSelected(new Set());
       setPanel(null);
       router.refresh();
     });
@@ -200,6 +212,11 @@ export function QuestionsTable({
             ✓ תורגמו {translateDone} שאלות
           </span>
         )}
+        {regenDone !== null && (
+          <span className="text-xs text-purple-700 dark:text-purple-400">
+            ✓ נוספו לתור {regenDone.enqueued} שאלות{regenDone.skipped > 0 ? ` (${regenDone.skipped} דולגו — כבר בתור)` : ""}
+          </span>
+        )}
       </div>
 
       {/* Batch action bar */}
@@ -219,6 +236,13 @@ export function QuestionsTable({
             disabled={pending}
           >
             תרגם חסר (EN)
+          </button>
+          <button
+            onClick={() => setPanel("regenerate")}
+            className="rounded bg-purple-600 px-3 py-1.5 text-sm text-white hover:bg-purple-700 disabled:opacity-50"
+            disabled={pending}
+          >
+            חולל מחדש
           </button>
           <button
             onClick={() => setPanel("disable")}
@@ -319,6 +343,30 @@ export function QuestionsTable({
               className="rounded bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {pending ? "מתרגם..." : "המשך"}
+            </button>
+            <button
+              onClick={() => setPanel(null)}
+              className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate confirmation panel */}
+      {panel === "regenerate" && (
+        <div className="mb-3 rounded border border-purple-300 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 p-4 space-y-3">
+          <p className="text-sm text-purple-800 dark:text-purple-300">
+            לחולל מחדש תשובות עבור <strong>{selected.size}</strong> שאלות? משימות יתווספו לתור. שאלות עם משימה פתוחה קיימת ידולגו.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRegenerate}
+              disabled={pending}
+              className="rounded bg-purple-600 px-4 py-1.5 text-sm text-white hover:bg-purple-700 disabled:opacity-50"
+            >
+              {pending ? "מוסיף לתור..." : "כן, חולל מחדש"}
             </button>
             <button
               onClick={() => setPanel(null)}
