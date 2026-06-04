@@ -7,7 +7,7 @@ import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
 import { Suspense } from "react";
 import { AdminNav } from "../AdminNav";
 
-const LIMIT = 100;
+const PAGE_SIZE = 100;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
 const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "confidence", "escalated", "insufficientEvidence", "translationCount", "attemptCount", "percentCorrect", "createdAt"] as const;
 
@@ -25,6 +25,7 @@ export default async function AdminQuestionsPage({
     q?: string;
     source?: string;
     year?: string;
+    suffix?: string;
     hasExplanation?: string;
     chapter?: string;
     confidence?: string;
@@ -33,6 +34,7 @@ export default async function AdminQuestionsPage({
     status?: string;
     sort?: string;
     order?: string;
+    page?: string;
   }>;
 }) {
   await requireAdmin();
@@ -50,15 +52,27 @@ export default async function AdminQuestionsPage({
 
   const sourceFilter = sp.source?.trim();
   const yearFilter = sp.year?.trim();
+  const suffixFilter = sp.suffix?.trim();
 
   if (sourceFilter === NULL_SOURCE_FILTER) {
     where.source = null;
+  } else if (sourceFilter && yearFilter && suffixFilter) {
+    where.source = { equals: `${sourceFilter} ${yearFilter} ${suffixFilter}` };
   } else if (sourceFilter && yearFilter) {
-    where.source = { equals: `${sourceFilter} ${yearFilter}` };
+    where.source = { startsWith: `${sourceFilter} ${yearFilter}` };
+  } else if (sourceFilter && suffixFilter) {
+    where.AND = [
+      { source: { startsWith: sourceFilter } },
+      { source: { endsWith: ` ${suffixFilter}` } },
+    ];
+  } else if (yearFilter && suffixFilter) {
+    where.source = { contains: ` ${yearFilter} ${suffixFilter}` };
   } else if (sourceFilter) {
     where.source = { startsWith: sourceFilter };
   } else if (yearFilter) {
-    where.source = { endsWith: ` ${yearFilter}` };
+    where.source = { contains: ` ${yearFilter}` };
+  } else if (suffixFilter) {
+    where.source = { endsWith: ` ${suffixFilter}` };
   }
 
   // Quality predicates on the related GeminiAnswer.
@@ -116,6 +130,9 @@ export default async function AdminQuestionsPage({
                     ? [{ geminiAnswer: { insufficientEvidence: order } }, { id: "desc" as const }]
                     : /* translationCount, attemptCount, percentCorrect, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
 
+  const pageNum = Math.max(1, Number(sp.page) || 1);
+  const skip = (pageNum - 1) * PAGE_SIZE;
+
   const [questions, total, chapters] = await Promise.all([
     db.question.findMany({
       where,
@@ -136,7 +153,8 @@ export default async function AdminQuestionsPage({
         },
       },
       orderBy,
-      take: LIMIT,
+      take: PAGE_SIZE,
+      skip,
     }),
     db.question.count({ where }),
     db.chapter.findMany({
@@ -252,13 +270,80 @@ export default async function AdminQuestionsPage({
         <QuestionsFilters chapters={chapters} />
       </Suspense>
 
-      <div className="text-sm text-muted-foreground">
-        {total > LIMIT
-          ? `מציג ${LIMIT} מתוך ${total} שאלות`
-          : `${total} שאלות`}
+      <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+        <div>
+          {total === 0
+            ? "אין שאלות"
+            : `מציג ${skip + 1}\u2013${Math.min(skip + rows.length, total)} מתוך ${total} שאלות`}
+        </div>
+        <Pagination total={total} page={pageNum} pageSize={PAGE_SIZE} searchParams={sp} />
       </div>
 
       <QuestionsTable questions={rows} sort={sort} order={order} />
+    </div>
+  );
+}
+
+function Pagination({
+  total,
+  page,
+  pageSize,
+  searchParams,
+}: {
+  total: number;
+  page: number;
+  pageSize: number;
+  searchParams: Record<string, string | undefined>;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (totalPages <= 1) return null;
+
+  function hrefFor(p: number) {
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(searchParams)) {
+      if (typeof v === "string" && v.trim() && k !== "page") sp.set(k, v);
+    }
+    if (p > 1) sp.set("page", String(p));
+    const qs = sp.toString();
+    return qs ? `/admin/questions?${qs}` : "/admin/questions";
+  }
+
+  const prev = Math.max(1, page - 1);
+  const next = Math.min(totalPages, page + 1);
+
+  return (
+    <div className="flex items-center gap-2">
+      <a
+        href={hrefFor(1)}
+        aria-disabled={page === 1}
+        className={`rounded border px-2 py-1 text-xs ${page === 1 ? "pointer-events-none opacity-50" : "hover:bg-muted"}`}
+      >
+        « ראשון
+      </a>
+      <a
+        href={hrefFor(prev)}
+        aria-disabled={page === 1}
+        className={`rounded border px-2 py-1 text-xs ${page === 1 ? "pointer-events-none opacity-50" : "hover:bg-muted"}`}
+      >
+        ‹ הקודם
+      </a>
+      <span className="px-2 text-xs">
+        עמוד {page} / {totalPages}
+      </span>
+      <a
+        href={hrefFor(next)}
+        aria-disabled={page === totalPages}
+        className={`rounded border px-2 py-1 text-xs ${page === totalPages ? "pointer-events-none opacity-50" : "hover:bg-muted"}`}
+      >
+        הבא ›
+      </a>
+      <a
+        href={hrefFor(totalPages)}
+        aria-disabled={page === totalPages}
+        className={`rounded border px-2 py-1 text-xs ${page === totalPages ? "pointer-events-none opacity-50" : "hover:bg-muted"}`}
+      >
+        אחרון »
+      </a>
     </div>
   );
 }

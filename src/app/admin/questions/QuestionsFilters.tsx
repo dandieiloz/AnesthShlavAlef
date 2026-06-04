@@ -75,6 +75,17 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
         />
       </div>
 
+      {/* Suffix / group */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה</label>
+        <input
+          name="suffix"
+          defaultValue={params.get("suffix") ?? ""}
+          placeholder="א, ב..."
+          className="w-24 rounded border p-2 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+        />
+      </div>
+
       {/* Has explanation */}
       <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1">הסבר</label>
