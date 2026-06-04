@@ -367,6 +367,7 @@ model AnswerReport {
   resolvedById    String?
   adminResponse   String?      @db.Text
   adminResponseAt DateTime?
+  adminResponseSeenAt DateTime?
 
   question     Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
   user         User         @relation("ReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
@@ -393,6 +394,7 @@ model DebugReport {
   resolvedAt    DateTime?
   adminResponse   String?       @db.Text
   adminResponseAt DateTime?
+  adminResponseSeenAt DateTime?
 
   user      User      @relation("DebugReportAuthor", fields: [userId], references: [id], onDelete: Cascade)
   resolver  User?     @relation("DebugReportResolver", fields: [resolvedById], references: [id])

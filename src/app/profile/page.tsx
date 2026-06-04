@@ -15,6 +15,7 @@ import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { LanguageSettingsCard } from "@/components/LanguageSettingsCard";
 import { LocalPdfSettingsCard } from "@/components/LocalPdfSettingsCard";
+import { markAdminResponsesSeen } from "@/lib/notifications";
 
 const DATE_FMT = new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" });
 
@@ -34,9 +35,16 @@ const KIND_LABEL: Record<string, string> = {
   TECHNICAL: "טכני",
 };
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/");
+
+  const sp = (await searchParams) ?? {};
+  const activeTab: "settings" | "messages" = sp.tab === "messages" ? "messages" : "settings";
 
   const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const t = getDictionary(locale).profile;
@@ -48,7 +56,7 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/");
 
-  const [answerReports, debugReports] = await Promise.all([
+  const [answerReports, debugReports, unreadCount] = await Promise.all([
     db.answerReport.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
@@ -60,6 +68,7 @@ export default async function ProfilePage() {
         status: true,
         adminResponse: true,
         adminResponseAt: true,
+        adminResponseSeenAt: true,
         createdAt: true,
         question: { select: { stem: true, chapter: { select: { number: true } } } },
       },
@@ -76,15 +85,32 @@ export default async function ProfilePage() {
         status: true,
         adminResponse: true,
         adminResponseAt: true,
+        adminResponseSeenAt: true,
         createdAt: true,
         questionId: true,
         chapterNumber: true,
       },
     }),
+    db.answerReport.count({
+      where: { userId: session.user.id, adminResponse: { not: null }, adminResponseSeenAt: null },
+    }).then(async (a) => {
+      const d = await db.debugReport.count({
+        where: { userId: session.user.id, adminResponse: { not: null }, adminResponseSeenAt: null },
+      });
+      return a + d;
+    }),
   ]);
-  const answeredCount =
-    answerReports.filter((r) => r.adminResponse).length +
-    debugReports.filter((r) => r.adminResponse).length;
+  const hasMessages = answerReports.length > 0 || debugReports.length > 0;
+
+  // Mark admin responses as seen ONLY when the user actually opens the messages tab.
+  if (activeTab === "messages" && unreadCount > 0) {
+    await markAdminResponsesSeen(session.user.id);
+  }
+
+  const tabBtn = (active: boolean) =>
+    `relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+      active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+    }`;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-10 animate-fade-in">
@@ -102,6 +128,25 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
+      <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+        <Link href="/profile" className={tabBtn(activeTab === "settings")}>
+          הגדרות
+        </Link>
+        <Link href="/profile?tab=messages" className={tabBtn(activeTab === "messages")}>
+          <span className="inline-flex items-center gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5" />
+            הודעות מהצוות
+            {unreadCount > 0 && activeTab !== "messages" && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">
+                {unreadCount}
+              </span>
+            )}
+          </span>
+        </Link>
+      </div>
+
+      {activeTab === "settings" && (
+        <>
       <Card>
         <CardHeader>
           <CardTitle>{t.updateTitle}</CardTitle>
@@ -187,16 +232,26 @@ export default async function ProfilePage() {
           offsetHelp: t.localPdfOffsetHelp,
         }}
       />
+        </>
+      )}
 
-      {(answerReports.length > 0 || debugReports.length > 0) && (
+      {activeTab === "messages" && !hasMessages && (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            עוד לא שלחת דיווחים. כשתשלח/י דיווח על תשובה שגויה או באג, תגובות הצוות יופיעו כאן.
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === "messages" && hasMessages && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span>הדיווחים שלי</span>
-              {answeredCount > 0 && (
+              {unreadCount > 0 && (
                 <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">
                   <MessageSquare className="h-3 w-3" />
-                  {answeredCount} תגובות חדשות מהצוות
+                  {unreadCount} תגובות חדשות מהצוות
                 </Badge>
               )}
             </CardTitle>
@@ -212,14 +267,15 @@ export default async function ProfilePage() {
                 <ul className="space-y-3">
                   {answerReports.map((r) => {
                     const pill = statusPill(r.status);
+                    const unseen = !!r.adminResponse && !r.adminResponseSeenAt;
                     return (
-                      <li key={`a-${r.id}`} className="rounded-lg border bg-card p-3 text-sm">
+                      <li key={`a-${r.id}`} className={`rounded-lg border bg-card p-3 text-sm ${unseen ? "ring-2 ring-emerald-400/60" : ""}`}>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span className={`rounded px-2 py-0.5 ${pill.cls}`}>{pill.label}</span>
                           {r.adminResponse && (
                             <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">
                               <MessageSquare className="h-3 w-3" />
-                              תגובה מהצוות
+                              {unseen ? "תגובה חדשה מהצוות" : "תגובה מהצוות"}
                             </Badge>
                           )}
                           <span>פרק {r.question.chapter.number}</span>
@@ -266,14 +322,15 @@ export default async function ProfilePage() {
                 <ul className="space-y-3">
                   {debugReports.map((r) => {
                     const pill = statusPill(r.status);
+                    const unseen = !!r.adminResponse && !r.adminResponseSeenAt;
                     return (
-                      <li key={`d-${r.id}`} className="rounded-lg border bg-card p-3 text-sm">
+                      <li key={`d-${r.id}`} className={`rounded-lg border bg-card p-3 text-sm ${unseen ? "ring-2 ring-emerald-400/60" : ""}`}>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span className={`rounded px-2 py-0.5 ${pill.cls}`}>{pill.label}</span>
                           {r.adminResponse && (
                             <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">
                               <MessageSquare className="h-3 w-3" />
-                              תגובה מהצוות
+                              {unseen ? "תגובה חדשה מהצוות" : "תגובה מהצוות"}
                             </Badge>
                           )}
                           <span>{KIND_LABEL[r.kind] ?? r.kind}</span>
