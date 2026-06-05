@@ -251,7 +251,32 @@ async function runGenerationPass(
     C: parsed.whyOthersWrong?.C ?? "",
     D: parsed.whyOthersWrong?.D ?? "",
   };
+  reconcileCorrectAnswer(parsed);
   return parsed;
+}
+
+// The schema asks the model to leave whyOthersWrong empty for the correct
+// option and write a real explanation for each wrong option. Pro occasionally
+// emits a 1-token slip on the discrete `correctAnswer` field while still
+// using the per-option whyOthersWrong slots correctly (e.g. emits
+// correctAnswer="D" but leaves whyOthersWrong.B empty and writes a real
+// "D is wrong because..." string). The per-option signal is far more
+// reliable because the model had to actively populate four fields and only
+// emptied the one it considered correct. When exactly one whyOthersWrong
+// slot is empty and it disagrees with `correctAnswer`, trust the empty slot.
+function reconcileCorrectAnswer(parsed: StructuredAnswer): void {
+  const choices: Choice[] = ["A", "B", "C", "D"];
+  const isEmpty = (v: string) => !v || v.trim().length < 5;
+  const emptySlots = choices.filter((c) => isEmpty(parsed.whyOthersWrong[c]));
+  if (emptySlots.length !== 1) return;
+  const inferred = emptySlots[0];
+  if (inferred === parsed.correctAnswer) return;
+  console.warn(
+    `[rag.answer] correctAnswer self-contradiction: model returned ` +
+      `correctAnswer="${parsed.correctAnswer}" but only whyOthersWrong.${inferred} ` +
+      `is empty. Auto-correcting to "${inferred}".`,
+  );
+  parsed.correctAnswer = inferred;
 }
 
 export async function generateExplanationForQuestionV2(
