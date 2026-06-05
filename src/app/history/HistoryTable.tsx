@@ -12,9 +12,9 @@ export type HistoryRow = {
   chapterNumber: number;
   chapterTitle: string;
   attempts: number;
-  lastSeenAt: string;
-  lastChoice: "A" | "B" | "C" | "D";
-  lastCorrect: boolean;
+  lastSeenAt: string | null;
+  lastChoice: "A" | "B" | "C" | "D" | null;
+  lastCorrect: boolean | null;
   lastQuizId: number | null;
   bookmarked: boolean;
   communityAttempts: number;
@@ -264,10 +264,12 @@ export function HistoryTable({
                   )}
                 </td>
                 <td className="p-2 text-center whitespace-nowrap text-muted-foreground">
-                  {DATE_FORMATTER.format(new Date(r.lastSeenAt))}
+                  {r.lastSeenAt ? DATE_FORMATTER.format(new Date(r.lastSeenAt)) : "—"}
                 </td>
                 <td className="p-2 text-center whitespace-nowrap">
-                  {r.lastCorrect ? (
+                  {r.lastCorrect === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : r.lastCorrect ? (
                     <span className="text-xs rounded px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
                       ✓ נכון ({r.lastChoice})
                     </span>

@@ -28,12 +28,15 @@ export default async function HistoryPage({
     result?: string;
     sort?: string;
     order?: string;
+    all?: string;
   }>;
 }) {
   const me = await requireCompletedProfile();
   const sp = await searchParams;
   const sort: SortField = isSortField(sp.sort) ? sp.sort : "lastSeen";
   const order: SortOrder = sp.order === "asc" ? "asc" : "desc";
+  const isAdmin = me.role === "ADMIN";
+  const showAll = isAdmin && sp.all === "1";
 
   const planGate = await questionAccessWhere(me);
 
@@ -69,22 +72,24 @@ export default async function HistoryPage({
     }
   }
 
-  // Fetch all questions the user has at least one attempt for that match the filter.
-  // Per-user volume is bounded (an active user might attempt ~thousands of questions);
-  // we cap output at LIMIT after sorting/filtering by latest-attempt metadata.
+  // Fetch questions matching the filter. By default we restrict to questions
+  // the user has at least one attempt for; admins can opt into showing all.
   const attemptedQuestions = await db.question.findMany({
-    where: {
-      AND: [
-        questionWhere,
-        { attempts: { some: { userId: me.id } } },
-      ],
-    },
+    where: showAll
+      ? questionWhere
+      : {
+          AND: [
+            questionWhere,
+            { attempts: { some: { userId: me.id } } },
+          ],
+        },
     select: {
       id: true,
       stem: true,
       source: true,
       chapter: { select: { number: true, title: true } },
     },
+    take: showAll ? 5000 : undefined,
   });
 
   const questionIds = attemptedQuestions.map((q) => q.id);
@@ -148,7 +153,7 @@ export default async function HistoryPage({
   let rows: HistoryRow[] = attemptedQuestions
     .map((q) => {
       const latest = latestMap.get(q.id);
-      if (!latest) return null;
+      if (!latest && !showAll) return null;
       const communityTotal = communityTotalMap.get(q.id) ?? 0;
       const communityCorrect = communityCorrectMap.get(q.id) ?? 0;
       return {
@@ -158,10 +163,10 @@ export default async function HistoryPage({
         chapterNumber: q.chapter.number,
         chapterTitle: q.chapter.title,
         attempts: countMap.get(q.id) ?? 0,
-        lastSeenAt: latest.createdAt.toISOString(),
-        lastChoice: latest.chosen,
-        lastCorrect: latest.isCorrect,
-        lastQuizId: latest.quizId,
+        lastSeenAt: latest ? latest.createdAt.toISOString() : null,
+        lastChoice: latest ? latest.chosen : null,
+        lastCorrect: latest ? latest.isCorrect : null,
+        lastQuizId: latest ? latest.quizId : null,
         bookmarked: bookmarkSet.has(q.id),
         communityAttempts: communityTotal,
         communityCorrect,
@@ -189,8 +194,11 @@ export default async function HistoryPage({
         return (a.chapterNumber - b.chapterNumber) * dir;
       case "attempts":
         return (a.attempts - b.attempts) * dir;
-      case "lastResult":
-        return ((a.lastCorrect ? 1 : 0) - (b.lastCorrect ? 1 : 0)) * dir;
+      case "lastResult": {
+        const av = a.lastCorrect === null ? -1 : a.lastCorrect ? 1 : 0;
+        const bv = b.lastCorrect === null ? -1 : b.lastCorrect ? 1 : 0;
+        return (av - bv) * dir;
+      }
       case "communityPercent": {
         const av = a.communityPercentCorrect;
         const bv = b.communityPercentCorrect;
@@ -200,10 +208,11 @@ export default async function HistoryPage({
         return (av - bv) * dir;
       }
       case "lastSeen":
-      default:
-        return (
-          (new Date(a.lastSeenAt).getTime() - new Date(b.lastSeenAt).getTime()) * dir
-        );
+      default: {
+        const at = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+        const bt = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+        return (at - bt) * dir;
+      }
     }
   });
 
@@ -224,11 +233,11 @@ export default async function HistoryPage({
       </div>
 
       <Suspense>
-        <HistoryFilters chapters={chapters} />
+        <HistoryFilters chapters={chapters} isAdmin={isAdmin} />
       </Suspense>
 
       <div className="text-sm text-muted-foreground">
-        {totalAttempted === 0
+        {!showAll && totalAttempted === 0
           ? "עדיין לא ניסית שאלות. גש/י ללימוד כדי להתחיל."
           : filteredTotal > LIMIT
             ? `מציג ${LIMIT} מתוך ${filteredTotal} שאלות`

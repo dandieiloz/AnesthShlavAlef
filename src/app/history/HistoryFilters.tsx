@@ -7,7 +7,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 type Chapter = { number: number; title: string };
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
 
-export function HistoryFilters({ chapters }: { chapters: Chapter[] }) {
+export function HistoryFilters({ chapters, isAdmin = false }: { chapters: Chapter[]; isAdmin?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
@@ -114,6 +114,19 @@ export function HistoryFilters({ chapters }: { chapters: Chapter[] }) {
           נקה
         </button>
       </div>
+
+      {isAdmin && (
+        <label className="flex items-center gap-2 text-sm text-muted-foreground basis-full">
+          <input
+            type="checkbox"
+            name="all"
+            value="1"
+            defaultChecked={params.get("all") === "1"}
+            className="h-4 w-4"
+          />
+          <span>הצג גם שאלות שלא נראו (אדמין)</span>
+        </label>
+      )}
     </form>
   );
 }
