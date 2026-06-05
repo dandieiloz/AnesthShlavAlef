@@ -43,6 +43,12 @@ const SYSTEM_PROMPT = [
   "  ✓ תשובה נכונה: C — היא השינוי המוקדם ביותר מבין האפשרויות הקיימות שמצוטט מילולית במקור.",
   "  ✗ תשובה שגויה: D — המקור אומר 'decreases in PVR' אבל אפשרות D אומרת 'עלייה ב-PVR' (כיוון הפוך). לא לבחור בה רק כי היא נוגעת בנושא PVR. אין במקור אפשרות 'ירידה ב-PVR', ולכן הופכים לאפשרות הבאה הנתמכת מילולית.",
   "",
+  "RULE 6 — ערך מחושב חייב להתמפות לאפשרות:",
+  "אם הסקת מסקנה מספרית (X mmHg, Y mEq/L, Z שעות וכו'), עבור על כל ארבע האפשרויות וחפש את המספר X בתוך הטקסט של כל אפשרות. המספר עשוי להופיע בפורמט לא רגיל (לפני או אחרי היחידה, עם או בלי רווח, למשל 'mmHg 80' במקום '80 mmHg' עקב כיווניות RTL). אסור לכתוב 'הערך המחושב אינו מופיע באפשרויות' לפני שווידאת מילולית, מספרה-במספרה, שהוא באמת אינו שם. אם המספר X נמצא באחת האפשרויות (בכל פורמט) — האפשרות הזו היא הנכונה, גם אם הפורמט שלה שונה ממה שציפית.",
+  "דוגמה — שאלה: 'מה ה-PaCO2 הבסיסי?'. חישוב: 80 mmHg. אפשרויות: A. mmHg 40, B. mmHg 50, C. mmHg 60, D. mmHg 80.",
+  "  ✓ תשובה נכונה: D — הטקסט 'mmHg 80' מכיל את המספר 80 שחישבת.",
+  "  ✗ תשובה שגויה: C עם נימוק 'אפשרות 80 לא קיימת ולכן 60 קרובה ביותר' — זו הזיה. ספור מספרה-במספרה: 'mmHg 80' מכיל '80'. האפשרות קיימת.",
+  "",
   "*** סוף חוקי הכרעה ***",
   "",
   "תפקידך: עוזר הוראה לרופאים מתמחים באנסתזיולוגיה.",
@@ -124,6 +130,20 @@ const PER_QUERY_K = 30;
 // SYSTEM_PROMPT rules 1–3).
 const GEN_THINKING_BUDGET = 128;
 
+// Reorder option text when the unit appears before the number, e.g.
+// "mmHg 80" -> "80 mmHg". Some questions were uploaded under RTL
+// rendering and the unit/number got swapped. We don't mutate the DB —
+// only the prompt view — so the model can match calculated numeric
+// answers to the right option without parsing through the inverted
+// format. Falls through unchanged for any text that doesn't match.
+const UNIT_BEFORE_NUMBER_RE = /^([\p{L}/%μ]+)\s+(\d+(?:[.,]\d+)?(?:\s*[-–/]\s*\d+(?:[.,]\d+)?)?)(\s.*)?$/u;
+function normalizeOptionForPrompt(s: string): string {
+  const m = s.trim().match(UNIT_BEFORE_NUMBER_RE);
+  if (!m) return s;
+  const [, unit, number, rest] = m;
+  return `${number} ${unit}${rest ?? ""}`;
+}
+
 function buildUserPrompt(opts: {
   stem: string;
   optionA: string;
@@ -146,10 +166,10 @@ function buildUserPrompt(opts: {
     "שאלה:",
     opts.stem,
     "",
-    `א. ${opts.optionA}`,
-    `ב. ${opts.optionB}`,
-    `ג. ${opts.optionC}`,
-    `ד. ${opts.optionD}`,
+    `א. ${normalizeOptionForPrompt(opts.optionA)}`,
+    `ב. ${normalizeOptionForPrompt(opts.optionB)}`,
+    `ג. ${normalizeOptionForPrompt(opts.optionC)}`,
+    `ד. ${normalizeOptionForPrompt(opts.optionD)}`,
     "",
     `להלן ${opts.chunks.length} קטעי מקור מספר הלימוד (ממספר פרקים). אלה הם היחידים שמותר להסתמך עליהם:`,
     sourceBlock,
