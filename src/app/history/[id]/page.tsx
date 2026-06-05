@@ -36,10 +36,11 @@ export default async function HistoryQuestionPage({
   if (!Number.isFinite(questionId)) notFound();
 
   // The user must have at least one attempt for this question; otherwise this page is hidden.
+  // Admins can view any question to support troubleshooting and content review.
   const userAttemptCount = await db.attempt.count({
     where: { userId: me.id, questionId },
   });
-  if (userAttemptCount === 0) notFound();
+  if (userAttemptCount === 0 && me.role !== "ADMIN") notFound();
 
   await assertCanAccessQuestion(me, questionId);
 
@@ -244,6 +245,9 @@ export default async function HistoryQuestionPage({
       <Card>
         <CardContent className="p-4 space-y-2">
           <h2 className="text-sm font-semibold">הניסיונות שלי ({attempts.length})</h2>
+          {attempts.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">עדיין לא ניסית שאלה זו.</p>
+          ) : (
           <ul className="divide-y">
             {attempts.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -273,6 +277,7 @@ export default async function HistoryQuestionPage({
               </li>
             ))}
           </ul>
+          )}
         </CardContent>
       </Card>
     </div>
