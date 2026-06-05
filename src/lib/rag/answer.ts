@@ -8,14 +8,38 @@ import { translateStemToEnglish } from "./translate";
 import { hashQuestion } from "./hash";
 import type { CachedAnswerPayload, EvidenceCitation, RetrievedChunk, StructuredAnswer } from "./types";
 
-/**
- * v2 system prompt: NO chapter hints. The model is told evidence may come
- * from any chapter and is required to cite which chapter it actually used
- * for each piece of evidence (these citations later drive the question's
- * derived chapter tags).
- */
+// v2 system prompt: literal-evidence priority rules are HOISTED to the top
+// of the system instruction (before the role description) so the model
+// processes them first. Each rule is imperative ("RULE N: ...") and is
+// followed by a Hebrew worked example matched to a real B-class failure
+// pattern observed in our regression set (Q1 hepatic zones, Q9 procedure-
+// vs-patient risk, Q6 dexamethasone duration). The role description and
+// schema specification come AFTER the rules.
 const SYSTEM_PROMPT = [
-  "אתה עוזר הוראה לרופאים מתמחים באנסתזיולוגיה.",
+  "*** חוקי הכרעה — קרא לפני כל דבר אחר ***",
+  "",
+  "RULE 1 — מילוליות לפני מכניסטיקה:",
+  "אם קטע במקור קובע במפורש את התשובה לשאלה, החזר אותה כפי שכתוב גם אם שרשרת ההסקה הפיזיולוגית/הביוכימית שלך נראית כאילו מובילה לתשובה אחרת. אל תבנה שרשרת חלופית 'כי היא הגיונית'.",
+  "דוגמה — שאלה: 'איזו פונקציית כבד נפגעת בעיקר בהיפוקסיה כבדית?' המקור אומר: 'zone 3 hepatocytes are the most sensitive to hypoxia, and zone 3 is the primary site of glycolysis'.",
+  "  ✓ תשובה נכונה: Glycolysis (כי המקור מצביע ישירות על zone 3 = glycolysis).",
+  "  ✗ תשובה שגויה: Gluconeogenesis (שרשרת מכניסטית 'היפוקסיה פוגעת בתהליכים אירוביים → gluconeogenesis אירובי → הוא ייפגע' — זו דווקא שרשרת שמתעלמת מהאמירה המילולית של המקור).",
+  "",
+  "RULE 2 — סיווג מפורש לפני סיווג גנרי:",
+  "אם המקור מסווג ישות ספציפית (ניתוח, תרופה, גורם סיכון) בקטגוריה מסוימת ברשימה, השתמש בסיווג הזה — אל תחליף אותו בקטגוריה כללית יותר רק כי המטופל/ההקשר נראה מתאים לקטגוריה אחרת.",
+  "דוגמה — שאלה: 'מטופל בן 70 לפני TUR-P ללא גורמי סיכון, מה ההערכה הקרדיאלית לפי ESC 2022?'. המקור מסווג TUR-P במפורש כ-minor urologic surgery עם low cardiac risk.",
+  "  ✓ תשובה נכונה: אישור ללא בדיקות נוספות (כי הסיווג של הפרוצדורה הוא low risk).",
+  "  ✗ תשובה שגויה: ECG + biomarkers + הערכה תפקודית (שרשרת 'גיל ≥65 → intermediate risk → צריך biomarkers' — זו שרשרת שמערבבת בין סיווג המטופל לסיווג הפרוצדורה, ומתעלמת מהסיווג המפורש של TUR-P כ-low risk).",
+  "",
+  "RULE 3 — מספרים מדויקים בלבד:",
+  "אם המקור נוקב בערך מספרי או טווח זמן ספציפי, אל תוריד אותו בשקט לערך אחר. הצטט בדיוק את המספר מהמקור או הצהר insufficientEvidence=true.",
+  "דוגמה — המקור אומר 'dexamethasone יכול להאריך חסם פריפרי עד 10 שעות'. אל תכתוב 'כ-4 שעות' אפילו אם 'אתה זוכר' ערך נמוך יותר ממקור אחר.",
+  "",
+  "RULE 4 — בדיקה עצמית לפני שליחת JSON:",
+  "עבור על כל ציטוט ב-evidence[] וודא שהוא תומך ב-correctAnswer. אם הציטוט שצוטטת אומר 'אין ראיה ש-X משפר Y' ובחרת ב-Y כתשובה — הפוך את התשובה או הצהר insufficientEvidence=true. אם הציטוט מצביע על אפשרות אחרת מזו שבחרת — שנה את ה-correctAnswer.",
+  "",
+  "*** סוף חוקי הכרעה ***",
+  "",
+  "תפקידך: עוזר הוראה לרופאים מתמחים באנסתזיולוגיה.",
   "התשובות שלך מבוססות אך ורק על קטעי המקור המצורפים מספר Millers Anesthesia.",
   "הקטעים עשויים להגיע מפרקים שונים — אל תניח שהתשובה נמצאת בפרק כלשהו מראש.",
   "אם המידע אינו מופיע במקור המצורף, הגדר insufficientEvidence = true והסבר זאת.",
@@ -84,10 +108,15 @@ const RESPONSE_SCHEMA = {
 // the top-K cluster being concentrated in a single chapter.
 const RERANK_POOL = 25;        // top-N kept from the Flash judge
 const TOP_K_GEN = 15;          // chunks actually sent to the generator
-const MAX_CHUNKS_PER_CHAPTER = 3;
+const MAX_CHUNKS_PER_CHAPTER = 5;
 const RETRY_RERANK_POOL = 30;
 const RETRY_TOP_K_GEN = 18;
+const RETRY_MAX_CHUNKS_PER_CHAPTER = 6;
 const PER_QUERY_K = 30;
+// Minimum allowed Pro thinking budget. Caps overlong mechanistic-reasoning
+// chains that were observed to override literal textbook evidence (see
+// SYSTEM_PROMPT rules 1–3).
+const GEN_THINKING_BUDGET = 128;
 
 function buildUserPrompt(opts: {
   stem: string;
@@ -205,7 +234,14 @@ async function runGenerationPass(
   hint?: string,
 ): Promise<StructuredAnswer> {
   const userPrompt = buildUserPrompt({ ...question, chunks, hint });
-  const parsed = await generateJson<StructuredAnswer>(model, SYSTEM_PROMPT, userPrompt, RESPONSE_SCHEMA, 0.2);
+  const parsed = await generateJson<StructuredAnswer>(
+    model,
+    SYSTEM_PROMPT,
+    userPrompt,
+    RESPONSE_SCHEMA,
+    0,
+    { thinkingBudget: GEN_THINKING_BUDGET },
+  );
   // Defensive coercion: ensure confidence is in [0,1] and whyOthersWrong has all keys
   parsed.confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
   parsed.evidence = parsed.evidence ?? [];
@@ -337,7 +373,7 @@ export async function generateExplanationForQuestionV2(
       expandedCandidates,
       RETRY_RERANK_POOL,
     );
-    finalChunks = pickDiverseTopN(expandedPool, RETRY_TOP_K_GEN, MAX_CHUNKS_PER_CHAPTER);
+    finalChunks = pickDiverseTopN(expandedPool, RETRY_TOP_K_GEN, RETRY_MAX_CHUNKS_PER_CHAPTER);
     structured = await runGenerationPass(GEN_MODEL, finalChunks, question, hint);
   }
 

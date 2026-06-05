@@ -171,6 +171,14 @@ function looksLikeRunningHeadFoot(text: string): boolean {
 }
 
 const CAPTION_RE = /^(FIGURE|FIG\.|TABLE|BOX|VIDEO|EQUATION|EQ\.)\s+\d+[.\-]?\d*\b/i;
+const CAPTION_KEEP_RE = /^(TABLE|BOX|EQUATION|EQ\.)\s+\d+[.\-]?\d*\b/i;
+const CAPTION_FIGURE_RE = /^(FIGURE|FIG\.)\s+\d+[.\-]?\d*\b/i;
+const CAPTION_VIDEO_RE = /^(VIDEO)\s+\d+[.\-]?\d*\b/i;
+// Figure/Fig. captions are kept only when their body has at least this many
+// chars of prose (e.g., Fig. 44.9 decision pathway). Short photo-style
+// captions ("Diagram of the larynx.") fall below this threshold and are
+// suppressed as before.
+const FIGURE_KEEP_MIN_BODY_CHARS = 100;
 
 function looksLikeCaptionStart(text: string): boolean {
   return CAPTION_RE.test(text.trim());
@@ -440,21 +448,45 @@ export async function extractStructuredChunks(pdfData: Uint8Array): Promise<Extr
     }
     flushColumns();
 
-    // Caption suppression: walk lines and skip a contiguous run that starts
-    // with FIGURE/TABLE/BOX/etc. and is set in <body font (i.e. visually a
-    // caption block). Stop suppressing when we hit a line at body size again.
+    // Selective caption handling: previously we dropped any contiguous below-
+    // body-font run that started with FIGURE/TABLE/BOX/etc., which stripped
+    // every table/box body from the index. Now we KEEP tables, boxes, and
+    // equations (their bodies carry answer-relevant cells), KEEP text-rich
+    // figure captions, and only drop short photo-style figure captions and
+    // VIDEO placeholders. Preserved lines are bumped to body font so the
+    // downstream heading classifier and chunker treat them as normal prose.
     let i = 0;
     while (i < pageLines.length) {
       const ln = pageLines[i];
-      if (looksLikeCaptionStart(ln.text) && ln.size <= pageBodySize - CAPTION_SIZE_GAP + 0.05) {
-        let j = i + 1;
-        while (j < pageLines.length && pageLines[j].size <= pageBodySize - CAPTION_SIZE_GAP + 0.05) {
-          j++;
-        }
+      const isCaption =
+        looksLikeCaptionStart(ln.text) &&
+        ln.size <= pageBodySize - CAPTION_SIZE_GAP + 0.05;
+      if (!isCaption) {
+        i++;
+        continue;
+      }
+      let j = i + 1;
+      while (j < pageLines.length && pageLines[j].size <= pageBodySize - CAPTION_SIZE_GAP + 0.05) {
+        j++;
+      }
+      const captionText = ln.text;
+      const bodyChars = pageLines.slice(i + 1, j).reduce((n, l) => n + l.text.length, 0);
+      const keepKind =
+        CAPTION_KEEP_RE.test(captionText)
+          ? "table-or-box"
+          : CAPTION_FIGURE_RE.test(captionText) && bodyChars >= FIGURE_KEEP_MIN_BODY_CHARS
+            ? "figure"
+            : CAPTION_VIDEO_RE.test(captionText)
+              ? "drop"
+              : "drop";
+      if (keepKind === "drop") {
         pageLines.splice(i, j - i);
         continue;
       }
-      i++;
+      for (let k = i; k < j; k++) {
+        pageLines[k] = { ...pageLines[k], size: pageBodySize };
+      }
+      i = j;
     }
 
     for (const ln of pageLines) {

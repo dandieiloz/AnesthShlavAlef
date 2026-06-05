@@ -55,14 +55,16 @@ export async function retrieveCandidates(opts: {
 }): Promise<RetrievedChunk[]> {
   const k = opts.perQueryK ?? PER_QUERY_K;
 
-  const heVec = await embedText(opts.hebrewQuery, "RETRIEVAL_QUERY");
-  const hePromise = annSearch(heVec, k);
-  let enPromise: Promise<Row[]> | null = null;
-  if (opts.englishQuery && opts.englishQuery.trim().length > 0) {
-    enPromise = embedText(opts.englishQuery, "RETRIEVAL_QUERY").then((v) => annSearch(v, k));
-  }
-  const heRows = await hePromise;
-  const enRows = enPromise ? await enPromise : [];
+  const hasEn = !!(opts.englishQuery && opts.englishQuery.trim().length > 0);
+  // Launch both queries in parallel via Promise.all so a rejection on either
+  // branch is observed and surfaced as a single awaited rejection — otherwise
+  // an early HE failure leaves the EN promise unhandled and crashes the process.
+  const [heRows, enRows] = await Promise.all<Row[]>([
+    embedText(opts.hebrewQuery, "RETRIEVAL_QUERY").then((v) => annSearch(v, k)),
+    hasEn
+      ? embedText(opts.englishQuery as string, "RETRIEVAL_QUERY").then((v) => annSearch(v, k))
+      : Promise.resolve<Row[]>([]),
+  ]);
 
   // Dedup by chunk id, keeping the lowest (best) vector score across both queries.
   const merged = new Map<number, RetrievedChunk>();

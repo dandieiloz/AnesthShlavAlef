@@ -7,6 +7,8 @@ const SYS = [
   "Given a question and a set of candidate textbook passages, score how directly each passage helps answer the question on a 0..10 scale.",
   "10 = passage contains the answer or its definitive evidence. 0 = irrelevant.",
   "Be strict: only the most directly evidential passages should score >= 7.",
+  "For outcome-type questions (e.g. 'what does X improve / reduce / prevent', 'which complication is most/least common'), passages that explicitly NAME the specific outcome from the question score higher than passages that merely discuss the same device/drug/topic in general.",
+  "Passages that explicitly RULE OUT a candidate answer (e.g. 'there is no evidence X improves mortality', 'X is not associated with Y') are high-value evidence \u2014 score them >= 7 when they negate a plausible distractor.",
   "Score each passage independently. Return JSON only.",
 ].join("\n");
 

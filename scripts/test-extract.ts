@@ -29,14 +29,39 @@ async function main() {
   const caps = chunks.filter((c) => /^(FIGURE|TABLE|FIG\.)\s+\d/i.test(c.text.slice(0, 30)));
   console.log(`Caption-leading chunks: ${caps.length}`);
 
+  // Phase 2 visibility: how many chunks contain TABLE/BOX/EQUATION mentions anywhere?
+  // Tracks whether preserved tables/boxes are actually making it into the index.
+  const tableMentions = chunks.filter((c) => /\bTABLE\s+\d/i.test(c.text)).length;
+  const boxMentions = chunks.filter((c) => /\bBOX\s+\d/i.test(c.text)).length;
+  const eqMentions = chunks.filter((c) => /\bEQUATION\s+\d/i.test(c.text)).length;
+  const figureMentions = chunks.filter((c) => /\bFIG(?:URE)?\.?\s+\d/i.test(c.text)).length;
+  console.log(`TABLE-mention chunks: ${tableMentions}  BOX: ${boxMentions}  EQUATION: ${eqMentions}  FIGURE: ${figureMentions}`);
+
   const mojibake = chunks.filter((c) => /[\uE000-\uF8FF\u144F]/.test(c.text));
   console.log(`PUA/mojibake chunks: ${mojibake.length}`);
 
-  const matches = chunks.filter((c) => c.text.toLowerCase().includes(needle));
-  console.log(`\n--- "${needle}" matches: ${matches.length} ---`);
-  for (const c of matches) {
-    console.log(`\n[ord=${c.ord} pages ${c.pageStart}-${c.pageEnd}] section: ${c.sectionPath}`);
-    console.log(c.text);
+  // The needle arg can be a comma-separated list to assert several substrings
+  // co-occur somewhere in the index (e.g., "Brain tumor,peptic ulcer" for
+  // Table 46.2). When a single token, behaves as before.
+  const needles = needle.split(",").map((s) => s.trim()).filter(Boolean);
+  if (needles.length > 1) {
+    console.log(`\n--- co-occurrence check: ${needles.map((n) => `"${n}"`).join(" + ")} ---`);
+    const both = chunks.filter((c) => {
+      const lc = c.text.toLowerCase();
+      return needles.every((n) => lc.includes(n));
+    });
+    console.log(`chunks containing all ${needles.length} needles: ${both.length}`);
+    for (const c of both.slice(0, 3)) {
+      console.log(`\n[ord=${c.ord} pages ${c.pageStart}-${c.pageEnd}] section: ${c.sectionPath}`);
+      console.log(c.text.slice(0, 1200));
+    }
+  } else {
+    const matches = chunks.filter((c) => c.text.toLowerCase().includes(needle));
+    console.log(`\n--- "${needle}" matches: ${matches.length} ---`);
+    for (const c of matches) {
+      console.log(`\n[ord=${c.ord} pages ${c.pageStart}-${c.pageEnd}] section: ${c.sectionPath}`);
+      console.log(c.text);
+    }
   }
 }
 

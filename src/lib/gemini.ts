@@ -52,6 +52,7 @@ export async function generateJson<T>(
   userPrompt: string,
   schema: Schema,
   temperature = 0.2,
+  thinkingConfig?: { thinkingBudget: number },
 ): Promise<T> {
   const resp = await genai.models.generateContent({
     model,
@@ -61,6 +62,7 @@ export async function generateJson<T>(
       temperature,
       responseMimeType: "application/json",
       responseSchema: schema,
+      ...(thinkingConfig ? { thinkingConfig } : {}),
     },
   });
   const raw = resp.text ?? "";
