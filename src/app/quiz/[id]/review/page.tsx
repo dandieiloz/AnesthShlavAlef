@@ -354,7 +354,8 @@ export default async function QuizReviewPage({
                     {OPTION_KEYS.map((k, idx) => {
                       const optionText = optionTexts[idx];
                       const isChosen = attempt.chosen === k;
-                      const isCorrectAnswer = q.geminiAnswer?.correctAnswer === k;
+                      const isCorrectAnswer =
+                        q.geminiAnswer?.correctAnswer === k || q.acceptedAnswers.includes(k);
 
                       let rowClass =
                         "flex items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors ";
@@ -408,6 +409,8 @@ export default async function QuizReviewPage({
                             evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
                             whyOthersWrong={q.geminiAnswer.whyOthersWrong}
                             correctAnswer={q.geminiAnswer.correctAnswer}
+                            acceptedAnswers={q.acceptedAnswers}
+                            userChoice={attempt?.chosen ?? undefined}
                             options={[
                               { key: "A", text: q.optionA },
                               { key: "B", text: q.optionB },

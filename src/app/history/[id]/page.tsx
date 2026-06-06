@@ -129,7 +129,8 @@ export default async function HistoryQuestionPage({
 
           <div className="space-y-1.5">
             {OPTION_KEYS.map((k, idx) => {
-              const isCorrect = correctAnswer === k;
+              const isCorrect =
+                correctAnswer === k || question.acceptedAnswers.includes(k);
               const rowClass = isCorrect
                 ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
                 : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
@@ -162,6 +163,8 @@ export default async function HistoryQuestionPage({
                 evidenceCitations={question.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
                 whyOthersWrong={question.geminiAnswer.whyOthersWrong}
                 correctAnswer={question.geminiAnswer.correctAnswer}
+                acceptedAnswers={question.acceptedAnswers}
+                userChoice={attempts[0]?.chosen ?? undefined}
                 options={[
                   { key: "A", text: question.optionA },
                   { key: "B", text: question.optionB },

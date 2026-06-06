@@ -141,6 +141,7 @@ export default async function AdminQuestionsPage({
         stem: true,
         source: true,
         disabled: true,
+        acceptedAnswers: true,
         createdAt: true,
         chapter: { select: { number: true } },
         geminiAnswer: {
@@ -231,6 +232,7 @@ export default async function AdminQuestionsPage({
       chapterNumber: q.chapter.number,
       hasExplanation: q.geminiAnswer !== null,
       disabled: q.disabled,
+      acceptedAnswersCount: q.acceptedAnswers.length,
       confidence: q.geminiAnswer?.confidence ?? null,
       escalated: q.geminiAnswer?.escalated ?? null,
       insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,

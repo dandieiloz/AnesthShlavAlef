@@ -1,7 +1,7 @@
 import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { CitationPageLink } from "@/components/CitationPageLink";
-import { Lightbulb, BookMarked, XCircle, AlertTriangle } from "lucide-react";
+import { Lightbulb, BookMarked, XCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const HEBREW_LETTERS: Record<string, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
 
@@ -21,6 +21,10 @@ type Props = {
   evidenceCitations?: EvidenceCitationDisplay[] | null;
   whyOthersWrong: string;
   correctAnswer: Choice;
+  /** Additional choices an admin has marked as also accepted (excludes the primary `correctAnswer`). */
+  acceptedAnswers?: Choice[];
+  /** The choice the user actually submitted, used to decide whether to render the "also accepted" banner. */
+  userChoice?: Choice;
   options: { key: Choice; text: string }[];
   insufficientEvidence?: boolean;
   locale?: "he" | "en";
@@ -46,6 +50,7 @@ type Props = {
 const UI = {
   he: {
     insufficient: "הראיות בספר הלימוד אינן מספיקות להוכחה חד-משמעית. ההסבר מבוסס על הנחיות כלליות.",
+    alsoAccepted: "תשובה זו מתקבלת גם היא כתשובה נכונה. התשובה הראשית מוצגת למטה.",
     explanation: "הסבר",
     whyWrong: "מדוע שאר האפשרויות שגויות",
     evidence: "ראיות מספר הלימוד",
@@ -58,6 +63,7 @@ const UI = {
   },
   en: {
     insufficient: "The textbook evidence is insufficient for a definitive proof. The explanation is based on general guidelines.",
+    alsoAccepted: "This answer is also accepted. The explanation below refers to the primary answer.",
     explanation: "Explanation",
     whyWrong: "Why the other options are wrong",
     evidence: "Textbook Evidence",
@@ -85,6 +91,8 @@ export function AnswerExplanation({
   evidenceCitations,
   whyOthersWrong,
   correctAnswer,
+  acceptedAnswers,
+  userChoice,
   options,
   insufficientEvidence,
   locale = "he",
@@ -93,8 +101,15 @@ export function AnswerExplanation({
   highlightT,
 }: Props) {
   const wrongReasons = parseWhyOthersWrong(whyOthersWrong);
-  const wrongOptions = options.filter((o) => o.key !== correctAnswer);
+  const acceptedSet = new Set<Choice>(acceptedAnswers ?? []);
+  const wrongOptions = options.filter(
+    (o) => o.key !== correctAnswer && !acceptedSet.has(o.key),
+  );
   const hasWrongReasons = wrongOptions.some((o) => wrongReasons[o.key]);
+  const showAlsoAcceptedBanner =
+    userChoice !== undefined &&
+    userChoice !== correctAnswer &&
+    acceptedSet.has(userChoice);
   const ui = UI[locale];
   const dir = locale === "en" ? "ltr" : "rtl";
 
@@ -106,6 +121,17 @@ export function AnswerExplanation({
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             {ui.insufficient}
+          </p>
+        </div>
+      )}
+
+      {/* Also-accepted banner: shown when the user picked a non-primary answer
+          that the admin has marked as additionally accepted. */}
+      {showAlsoAcceptedBanner && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-emerald-400/50 bg-emerald-400/10 px-3.5 py-3">
+          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-xs leading-relaxed text-emerald-700 dark:text-emerald-300">
+            {ui.alsoAccepted}
           </p>
         </div>
       )}

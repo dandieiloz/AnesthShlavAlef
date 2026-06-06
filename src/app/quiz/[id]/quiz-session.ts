@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { getTranslatedFields } from "@/lib/translate";
-import { questionAccessWhere, type PlanGatedUser } from "@/lib/plan";
+import { questionAccessWhere, hasUsableAnswerWhere, type PlanGatedUser } from "@/lib/plan";
 import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import type { HighlightRecord } from "@/components/HighlightableMarkdown";
 
@@ -21,6 +21,8 @@ export type QuestionPayload = {
   videoUrl: string | null;
   answer: {
     correctAnswer: Choice;
+    /** Additional choices that an admin has marked as also accepted (excludes the primary correctAnswer). */
+    acceptedAnswers: Choice[];
     explanation: string;
     whyOthersWrong: string;
     evidenceCitations: EvidenceCitationDisplay[] | null;
@@ -55,15 +57,13 @@ function buildQuestionFilter(
   if (useFixedSet) {
     return {
       id: { in: quiz.questionIds, notIn: excludeIds },
-      geminiAnswer: { isNot: null },
-      AND: [planGate],
+      AND: [planGate, hasUsableAnswerWhere],
     };
   }
   return {
     chapterIds: { hasSome: quiz.chapterIds },
     id: { notIn: excludeIds },
-    geminiAnswer: { isNot: null },
-    AND: [planGate],
+    AND: [planGate, hasUsableAnswerWhere],
   };
 }
 
@@ -92,7 +92,9 @@ export async function loadQuizBatch(args: {
   });
 
   const hasMore = rows.length > batchSize;
-  const batch = rows.slice(0, batchSize).filter((q) => q.geminiAnswer);
+  const batch = rows.slice(0, batchSize).filter(
+    (q) => q.geminiAnswer || (q.imageUrl && q.correctAnswer),
+  );
   if (batch.length === 0) return { questions: [], hasMore: false };
 
   const ids = batch.map((q) => q.id);
@@ -144,7 +146,7 @@ export async function loadQuizBatch(args: {
 
   const questions: QuestionPayload[] = await Promise.all(
     batch.map(async (q) => {
-      const g = q.geminiAnswer!;
+      const g = q.geminiAnswer;
       const [qFields, ansFields] = await Promise.all([
         getTranslatedFields(
           "Question",
@@ -152,12 +154,14 @@ export async function loadQuizBatch(args: {
           { stem: q.stem, optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD },
           args.contentLocale,
         ),
-        getTranslatedFields(
-          "GeminiAnswer",
-          String(g.id),
-          { explanation: g.explanation, whyOthersWrong: g.whyOthersWrong },
-          args.contentLocale,
-        ),
+        g
+          ? getTranslatedFields(
+              "GeminiAnswer",
+              String(g.id),
+              { explanation: g.explanation, whyOthersWrong: g.whyOthersWrong },
+              args.contentLocale,
+            )
+          : Promise.resolve({ explanation: "", whyOthersWrong: "" }),
       ]);
       return {
         id: q.id,
@@ -172,11 +176,14 @@ export async function loadQuizBatch(args: {
         imageAlt: q.imageAlt,
         videoUrl: q.videoUrl,
         answer: {
-          correctAnswer: g.correctAnswer as Choice,
-          explanation: ansFields.explanation || g.explanation,
-          whyOthersWrong: ansFields.whyOthersWrong || g.whyOthersWrong,
-          evidenceCitations: (g.evidenceCitations as EvidenceCitationDisplay[] | null) ?? null,
-          insufficientEvidence: g.insufficientEvidence,
+          correctAnswer: (g?.correctAnswer ?? q.correctAnswer!) as Choice,
+          acceptedAnswers: (q.acceptedAnswers ?? []) as Choice[],
+          explanation: g ? (ansFields.explanation || g.explanation) : "",
+          whyOthersWrong: g ? (ansFields.whyOthersWrong || g.whyOthersWrong) : "",
+          evidenceCitations: g
+            ? ((g.evidenceCitations as EvidenceCitationDisplay[] | null) ?? null)
+            : null,
+          insufficientEvidence: g?.insufficientEvidence ?? false,
         },
         bookmarked: bookmarkedSet.has(q.id),
         latestReport: latestReportByQ.get(q.id) ?? null,
@@ -215,7 +222,7 @@ export async function loadQuizSession(args: {
     useFixedSet
       ? Promise.resolve(quiz.questionIds.length)
       : db.question.count({
-          where: { chapterIds: { hasSome: quiz.chapterIds }, geminiAnswer: { isNot: null }, AND: [planGate] },
+          where: { chapterIds: { hasSome: quiz.chapterIds }, AND: [planGate, hasUsableAnswerWhere] },
         }),
   ]);
 

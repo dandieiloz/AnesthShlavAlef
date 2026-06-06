@@ -69,6 +69,8 @@ export default async function BookmarksPage() {
             optionB: true,
             optionC: true,
             optionD: true,
+            correctAnswer: true,
+            acceptedAnswers: true,
             imageUrl: true,
             imageAlt: true,
             videoUrl: true,
@@ -240,7 +242,8 @@ export default async function BookmarksPage() {
                       {/* Answer options */}
                       <div className="space-y-1.5">
                         {OPTION_KEYS.map((k, idx) => {
-                          const isCorrect = correctAnswer === k;
+                          const isCorrect =
+                            correctAnswer === k || q.acceptedAnswers.includes(k);
                           const rowClass = isCorrect
                             ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
                             : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
@@ -276,6 +279,7 @@ export default async function BookmarksPage() {
                                 evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
                                 whyOthersWrong={q.geminiAnswer.whyOthersWrong}
                                 correctAnswer={q.geminiAnswer.correctAnswer}
+                                acceptedAnswers={q.acceptedAnswers}
                                 options={[
                                   { key: "A", text: q.optionA },
                                   { key: "B", text: q.optionB },

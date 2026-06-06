@@ -15,12 +15,16 @@ const QuestionSchema = z.object({
   optionC: z.string().min(1),
   optionD: z.string().min(1),
   correctAnswer: z.enum(["A", "B", "C", "D"]).optional(),
+  // Additional choices that are also accepted as correct alongside `correctAnswer`.
+  // The primary correctAnswer is always implicitly accepted and is filtered out of this array on save.
+  acceptedAnswers: z.array(z.enum(["A", "B", "C", "D"])).default([]),
   source: z.string().optional(),
 });
 
 export async function saveQuestionAction(formData: FormData) {
   const me = await requireAdmin();
   const rawCorrectAnswer = formData.get("correctAnswer");
+  const rawAcceptedAnswers = formData.getAll("acceptedAnswers").map((v) => String(v));
   const data = QuestionSchema.parse({
     id: formData.get("id") || undefined,
     chapterNumber: formData.get("chapterNumber"),
@@ -30,6 +34,7 @@ export async function saveQuestionAction(formData: FormData) {
     optionC: formData.get("optionC"),
     optionD: formData.get("optionD"),
     correctAnswer: rawCorrectAnswer || undefined,
+    acceptedAnswers: rawAcceptedAnswers,
     source: (() => {
       const inst = ((formData.get("sourceInstitution") as string) || "").trim();
       const yr = ((formData.get("sourceYear") as string) || "").trim();
@@ -39,14 +44,29 @@ export async function saveQuestionAction(formData: FormData) {
         : inst || yr || undefined;
     })(),
   });
+  // Defensive: never store the primary correct answer inside `acceptedAnswers`,
+  // and de-duplicate. The primary is always implicitly accepted at validation time.
+  const acceptedAnswers = Array.from(
+    new Set(data.acceptedAnswers.filter((c) => c !== data.correctAnswer)),
+  );
   const chapter = await db.chapter.findUnique({ where: { number: data.chapterNumber } });
   if (!chapter) throw new Error("Chapter not found");
 
   if (data.id) {
-    // Fetch existing values so we only invalidate translations for fields that actually changed.
+    // Fetch existing values so we only invalidate translations for fields that actually changed,
+    // and so we can decide whether to re-score past attempts.
     const existing = await db.question.findUnique({
       where: { id: data.id },
-      select: { stem: true, optionA: true, optionB: true, optionC: true, optionD: true },
+      select: {
+        stem: true,
+        optionA: true,
+        optionB: true,
+        optionC: true,
+        optionD: true,
+        correctAnswer: true,
+        acceptedAnswers: true,
+        geminiAnswer: { select: { correctAnswer: true } },
+      },
     });
     await db.question.update({
       where: { id: data.id },
@@ -57,6 +77,7 @@ export async function saveQuestionAction(formData: FormData) {
         optionC: data.optionC,
         optionD: data.optionD,
         correctAnswer: data.correctAnswer ?? null,
+        acceptedAnswers,
         source: data.source ?? null,
       },
     });
@@ -69,6 +90,31 @@ export async function saveQuestionAction(formData: FormData) {
       if (existing.optionD !== data.optionD) changed.push("optionD");
       if (changed.length > 0) {
         await invalidateTranslations("Question", String(data.id), changed);
+      }
+      // Retroactive re-score: if the accepted set OR the primary changed, fix
+      // existing Attempt rows so historical stats reflect the new ruling.
+      const prevPrimary = existing.geminiAnswer?.correctAnswer ?? existing.correctAnswer ?? null;
+      const newPrimary = existing.geminiAnswer?.correctAnswer ?? (data.correctAnswer ?? null);
+      const prevSet = new Set<string>([
+        ...(prevPrimary ? [prevPrimary] : []),
+        ...existing.acceptedAnswers,
+      ]);
+      const nextSet = new Set<string>([
+        ...(newPrimary ? [newPrimary] : []),
+        ...acceptedAnswers,
+      ]);
+      const setsEqual =
+        prevSet.size === nextSet.size && [...prevSet].every((c) => nextSet.has(c));
+      if (!setsEqual && newPrimary) {
+        const acceptedList = [...nextSet] as ("A" | "B" | "C" | "D")[];
+        await db.attempt.updateMany({
+          where: { questionId: data.id, chosen: { in: acceptedList } },
+          data: { isCorrect: true },
+        });
+        await db.attempt.updateMany({
+          where: { questionId: data.id, chosen: { notIn: acceptedList } },
+          data: { isCorrect: false },
+        });
       }
     }
     revalidatePath(`/admin/questions/${data.id}`);
@@ -83,6 +129,7 @@ export async function saveQuestionAction(formData: FormData) {
         optionC: data.optionC,
         optionD: data.optionD,
         correctAnswer: data.correctAnswer ?? null,
+        acceptedAnswers,
         source: data.source ?? null,
         createdById: me.id,
       },

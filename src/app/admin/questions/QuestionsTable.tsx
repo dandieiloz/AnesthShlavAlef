@@ -15,6 +15,8 @@ export type QuestionRow = {
   chapterNumber: number;
   hasExplanation: boolean;
   disabled: boolean;
+  /** Number of admin-marked additionally-accepted answers (excludes the primary). 0 = single-answer question. */
+  acceptedAnswersCount: number;
   /** Confidence in [0,1] from the GeminiAnswer, or null when no answer exists. */
   confidence: number | null;
   escalated: boolean | null;
@@ -505,6 +507,14 @@ export function QuestionsTable({
                     {q.disabled ? (
                       <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         מושבתת
+                      </span>
+                    ) : null}
+                    {q.acceptedAnswersCount > 0 ? (
+                      <span
+                        className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"
+                        title="לשאלה זו מוגדרות מספר תשובות נכונות"
+                      >
+                        תשובות מרובות
                       </span>
                     ) : null}
                   </div>

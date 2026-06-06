@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { hasUsableAnswerWhere } from "@/lib/plan";
 import { computeLevel, type LevelComputation } from "@/lib/progress-level";
 
 const TOTAL_TTL_MS = 5 * 60 * 1000;
@@ -8,7 +9,7 @@ async function getTotalQuestionCount(): Promise<number> {
   const now = Date.now();
   if (totalCache && totalCache.expiresAt > now) return totalCache.value;
   const value = await db.question.count({
-    where: { disabled: false, geminiAnswer: { isNot: null } },
+    where: { disabled: false, AND: [hasUsableAnswerWhere] },
   });
   totalCache = { value, expiresAt: now + TOTAL_TTL_MS };
   return value;

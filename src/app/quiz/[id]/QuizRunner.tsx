@@ -600,7 +600,11 @@ export function QuizRunner(props: Props) {
       ? mode === "immediate" && pastEntry.chosen !== null
       : revealed && revealedQuestionId !== null && current?.id === revealedQuestionId;
   const correctChoice = display.answer.correctAnswer;
-  const isCorrectChoice = displayRevealed && displayChosen === correctChoice;
+  const acceptedChoices = display.answer.acceptedAnswers ?? [];
+  const isCorrectChoice =
+    displayRevealed &&
+    displayChosen !== null &&
+    (displayChosen === correctChoice || acceptedChoices.includes(displayChosen));
   const showReveal = displayRevealed && (isViewingPast || mode === "immediate");
   const canGoPrev = past.length > 0 && (viewingIndex === -1 || viewingIndex > 0);
   const skippedRemaining = past.filter((p) => p.chosen === null).map((p) => p.question);
@@ -933,25 +937,31 @@ export function QuizRunner(props: Props) {
             <Separator />
 
             <CardContent className="pt-5 pb-6 px-6 space-y-5">
-              <AnswerExplanation
-                explanation={display.answer.explanation}
-                evidenceCitations={display.answer.evidenceCitations}
-                whyOthersWrong={display.answer.whyOthersWrong}
-                correctAnswer={correctChoice}
-                options={[
-                  { key: "A", text: display.optionA },
-                  { key: "B", text: display.optionB },
-                  { key: "C", text: display.optionC },
-                  { key: "D", text: display.optionD },
-                ]}
-                insufficientEvidence={display.answer.insufficientEvidence}
-                locale={props.contentLocale}
-                questionId={display.id}
-                highlights={display.highlights}
-                highlightT={dict.highlights}
-              />
+              {display.answer.explanation && (
+                <>
+                  <AnswerExplanation
+                    explanation={display.answer.explanation}
+                    evidenceCitations={display.answer.evidenceCitations}
+                    whyOthersWrong={display.answer.whyOthersWrong}
+                    correctAnswer={correctChoice}
+                    acceptedAnswers={acceptedChoices}
+                    userChoice={displayChosen ?? undefined}
+                    options={[
+                      { key: "A", text: display.optionA },
+                      { key: "B", text: display.optionB },
+                      { key: "C", text: display.optionC },
+                      { key: "D", text: display.optionD },
+                    ]}
+                    insufficientEvidence={display.answer.insufficientEvidence}
+                    locale={props.contentLocale}
+                    questionId={display.id}
+                    highlights={display.highlights}
+                    highlightT={dict.highlights}
+                  />
 
-              <Separator className="opacity-50" />
+                  <Separator className="opacity-50" />
+                </>
+              )}
 
               <ReportAnswerForm
                 questionId={display.id}

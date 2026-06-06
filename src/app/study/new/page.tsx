@@ -8,7 +8,7 @@ import Link from "next/link";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
-import { questionAccessWhere } from "@/lib/plan";
+import { questionAccessWhere, hasUsableAnswerWhere } from "@/lib/plan";
 import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
 
 export default async function NewQuizPage({
@@ -54,8 +54,7 @@ export default async function NewQuizPage({
   const attemptedIds = new Set(attempted.map((a) => a.questionId));
   const allQuestions = await db.question.findMany({
     where: {
-      geminiAnswer: { isNot: null },
-      AND: [planGate],
+      AND: [planGate, hasUsableAnswerWhere],
     },
     select: { id: true, chapterIds: true, source: true },
   });

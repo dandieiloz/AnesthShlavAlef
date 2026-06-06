@@ -8,7 +8,7 @@ import { Choice } from "@prisma/client";
 import { ProfileSchema } from "@/app/onboarding/schema";
 import { getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
-import { questionAccessWhere, assertCanAccessQuestion } from "@/lib/plan";
+import { questionAccessWhere, assertCanAccessQuestion, hasUsableAnswerWhere } from "@/lib/plan";
 import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
 import { loadQuizBatch, type QuizBatch } from "@/app/quiz/[id]/quiz-session";
 
@@ -88,9 +88,8 @@ export async function createQuizAction(formData: FormData) {
     const pool = await db.question.findMany({
       where: {
         source: sourceValue,
-        geminiAnswer: { isNot: null },
         id: { notIn: attemptedIds },
-        AND: [planGate],
+        AND: [planGate, hasUsableAnswerWhere],
       },
       select: { id: true },
     });
@@ -138,10 +137,10 @@ export async function createQuizAction(formData: FormData) {
   const pool = await db.question.findMany({
     where: {
       chapterIds: { hasSome: data.chapterIds },
-      geminiAnswer: { isNot: null },
       id: { notIn: attemptedIds },
       AND: [
         planGate,
+        hasUsableAnswerWhere,
         ...(data.excludeOfficial
           ? [{ NOT: { source: { startsWith: OFFICIAL_EXAM_SOURCE } } }]
           : []),
@@ -188,10 +187,16 @@ export async function recordAttemptAction(input: {
   await assertCanAccessQuestion(me, data.questionId);
   const q = await db.question.findUnique({
     where: { id: data.questionId },
-    select: { geminiAnswer: { select: { correctAnswer: true } } },
+    select: {
+      correctAnswer: true,
+      acceptedAnswers: true,
+      geminiAnswer: { select: { correctAnswer: true } },
+    },
   });
-  if (!q?.geminiAnswer) throw new Error("No cached answer for question");
-  const isCorrect = data.chosen === q.geminiAnswer.correctAnswer;
+  const correctAnswer = q?.geminiAnswer?.correctAnswer ?? q?.correctAnswer ?? null;
+  if (!correctAnswer) throw new Error("No cached answer for question");
+  const accepted: Choice[] = q?.acceptedAnswers ?? [];
+  const isCorrect = data.chosen === correctAnswer || accepted.includes(data.chosen as Choice);
 
   // Dedupe rapid duplicate submissions (key-repeat, double-click, React state lag,
   // server-action retries). If the same user already recorded an attempt for this
@@ -256,7 +261,11 @@ export async function submitFullQuizAction(input: {
   const [questions, existing] = await Promise.all([
     db.question.findMany({
       where: { id: { in: questionIds } },
-      select: { id: true, geminiAnswer: { select: { correctAnswer: true } } },
+      select: {
+        id: true,
+        acceptedAnswers: true,
+        geminiAnswer: { select: { correctAnswer: true } },
+      },
     }),
     db.attempt.findMany({
       where: { userId: me.id, quizId: quiz.id, questionId: { in: questionIds } },
@@ -264,9 +273,11 @@ export async function submitFullQuizAction(input: {
     }),
   ]);
 
-  const correctById = new Map<number, Choice>();
+  const acceptedById = new Map<number, Set<Choice>>();
   for (const q of questions) {
-    if (q.geminiAnswer) correctById.set(q.id, q.geminiAnswer.correctAnswer);
+    if (!q.geminiAnswer) continue;
+    const set = new Set<Choice>([q.geminiAnswer.correctAnswer, ...q.acceptedAnswers]);
+    acceptedById.set(q.id, set);
   }
   const alreadyRecorded = new Set(existing.map((a) => a.questionId));
 
@@ -274,9 +285,9 @@ export async function submitFullQuizAction(input: {
   let correctCount = 0;
   for (const a of data.answers) {
     if (alreadyRecorded.has(a.questionId)) continue;
-    const correct = correctById.get(a.questionId);
-    if (!correct) continue;
-    const isCorrect = a.chosen === correct;
+    const set = acceptedById.get(a.questionId);
+    if (!set) continue;
+    const isCorrect = set.has(a.chosen as Choice);
     if (isCorrect) correctCount++;
     rows.push({
       userId: me.id,

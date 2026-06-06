@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
+import type { Prisma } from "@prisma/client";
 import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
 
 const NULL_SOURCE_SENTINEL = "__NULL__";
@@ -106,5 +107,20 @@ export async function assertCanAccessQuestion(user: PlanGatedUser, questionId: n
   }
   if (!sources.includes(q.source)) notFound();
 }
+
+/**
+ * Predicate for "this question can be served to a learner". Most questions
+ * have a generated `GeminiAnswer`. Image-based questions cannot be answered
+ * by Gemini by design, so admins set `Question.correctAnswer` directly when
+ * they upload an image; we accept those too. Non-admin visibility is still
+ * subject to the publish gate inside `questionAccessWhere` (which requires
+ * `adminApproved: true` when there is no `GeminiAnswer`).
+ */
+export const hasUsableAnswerWhere: Prisma.QuestionWhereInput = {
+  OR: [
+    { geminiAnswer: { isNot: null } },
+    { imageUrl: { not: null }, correctAnswer: { not: null } },
+  ],
+};
 
 export { NULL_SOURCE_SENTINEL };

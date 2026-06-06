@@ -114,6 +114,11 @@ export default async function AdminQuestionPage({
               מאושרת ידנית
             </span>
           ) : null}
+          {q.acceptedAnswers.length > 0 ? (
+            <span className="rounded bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200" title={`תשובות מתקבלות נוספות: ${q.acceptedAnswers.join(", ")}`}>
+              תשובות מרובות
+            </span>
+          ) : null}
           {showApproveButton && (
             <ApproveQuestionButton
               questionId={q.id}
@@ -225,6 +230,37 @@ export default async function AdminQuestionPage({
             <option value="D">ד</option>
           </select>
         </div>
+        {(() => {
+          const primary = q.correctAnswer ?? q.geminiAnswer?.correctAnswer ?? null;
+          const accepted = new Set(q.acceptedAnswers);
+          const HEB: Record<"A" | "B" | "C" | "D", string> = { A: "א", B: "ב", C: "ג", D: "ד" };
+          return (
+            <fieldset className="flex flex-wrap items-center gap-3 rounded border border-dashed p-2">
+              <legend className="px-1 text-xs font-medium text-muted-foreground">
+                תשובות נוספות שמתקבלות (לשאלות עם יותר מתשובה אחת נכונה)
+              </legend>
+              {(["A", "B", "C", "D"] as const).map((c) => {
+                const isPrimary = primary === c;
+                return (
+                  <label
+                    key={c}
+                    className={`flex items-center gap-1.5 text-sm ${isPrimary ? "opacity-50" : ""}`}
+                    title={isPrimary ? "זוהי התשובה הנכונה הראשית" : undefined}
+                  >
+                    <input
+                      type="checkbox"
+                      name="acceptedAnswers"
+                      value={c}
+                      defaultChecked={accepted.has(c)}
+                      disabled={isPrimary}
+                    />
+                    <span>{HEB[c]}</span>
+                  </label>
+                );
+              })}
+            </fieldset>
+          );
+        })()}
         <button className="rounded bg-slate-900 px-4 py-2 text-white">שמור</button>
       </form>
 

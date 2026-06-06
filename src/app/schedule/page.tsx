@@ -23,7 +23,7 @@ import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { computeSchedule, type PaceStatus } from "@/lib/schedule";
 import { saveScheduleAction } from "./actions";
-import { questionAccessWhere } from "@/lib/plan";
+import { questionAccessWhere, hasUsableAnswerWhere } from "@/lib/plan";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export default async function SchedulePage() {
         where: { id: me.id },
         select: { examDate: true, questionsPerWeek: true },
       }),
-      db.question.count({ where: { geminiAnswer: { isNot: null }, AND: [planGate] } }),
+      db.question.count({ where: { AND: [planGate, hasUsableAnswerWhere] } }),
       db.question.count({ where: { AND: [planGate] } }),
       db.attempt.findMany({
         where: { userId: me.id },
