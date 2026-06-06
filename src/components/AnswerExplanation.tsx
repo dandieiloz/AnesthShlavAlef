@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { CitationPageLink } from "@/components/CitationPageLink";
@@ -188,6 +188,74 @@ export function AnswerExplanation({
     el.addEventListener("click", handler);
     return () => el.removeEventListener("click", handler);
   }, []);
+
+  // Hover preview state for the inline citation hovercard.
+  const [preview, setPreview] = useState<{ idx: number; rect: DOMRect } | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const cancelHide = () => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  };
+  const scheduleHide = () => {
+    cancelHide();
+    hideTimerRef.current = window.setTimeout(() => {
+      setPreview(null);
+      hideTimerRef.current = null;
+    }, 140);
+  };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !evidenceCitations || evidenceCitations.length === 0) return;
+    const findIdx = (anchor: HTMLAnchorElement): number | null => {
+      const href = anchor.getAttribute("href") || "";
+      const m = href.match(/#cite-\d+-(\d+)/);
+      if (!m) return null;
+      const num = parseInt(m[1], 10);
+      if (num < 1 || num > evidenceCitations.length) return null;
+      return num - 1;
+    };
+    const onOver = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      const link = target.closest('a[href*="#cite-"]') as HTMLAnchorElement | null;
+      if (!link) return;
+      const idx = findIdx(link);
+      if (idx === null) return;
+      cancelHide();
+      setPreview({ idx, rect: link.getBoundingClientRect() });
+    };
+    const onOut = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      const link = target.closest('a[href*="#cite-"]') as HTMLAnchorElement | null;
+      if (!link) return;
+      const related = ev.relatedTarget as HTMLElement | null;
+      if (related && related.closest("[data-cite-preview]")) return;
+      scheduleHide();
+    };
+    el.addEventListener("mouseover", onOver);
+    el.addEventListener("mouseout", onOut);
+    return () => {
+      el.removeEventListener("mouseover", onOver);
+      el.removeEventListener("mouseout", onOut);
+      cancelHide();
+    };
+  }, [evidenceCitations]);
+
+  // Close preview on scroll/resize so it never floats away from its anchor.
+  useEffect(() => {
+    if (!preview) return;
+    const close = () => setPreview(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [preview]);
 
   const wrongReasons = parseWhyOthersWrong(whyOthersWrong);
   const acceptedSet = new Set<Choice>(acceptedAnswers ?? []);
@@ -399,6 +467,124 @@ export function AnswerExplanation({
           </div>
         </div>
       )}
+
+      {/* Inline hovercard rendered when the user mouses over a [N] citation marker. */}
+      {preview && evidenceCitations && evidenceCitations[preview.idx] && (
+        <CitePreviewCard
+          citation={evidenceCitations[preview.idx]}
+          num={preview.idx + 1}
+          anchorRect={preview.rect}
+          isRtl={dir === "rtl"}
+          ui={ui}
+          onMouseEnter={cancelHide}
+          onMouseLeave={scheduleHide}
+        />
+      )}
+    </div>
+  );
+}
+
+function CitePreviewCard({
+  citation,
+  num,
+  anchorRect,
+  isRtl,
+  ui,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  citation: EvidenceCitationDisplay;
+  num: number;
+  anchorRect: DOMRect;
+  isRtl: boolean;
+  ui: (typeof UI)["he"];
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const cardEl = ref.current;
+    if (!cardEl) return;
+    const cardRect = cardEl.getBoundingClientRect();
+    const cardW = cardRect.width || 320;
+    const cardH = cardRect.height || 160;
+    const margin = 8;
+
+    let left = isRtl ? anchorRect.right - cardW : anchorRect.left;
+    left = Math.max(margin, Math.min(left, window.innerWidth - cardW - margin));
+
+    const spaceBelow = window.innerHeight - anchorRect.bottom;
+    const flipUp = spaceBelow < cardH + margin && anchorRect.top > cardH + margin;
+    const top = flipUp ? anchorRect.top - cardH - 6 : anchorRect.bottom + 6;
+
+    setPos({ top, left });
+  }, [anchorRect, isRtl]);
+
+  return (
+    <div
+      ref={ref}
+      data-cite-preview
+      dir={isRtl ? "rtl" : "ltr"}
+      className="fixed z-50 w-[320px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-amber-400/50 bg-popover shadow-lg ring-1 ring-amber-400/15"
+      style={{
+        top: pos?.top ?? anchorRect.bottom + 6,
+        left: pos?.left ?? Math.max(8, anchorRect.left),
+        opacity: pos ? 1 : 0,
+        transition: "opacity 100ms ease-out",
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="flex items-center gap-2 border-b border-amber-400/25 bg-amber-400/[0.10] px-3 py-2">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-400/50 bg-amber-400/15 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+          {num}
+        </span>
+        <span
+          dir="auto"
+          className="min-w-0 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300 [unicode-bidi:plaintext]"
+        >
+          {ui.chapter} {citation.chapterNumber} — {citation.chapterTitle}
+        </span>
+      </div>
+      <div className="space-y-1.5 px-3 py-2.5">
+        <p
+          dir="auto"
+          className="line-clamp-6 text-xs italic leading-relaxed text-foreground/85 [unicode-bidi:plaintext]"
+        >
+          &ldquo;{citation.quote}&rdquo;
+        </p>
+        {(citation.sectionPath || citation.pageStart != null) && (
+          <p
+            dir="ltr"
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-left text-[11px] font-medium text-muted-foreground"
+          >
+            {citation.sectionPath && (
+              <span
+                dir="auto"
+                className="min-w-0 truncate text-muted-foreground/70 [unicode-bidi:plaintext]"
+              >
+                › {citation.sectionPath}
+              </span>
+            )}
+            {citation.pageStart != null && (
+              <span className="text-muted-foreground/80 [unicode-bidi:isolate]">
+                <CitationPageLink
+                  page={citation.pageStart}
+                  notConfiguredLabel={ui.citationNotConfigured}
+                  permissionDeniedLabel={ui.citationPermissionDenied}
+                  notFoundLabel={ui.citationNotFound}
+                >
+                  {citation.pageEnd != null && citation.pageEnd !== citation.pageStart
+                    ? `${ui.pages} ${citation.pageStart}–${citation.pageEnd}`
+                    : `${ui.page} ${citation.pageStart}`}
+                </CitationPageLink>
+              </span>
+            )}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
