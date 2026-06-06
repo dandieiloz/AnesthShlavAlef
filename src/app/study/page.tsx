@@ -20,10 +20,15 @@ function residencyLabel(year: number | null, t: { yearLabels: Record<number, str
   return t.yearLabels[year] ?? t.yearLabel(year);
 }
 
-export default async function StudyPage() {
+export default async function StudyPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const me = await requireCompletedProfile();
   const locale = await getLocale();
   const t = getDictionary(locale).study;
+  const sp = await searchParams;
 
   const [allQuizzes, dbUser] = await Promise.all([
     db.quiz.findMany({
@@ -74,7 +79,7 @@ export default async function StudyPage() {
 
       {/* Stats + My quizzes */}
       <section>
-        <StatsSection userId={me.id} locale={locale}>
+        <StatsSection userId={me.id} locale={locale} searchParams={sp}>
           <div className="space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>

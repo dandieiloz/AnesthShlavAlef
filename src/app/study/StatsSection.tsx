@@ -12,9 +12,41 @@ import type { Locale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import type { ReactNode } from "react";
 
-export async function StatsSection({ userId, locale, children }: { userId: string; locale: Locale; children?: ReactNode }) {
+const CHAPTER_SORT_FIELDS = ["chapter", "title", "attempts", "correct", "accuracy", "usefulness"] as const;
+type ChapterSortField = (typeof CHAPTER_SORT_FIELDS)[number];
+type SortOrder = "asc" | "desc";
+
+function isChapterSortField(value: string | undefined): value is ChapterSortField {
+  return value !== undefined && CHAPTER_SORT_FIELDS.includes(value as ChapterSortField);
+}
+
+function compareNullableNumber(a: number | null, b: number | null) {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a - b;
+}
+
+export async function StatsSection({
+  userId,
+  locale,
+  searchParams,
+  children,
+}: {
+  userId: string;
+  locale: Locale;
+  searchParams?: Record<string, string | string[] | undefined>;
+  children?: ReactNode;
+}) {
   const dict = getDictionary(locale);
   const t = dict.dashboard;
+  const chapterSort: ChapterSortField = isChapterSortField(
+    typeof searchParams?.chapterSort === "string" ? searchParams.chapterSort : undefined,
+  )
+    ? (searchParams!.chapterSort as ChapterSortField)
+    : "chapter";
+  const chapterOrder: SortOrder =
+    typeof searchParams?.chapterOrder === "string" && searchParams.chapterOrder === "desc" ? "desc" : "asc";
 
   const [attempts, heatmapData] = await Promise.all([
     db.attempt.findMany({
@@ -49,12 +81,95 @@ export async function StatsSection({ userId, locale, children }: { userId: strin
   const chaptersAttempted = byChapter.size;
   const streak = getCurrentStreak(heatmapData);
 
-  const chapterEntries = [...byChapter.entries()].sort((a, b) => a[0] - b[0]);
+  const chapterEntries = [...byChapter.entries()];
   const chapterTitleTranslations = await Promise.all(
     chapterEntries.map(([num, r]) =>
       getTranslatedFields("Chapter", `n:${num}`, { title: r.title }, locale),
     ),
   );
+
+  const chapterRows = chapterEntries.map(([num, r], i) => ({
+    chapterNumber: num,
+    title: chapterTitleTranslations[i].title,
+    attempts: r.total,
+    correct: r.correct,
+    accuracy: Math.round((r.correct / r.total) * 100),
+    usefulness: r.learningUsefulnessIndex,
+  }));
+
+  const sortedChapterRows = [...chapterRows].sort((a, b) => {
+    let cmp = 0;
+    switch (chapterSort) {
+      case "chapter":
+        cmp = a.chapterNumber - b.chapterNumber;
+        break;
+      case "title":
+        cmp = a.title.localeCompare(b.title, locale);
+        break;
+      case "attempts":
+        cmp = a.attempts - b.attempts;
+        break;
+      case "correct":
+        cmp = a.correct - b.correct;
+        break;
+      case "accuracy":
+        cmp = a.accuracy - b.accuracy;
+        break;
+      case "usefulness":
+        cmp = compareNullableNumber(a.usefulness, b.usefulness);
+        break;
+    }
+
+    if (cmp === 0) {
+      cmp = a.chapterNumber - b.chapterNumber;
+    }
+
+    return chapterOrder === "asc" ? cmp : -cmp;
+  });
+
+  function sortHref(field: ChapterSortField) {
+    const nextParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(searchParams ?? {})) {
+      if (typeof value === "string") nextParams.set(key, value);
+    }
+
+    const nextOrder: SortOrder =
+      chapterSort === field
+        ? chapterOrder === "asc"
+          ? "desc"
+          : "asc"
+        : "asc";
+
+    nextParams.set("chapterSort", field);
+    nextParams.set("chapterOrder", nextOrder);
+
+    const query = nextParams.toString();
+    return query ? `/study?${query}` : "/study";
+  }
+
+  function sortIndicator(field: ChapterSortField) {
+    if (chapterSort !== field) return "";
+    return chapterOrder === "asc" ? "▲" : "▼";
+  }
+
+  function SortHead({
+    field,
+    label,
+    className,
+  }: {
+    field: ChapterSortField;
+    label: string;
+    className?: string;
+  }) {
+    return (
+      <TableHead className={className}>
+        <Link href={sortHref(field)} className="inline-flex items-center justify-center gap-1 hover:text-foreground">
+          <span>{label}</span>
+          <span aria-hidden="true" className="text-xs">{sortIndicator(field)}</span>
+        </Link>
+      </TableHead>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -100,50 +215,49 @@ export async function StatsSection({ userId, locale, children }: { userId: strin
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">{t.chapterCol}</TableHead>
-                  <TableHead>{t.titleCol}</TableHead>
-                  <TableHead className="w-20 text-center">{t.attemptsCol}</TableHead>
-                  <TableHead className="w-20 text-center">{t.correctCol}</TableHead>
-                  <TableHead className="w-24 text-center">{t.accuracyCol}</TableHead>
-                  <TableHead className="w-32 text-center">{t.usefulnessCol}</TableHead>
+                  <SortHead field="chapter" label={t.chapterCol} className="w-12 text-center" />
+                  <SortHead field="title" label={t.titleCol} />
+                  <SortHead field="attempts" label={t.attemptsCol} className="w-20 text-center" />
+                  <SortHead field="correct" label={t.correctCol} className="w-20 text-center" />
+                  <SortHead field="accuracy" label={t.accuracyCol} className="w-24 text-center" />
+                  <SortHead field="usefulness" label={t.usefulnessCol} className="w-32 text-center" />
                   <TableHead className="w-20 text-center" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {chapterEntries
-                  .map(([num, r], i) => {
-                    const tone = usefulnessTone(r.learningUsefulnessIndex);
-                    const pct = Math.round((r.correct / r.total) * 100);
+                {sortedChapterRows
+                  .map((row) => {
+                    const tone = usefulnessTone(row.usefulness);
                     return (
-                      <TableRow key={num} className={TONE_ROW_CLASS[tone]}>
-                        <TableCell className="text-center font-mono text-sm font-medium">{num}</TableCell>
-                        <TableCell className="font-medium">{chapterTitleTranslations[i].title}</TableCell>
-                        <TableCell className="text-center text-muted-foreground">{r.total}</TableCell>
-                        <TableCell className="text-center text-muted-foreground">{r.correct}</TableCell>
+                      <TableRow key={row.chapterNumber} className={TONE_ROW_CLASS[tone]}>
+                        <TableCell className="text-center font-mono text-sm font-medium">{row.chapterNumber}</TableCell>
+                        <TableCell className="font-medium">{row.title}</TableCell>
+                        <TableCell className="text-center text-muted-foreground">{row.attempts}</TableCell>
+                        <TableCell className="text-center text-muted-foreground">{row.correct}</TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
                               <div
                                 className={`h-full rounded-full transition-all ${
-                                  pct >= 70 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-destructive"
+                                  row.accuracy >= 70 ? "bg-success" : row.accuracy >= 50 ? "bg-warning" : "bg-destructive"
                                 }`}
-                                style={{ width: `${pct}%` }}
+                                style={{ width: `${row.accuracy}%` }}
                               />
                             </div>
-                            <span className="text-xs tabular-nums">{pct}%</span>
+                            <span className="text-xs tabular-nums">{row.accuracy}%</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge className={`text-xs ${TONE_BADGE_CLASS[tone]}`}>
                             {toneLabel(tone, locale)}
-                            {r.learningUsefulnessIndex !== null && (
-                              <span className="opacity-60 ms-1">({r.learningUsefulnessIndex})</span>
+                            {row.usefulness !== null && (
+                              <span className="opacity-60 ms-1">({row.usefulness})</span>
                             )}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <Button asChild variant="ghost" size="sm" className="h-6 text-xs text-primary">
-                            <Link href={`/study/new?chapter=${num}`}>{dict.common.practice}</Link>
+                            <Link href={`/study/new?chapter=${row.chapterNumber}`}>{dict.common.practice}</Link>
                           </Button>
                         </TableCell>
                       </TableRow>
