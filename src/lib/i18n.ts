@@ -144,6 +144,16 @@ export const DICTIONARIES = {
       submittingQuiz: "שולח...",
       changeAnswer: "שנה תשובה",
       reviewQuestion: "הצג שאלה",
+      progressSummary: "התקדמות",
+      progressSummaryTitle: "התקדמות במבחן",
+      progressSummaryIntro: "סקור את השאלות שענית, דילגת או סימנת.",
+      progressSummaryAnswered: "שאלות שענית",
+      progressSummaryUpcoming: "שאלות הבאות",
+      progressSummaryYouAreHere: "כאן אתה נמצא",
+      progressSummaryMoreUpcoming: (n: number) =>
+        n === 1 ? "+שאלה נוספת אחת שטרם נטענה" : `+${n} שאלות נוספות שטרם נטענו`,
+      progressSummaryQuestionNum: (n: number) => `שאלה ${n}`,
+      progressSummaryClose: "סגור",
     },
     study: {
       title: "ספריית מבחנים",
@@ -665,6 +675,16 @@ export const DICTIONARIES = {
       submittingQuiz: "Submitting...",
       changeAnswer: "Change answer",
       reviewQuestion: "View question",
+      progressSummary: "Progress",
+      progressSummaryTitle: "Quiz progress",
+      progressSummaryIntro: "Review the questions you've answered, skipped, or marked.",
+      progressSummaryAnswered: "Answered",
+      progressSummaryUpcoming: "Upcoming",
+      progressSummaryYouAreHere: "You're here",
+      progressSummaryMoreUpcoming: (n: number) =>
+        n === 1 ? "+1 more upcoming question not yet loaded" : `+${n} more upcoming questions not yet loaded`,
+      progressSummaryQuestionNum: (n: number) => `Question ${n}`,
+      progressSummaryClose: "Close",
     },
     study: {
       title: "Quiz Library",

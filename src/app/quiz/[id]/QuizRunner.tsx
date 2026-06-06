@@ -9,6 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowRight,
   BarChart2,
   Bookmark,
@@ -16,6 +23,7 @@ import {
   CheckCircle2,
   ClipboardList,
   HelpCircle,
+  ListChecks,
   Loader2,
   RotateCcw,
   X,
@@ -30,6 +38,8 @@ import {
   recordAttemptAction,
   submitFullQuizAction,
   toggleBookmarkValueAction,
+  loadFullQuizProgressAction,
+  loadQuestionAttemptAction,
 } from "@/app/(user)/actions";
 import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
@@ -93,6 +103,8 @@ export function QuizRunner(props: Props) {
   // recorded server-side. Bulk-submitted via submitFullQuizAction at finalize.
   const [draftAnswers, setDraftAnswers] = useState<Map<number, Choice>>(() => new Map());
   const [finalizing, setFinalizing] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [loadingPreviousQuestion, setLoadingPreviousQuestion] = useState(false);
   const [, startTransition] = useTransition();
   const refillInFlight = useRef(false);
   // Synchronous guards: state-based `submitting` is read from a stale closure
@@ -499,6 +511,47 @@ export function QuizRunner(props: Props) {
     lastRecordedQuestionId.current = null;
   }
 
+  // Reorder the queue so that the given upcoming question becomes the live one.
+  // Used by the mid-quiz progress summary to "jump" to a not-yet-answered
+  // question that's already loaded in the batch.
+  function jumpToUpcoming(questionId: number) {
+    setQueue((prev) => {
+      const idx = prev.findIndex((q) => q.id === questionId);
+      if (idx === -1) return prev;
+      const target = prev[idx];
+      return [target, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+    setViewingIndex(-1);
+    setChosen(null);
+    setRevealed(false);
+    setRevealedQuestionId(null);
+    lastRecordedQuestionId.current = null;
+  }
+
+  // Load and navigate to a previously answered question (from DB, not current session)
+  async function viewPreviousQuestion(questionId: number) {
+    setLoadingPreviousQuestion(true);
+    try {
+      const result = await loadQuestionAttemptAction(props.quizId, questionId);
+      if (result) {
+        // Add the question to past as an already-answered entry (read-only review)
+        const newEntry = { question: result.question, chosen: result.attempt?.chosen ?? null };
+        const newIndex = past.length; // index of the entry we're about to add
+        setPast((prev) => [...prev, newEntry]);
+        setViewingIndex(newIndex);
+        setChosen(null);
+        setRevealed(false);
+        setRevealedQuestionId(null);
+        lastRecordedQuestionId.current = null;
+        setSummaryOpen(false);
+      }
+    } catch (err) {
+      console.error("[quiz] failed to load previous question", err);
+    } finally {
+      setLoadingPreviousQuestion(false);
+    }
+  }
+
   // Pop a previously-answered question (full mode only) so the user can
   // change their answer before final submission. Removes the past entry,
   // drops the draft, decrements optimistic counters, prepends to the queue.
@@ -616,11 +669,22 @@ export function QuizRunner(props: Props) {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{props.quizName}</span>
-            <span>
-              {mode === "immediate"
-                ? t.progress(answered, props.totalQ, correct)
-                : t.progressNoCorrect(answered, props.totalQ)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span>
+                {mode === "immediate"
+                  ? t.progress(answered, props.totalQ, correct)
+                  : t.progressNoCorrect(answered, props.totalQ)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 font-medium text-foreground transition-colors hover:bg-muted"
+                aria-label={t.progressSummaryTitle}
+              >
+                <ListChecks className="h-3.5 w-3.5" />
+                {t.progressSummary}
+              </button>
+            </div>
           </div>
           <Progress value={progressPct} className="h-1.5" />
         </div>
@@ -676,6 +740,7 @@ export function QuizRunner(props: Props) {
             />
           )}
           <BookmarkToggle
+            key={display.id}
             questionId={display.id}
             initialBookmarked={display.bookmarked}
             labels={{
@@ -896,6 +961,7 @@ export function QuizRunner(props: Props) {
         {/* Reveal / explanation */}
         {showReveal && (
           <Card
+            key={display.id}
             className={`border-2 animate-fade-in overflow-hidden ${
               isCorrectChoice ? "border-success/40" : "border-destructive/40"
             }`}
@@ -981,6 +1047,55 @@ export function QuizRunner(props: Props) {
           </Card>
         )}
       </div>
+
+      <ProgressSummaryDialog
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        past={past}
+        queue={queue}
+        totalQ={props.totalQ}
+        hasMore={hasMore}
+        mode={mode}
+        unsureIds={unsureIds}
+        chapterLabel={common.chapter}
+        answered={answered}
+        quizId={props.quizId}
+        labels={{
+          title: t.progressSummaryTitle,
+          intro: t.progressSummaryIntro,
+          answeredSection: t.progressSummaryAnswered,
+          skippedSection: t.summarySkippedSection,
+          unsureSection: t.summaryUnsureSection,
+          upcomingSection: t.progressSummaryUpcoming,
+          youAreHere: t.progressSummaryYouAreHere,
+          moreUpcoming: t.progressSummaryMoreUpcoming,
+          questionNum: t.progressSummaryQuestionNum,
+          empty: t.summaryEmpty,
+          close: t.progressSummaryClose,
+          reviewQuestion: t.reviewQuestion,
+          answerSkipped: t.answerSkipped,
+          changeAnswer: t.changeAnswer,
+        }}
+        onJumpToPast={(id) => {
+          jumpToPast(id);
+          setSummaryOpen(false);
+        }}
+        onRequeueSkipped={(q) => {
+          requeueSkipped([q]);
+          setSummaryOpen(false);
+        }}
+        onRequeueAnswered={(id) => {
+          requeueAnswered(id);
+          setSummaryOpen(false);
+        }}
+        onJumpToUpcoming={(id) => {
+          jumpToUpcoming(id);
+          setSummaryOpen(false);
+        }}
+        onViewPreviousQuestion={(id) => {
+          viewPreviousQuestion(id);
+        }}
+      />
     </div>
   );
 }
@@ -1064,5 +1179,247 @@ function UnsureToggle({
       <HelpCircle className="h-3.5 w-3.5" />
       {marked ? labels.marked : labels.label}
     </button>
+  );
+}
+
+type ProgressSummaryLabels = {
+  title: string;
+  intro: string;
+  answeredSection: string;
+  skippedSection: string;
+  unsureSection: string;
+  upcomingSection: string;
+  youAreHere: string;
+  moreUpcoming: (n: number) => string;
+  questionNum: (n: number) => string;
+  empty: string;
+  close: string;
+  reviewQuestion: string;
+  answerSkipped: string;
+  changeAnswer: string;
+};
+
+function ProgressSummaryDialog({
+  open,
+  onClose,
+  past,
+  queue,
+  totalQ,
+  hasMore,
+  mode,
+  unsureIds,
+  chapterLabel,
+  labels,
+  onJumpToPast,
+  onRequeueSkipped,
+  onRequeueAnswered,
+  onJumpToUpcoming,
+  answered,
+  quizId,
+  onViewPreviousQuestion,
+}: {
+  open: boolean;
+  onClose: () => void;
+  past: { question: QuestionPayload; chosen: Choice | null }[];
+  queue: QuestionPayload[];
+  totalQ: number;
+  hasMore: boolean;
+  mode: AnswerMode;
+  unsureIds: Set<number>;
+  chapterLabel: string;
+  labels: ProgressSummaryLabels;
+  onJumpToPast: (questionId: number) => void;
+  onRequeueSkipped: (q: QuestionPayload) => void;
+  onRequeueAnswered: (questionId: number) => void;
+  onJumpToUpcoming: (questionId: number) => void;
+  answered: number;
+  quizId: number;
+  onViewPreviousQuestion: (questionId: number) => void;
+}) {
+  const [fullProgress, setFullProgress] = useState<{
+    totalQ: number;
+    answered: number;
+    questions: Array<{ id: number; chapter: number; answered: boolean }>;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setFullProgress(null);
+      return;
+    }
+    setLoading(true);
+    loadFullQuizProgressAction(quizId)
+      .then((data) => {
+        setFullProgress(data);
+      })
+      .catch((err) => {
+        console.error("[quiz] failed to load progress", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [open, quizId]);
+
+  // Map of session-visible questions for actions (from past + queue)
+  const sessionQuestionsMap = new Map<
+    number,
+    { question: QuestionPayload; chosen: Choice | null } | QuestionPayload
+  >();
+  past.forEach((p) => {
+    sessionQuestionsMap.set(p.question.id, p);
+  });
+  queue.forEach((q) => {
+    sessionQuestionsMap.set(q.id, q);
+  });
+
+  const currentPosition = answered + 1;
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{labels.title}</DialogTitle>
+          <DialogDescription>{labels.intro}</DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : fullProgress ? (
+          <div className="flex-1 overflow-y-auto border rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-muted border-b">
+                <tr>
+                  <th className="px-2 py-1 text-start font-semibold w-12">#</th>
+                  <th className="px-2 py-1 text-start font-semibold w-12">{chapterLabel}</th>
+                  <th className="px-2 py-1 text-start font-semibold flex-1">Status</th>
+                  <th className="px-2 py-1 text-end font-semibold w-20">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {fullProgress.questions.map((item, idx) => {
+                  const isCurrentQuestion = idx + 1 === currentPosition;
+                  const sessionQ = sessionQuestionsMap.get(item.id);
+                  const canAction = sessionQ !== undefined;
+
+                  let actionBtn: React.ReactNode = null;
+                  if (canAction && item.answered) {
+                    // Answered question in session
+                    const isPastEntry = "question" in sessionQ;
+                    actionBtn = (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-xs"
+                        onClick={() => {
+                          if (isPastEntry) {
+                            mode === "full"
+                              ? onRequeueAnswered(item.id)
+                              : onJumpToPast(item.id);
+                          } else {
+                            // In queue
+                            const qIdx = queue.findIndex((q) => q.id === item.id);
+                            if (qIdx > 0) onJumpToUpcoming(item.id);
+                          }
+                          onClose();
+                        }}
+                      >
+                        {mode === "full" ? "שנה" : "הצג"}
+                      </Button>
+                    );
+                  } else if (canAction && !item.answered) {
+                    // Unanswered (skipped or upcoming) in session
+                    const isPastEntry = "question" in sessionQ;
+                    actionBtn = (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-1.5 text-xs"
+                        onClick={() => {
+                          if (isPastEntry) {
+                            onRequeueSkipped((sessionQ as any).question);
+                          } else {
+                            const qIdx = queue.findIndex((q) => q.id === item.id);
+                            if (qIdx > 0) onJumpToUpcoming(item.id);
+                          }
+                          onClose();
+                        }}
+                      >
+                        {isPastEntry ? "ענה" : "הצג"}
+                      </Button>
+                    );
+                  } else if (!canAction && item.answered) {
+                    // Answered question NOT in session (outside current session scope)
+                    actionBtn = (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-xs"
+                        onClick={() => {
+                          onViewPreviousQuestion(item.id);
+                        }}
+                      >
+                        הצג
+                      </Button>
+                    );
+                  }
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`${isCurrentQuestion ? "bg-primary/5" : "hover:bg-muted/50"}`}
+                    >
+                      <td className="px-2 py-1 font-medium text-xs">{idx + 1}</td>
+                      <td className="px-2 py-1 text-muted-foreground text-xs">{item.chapter}</td>
+                      <td className="px-2 py-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {item.answered ? (
+                            <Badge variant="default" className="bg-green-500/20 text-green-700 text-[10px] px-1.5 py-0">
+                              ✓
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground text-[10px] px-1.5 py-0">
+                              -
+                            </Badge>
+                          )}
+                          {unsureIds.has(item.id) && (
+                            <Badge variant="outline" className="text-orange-600 text-[10px] px-1.5 py-0">
+                              לא בטוח
+                            </Badge>
+                          )}
+                          {isCurrentQuestion && (
+                            <span className="text-[9px] font-semibold bg-primary/10 text-primary rounded px-1 py-0.5">
+                              כאן
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-1 text-end">{actionBtn}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{labels.empty}</p>
+        )}
+
+        <div className="flex justify-end pt-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            {labels.close}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

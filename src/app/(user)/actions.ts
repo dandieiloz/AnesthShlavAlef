@@ -10,8 +10,8 @@ import { getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere, assertCanAccessQuestion, hasUsableAnswerWhere } from "@/lib/plan";
 import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
-import { loadQuizBatch, type QuizBatch } from "@/app/quiz/[id]/quiz-session";
-
+import { loadQuizBatch, type QuizBatch, type QuestionPayload } from "@/app/quiz/[id]/quiz-session";
+import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 export async function updateProfileAction(formData: FormData) {
   const me = await requireUser();
   const data = ProfileSchema.parse({
@@ -525,4 +525,177 @@ export async function deleteQuizAction(formData: FormData) {
   revalidatePath("/study");
   revalidatePath("/history");
   revalidatePath("/dashboard");
+}
+
+/**
+ * Load a specific question and the user's attempt for it (if any).
+ * Used for reviewing previously answered questions.
+ */
+export async function loadQuestionAttemptAction(
+  quizId: number,
+  questionId: number,
+): Promise<{
+  question: QuestionPayload;
+  attempt: { chosen: "A" | "B" | "C" | "D"; isCorrect: boolean } | null;
+} | null> {
+  const me = await requireUser();
+
+  // Verify user owns this quiz
+  const quiz = await db.quiz.findFirst({
+    where: { id: quizId, userId: me.id },
+    select: { id: true },
+  });
+  if (!quiz) return null;
+
+  // Get the question
+  const q = await db.question.findUnique({
+    where: { id: questionId },
+    include: { chapter: true, geminiAnswer: true },
+  });
+  if (!q) return null;
+
+  // Verify access
+  await assertCanAccessQuestion(me, questionId);
+
+  // Get user's attempt for this question
+  const attempt = await db.attempt.findFirst({
+    where: { userId: me.id, quizId, questionId },
+    select: { chosen: true, isCorrect: true },
+  });
+
+  const contentLocale = await getContentLocale();
+  const planGate = await questionAccessWhere(me);
+
+  // Fetch bookmarks, highlights, reports
+  const [bookmarkRow, highlightRows, reportRows] = await Promise.all([
+    db.bookmark.findFirst({
+      where: { userId: me.id, questionId },
+      select: { questionId: true },
+    }),
+    db.sentenceHighlight.findMany({
+      where: { userId: me.id, questionId, locale: contentLocale },
+      select: {
+        id: true,
+        questionId: true,
+        section: true,
+        sentenceIndex: true,
+        colorId: true,
+        sentenceHash: true,
+        note: true,
+      },
+    }),
+    db.answerReport.findMany({
+      where: { userId: me.id, questionId },
+      orderBy: { createdAt: "desc" },
+      select: { questionId: true, status: true, adminResponse: true, createdAt: true },
+    }),
+  ]);
+
+  const bookmarked = bookmarkRow != null;
+  const latestReport = reportRows.length > 0 ? { status: reportRows[0].status as "OPEN" | "RESOLVED" | "REJECTED", adminResponse: reportRows[0].adminResponse } : null;
+  const highlights = highlightRows.map((h) => ({
+    id: h.id,
+    section: h.section,
+    sentenceIndex: h.sentenceIndex,
+    colorId: h.colorId,
+    sentenceHash: h.sentenceHash,
+    note: h.note,
+  }));
+
+  const g = q.geminiAnswer;
+  const [qFields, ansFields] = await Promise.all([
+    getTranslatedFields(
+      "Question",
+      String(q.id),
+      { stem: q.stem, optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD },
+      contentLocale,
+    ),
+    g
+      ? getTranslatedFields(
+          "GeminiAnswer",
+          String(g.id),
+          { explanation: g.explanation, whyOthersWrong: g.whyOthersWrong },
+          contentLocale,
+        )
+      : Promise.resolve({ explanation: "", whyOthersWrong: "" }),
+  ]);
+
+  const question: QuestionPayload = {
+    id: q.id,
+    source: q.source,
+    chapter: { number: q.chapter.number, title: q.chapter.title },
+    stem: qFields.stem,
+    optionA: qFields.optionA,
+    optionB: qFields.optionB,
+    optionC: qFields.optionC,
+    optionD: qFields.optionD,
+    imageUrl: q.imageUrl,
+    imageAlt: q.imageAlt,
+    videoUrl: q.videoUrl,
+    answer: {
+      correctAnswer: (g?.correctAnswer ?? q.correctAnswer!) as Choice,
+      acceptedAnswers: (q.acceptedAnswers ?? []) as Choice[],
+      explanation: g ? (ansFields.explanation || g.explanation) : "",
+      whyOthersWrong: g ? (ansFields.whyOthersWrong || g.whyOthersWrong) : "",
+      evidenceCitations: g
+        ? ((g.evidenceCitations as EvidenceCitationDisplay[] | null) ?? null)
+        : null,
+      insufficientEvidence: g?.insufficientEvidence ?? false,
+    },
+    bookmarked,
+    latestReport,
+    highlights,
+  };
+
+  return {
+    question,
+    attempt: attempt ? { chosen: attempt.chosen, isCorrect: attempt.isCorrect } : null,
+  };
+}
+
+export async function loadFullQuizProgressAction(quizId: number): Promise<{
+  totalQ: number;
+  answered: number;
+  questions: Array<{ id: number; chapter: number; answered: boolean }>;
+}> {
+  const me = await requireUser();
+  const quiz = await db.quiz.findFirst({
+    where: { id: quizId, userId: me.id },
+    select: { chapterIds: true, questionIds: true },
+  });
+  if (!quiz) {
+    throw new Error("Quiz not found");
+  }
+
+  const planGate = await questionAccessWhere(me);
+  const useFixedSet = quiz.questionIds.length > 0;
+
+  // Get all questions in this quiz
+  const allQs = await db.question.findMany({
+    where: useFixedSet
+      ? { id: { in: quiz.questionIds }, AND: [planGate, hasUsableAnswerWhere] }
+      : { chapterIds: { hasSome: quiz.chapterIds }, AND: [planGate, hasUsableAnswerWhere] },
+    select: { id: true, chapter: { select: { number: true } } },
+    orderBy: { id: "asc" },
+  });
+
+  const totalQ = allQs.length;
+
+  // Get all attempts for this quiz
+  const attempts = await db.attempt.findMany({
+    where: { userId: me.id, quizId },
+    select: { questionId: true },
+  });
+
+  const answeredIds = new Set(attempts.map((a) => a.questionId));
+
+  return {
+    totalQ,
+    answered: answeredIds.size,
+    questions: allQs.map((q) => ({
+      id: q.id,
+      chapter: q.chapter.number,
+      answered: answeredIds.has(q.id),
+    })),
+  };
 }

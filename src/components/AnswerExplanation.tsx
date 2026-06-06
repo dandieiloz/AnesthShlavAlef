@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { CitationPageLink } from "@/components/CitationPageLink";
-import { Lightbulb, BookMarked, XCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { BookMarked, XCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const HEBREW_LETTERS: Record<string, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
 
@@ -51,8 +55,9 @@ const UI = {
   he: {
     insufficient: "הראיות בספר הלימוד אינן מספיקות להוכחה חד-משמעית. ההסבר מבוסס על הנחיות כלליות.",
     alsoAccepted: "תשובה זו מתקבלת גם היא כתשובה נכונה. התשובה הראשית מוצגת למטה.",
-    explanation: "הסבר",
-    whyWrong: "מדוע שאר האפשרויות שגויות",
+    correctLabel: "תשובה נכונה",
+    acceptedLabel: "מתקבלת גם",
+    wrongLabel: "שגוי",
     evidence: "ראיות מספר הלימוד",
     chapter: "פרק",
     page: "עמ׳",
@@ -64,8 +69,9 @@ const UI = {
   en: {
     insufficient: "The textbook evidence is insufficient for a definitive proof. The explanation is based on general guidelines.",
     alsoAccepted: "This answer is also accepted. The explanation below refers to the primary answer.",
-    explanation: "Explanation",
-    whyWrong: "Why the other options are wrong",
+    correctLabel: "Correct answer",
+    acceptedLabel: "Also accepted",
+    wrongLabel: "Incorrect",
     evidence: "Textbook Evidence",
     chapter: "Chapter",
     page: "p.",
@@ -86,6 +92,62 @@ function parseWhyOthersWrong(raw: string): Partial<Record<Choice, string>> {
   return map;
 }
 
+/**
+ * Replace inline `[N]` citation markers with clickable anchor links to the
+ * matching numbered citation in the evidence section. Math regions (`$...$`,
+ * `$$...$$`) are skipped so LaTeX brackets are not mangled. Markers that don't
+ * point to a real citation index are left as plain text.
+ */
+function injectCitationAnchors(
+  text: string,
+  questionId: number | undefined,
+  citationCount: number,
+): string {
+  if (questionId === undefined || citationCount === 0 || !text) return text;
+  const parts = text.split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g);
+  return parts
+    .map((part, idx) => {
+      if (idx % 2 === 1) return part;
+      return part.replace(/(?<!\[)\[(\d+)\](?!\()/g, (m, n) => {
+        const num = parseInt(n, 10);
+        if (num < 1 || num > citationCount) return m;
+        return `[${n}](#cite-${questionId}-${num})`;
+      });
+    })
+    .join("");
+}
+
+type Palette = {
+  border: string;
+  bg: string;
+  headerBg: string;
+  headerBorder: string;
+  badge: string;
+  iconClass: string;
+  label: string;
+};
+
+const PALETTES: Record<"correct" | "wrong", Palette> = {
+  correct: {
+    border: "border-emerald-400/30",
+    bg: "bg-emerald-500/[0.04] dark:bg-emerald-400/[0.06]",
+    headerBg: "bg-emerald-500/[0.10] dark:bg-emerald-400/[0.12]",
+    headerBorder: "border-emerald-400/25",
+    badge: "border-emerald-400/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    iconClass: "text-emerald-600 dark:text-emerald-400",
+    label: "text-emerald-700 dark:text-emerald-300",
+  },
+  wrong: {
+    border: "border-rose-400/30",
+    bg: "bg-rose-500/[0.03] dark:bg-rose-400/[0.05]",
+    headerBg: "bg-rose-500/[0.08] dark:bg-rose-400/[0.10]",
+    headerBorder: "border-rose-400/25",
+    badge: "border-rose-400/50 bg-rose-500/15 text-rose-600 dark:text-rose-400",
+    iconClass: "text-rose-500 dark:text-rose-400",
+    label: "text-rose-700 dark:text-rose-300",
+  },
+};
+
 export function AnswerExplanation({
   explanation,
   evidenceCitations,
@@ -100,21 +162,45 @@ export function AnswerExplanation({
   highlights = [],
   highlightT,
 }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Smooth-scroll + flash when an inline [N] anchor is clicked.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      const link = target.closest('a[href*="#cite-"]') as HTMLAnchorElement | null;
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      const hashIdx = href.indexOf("#");
+      if (hashIdx < 0) return;
+      const id = href.slice(hashIdx + 1);
+      if (!id.startsWith("cite-")) return;
+      const targetEl = document.getElementById(id);
+      if (!targetEl) return;
+      ev.preventDefault();
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      targetEl.classList.add("cite-flash");
+      window.setTimeout(() => targetEl.classList.remove("cite-flash"), 1400);
+    };
+    el.addEventListener("click", handler);
+    return () => el.removeEventListener("click", handler);
+  }, []);
+
   const wrongReasons = parseWhyOthersWrong(whyOthersWrong);
   const acceptedSet = new Set<Choice>(acceptedAnswers ?? []);
-  const wrongOptions = options.filter(
-    (o) => o.key !== correctAnswer && !acceptedSet.has(o.key),
-  );
-  const hasWrongReasons = wrongOptions.some((o) => wrongReasons[o.key]);
   const showAlsoAcceptedBanner =
     userChoice !== undefined &&
     userChoice !== correctAnswer &&
     acceptedSet.has(userChoice);
   const ui = UI[locale];
   const dir = locale === "en" ? "ltr" : "rtl";
+  const citationCount = evidenceCitations?.length ?? 0;
 
   return (
-    <div className="space-y-3 text-sm" dir={dir}>
+    <div ref={containerRef} className="space-y-3 text-sm" dir={dir}>
       {/* Insufficient evidence warning */}
       {insufficientEvidence && (
         <div className="flex items-start gap-2.5 rounded-lg border border-amber-400/50 bg-amber-400/10 px-3.5 py-3">
@@ -136,76 +222,102 @@ export function AnswerExplanation({
         </div>
       )}
 
-      {/* ── Section 1: Explanation ─────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-sky-400/30 bg-sky-500/[0.04] dark:bg-sky-400/[0.06]">
-        <div className="flex items-center gap-2 border-b border-sky-400/25 bg-sky-500/[0.08] dark:bg-sky-400/[0.10] px-4 py-2.5">
-          <Lightbulb className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
-          <span className="text-[11px] font-bold uppercase tracking-widest text-sky-700 dark:text-sky-300">
-            {ui.explanation}
-          </span>
-        </div>
-        <div className="px-4 py-3.5">
-          {questionId !== undefined && highlightT ? (
-            <HighlightableMarkdown
-              text={explanation}
-              section="EXPLANATION"
-              questionId={questionId}
-              locale={locale}
-              highlights={highlights}
-              t={highlightT}
-            />
-          ) : (
-            <MathMarkdown>{explanation}</MathMarkdown>
-          )}
-        </div>
+      {/* ── Per-answer cards: correct + accepted first, then wrong answers in original order ── */}
+      <div className="space-y-2">
+        {[...options]
+          .sort((a, b) => {
+            const rank = (k: Choice) =>
+              k === correctAnswer ? 0 : acceptedSet.has(k) ? 1 : 2;
+            const ra = rank(a.key);
+            const rb = rank(b.key);
+            if (ra !== rb) return ra - rb;
+            return options.findIndex((o) => o.key === a.key) -
+              options.findIndex((o) => o.key === b.key);
+          })
+          .map(({ key, text }) => {
+          const isCorrect = key === correctAnswer;
+          const isAlsoAccepted = !isCorrect && acceptedSet.has(key);
+          const wrongReasonText =
+            !isCorrect && !isAlsoAccepted ? wrongReasons[key] : undefined;
+          const isWrong = !isCorrect && !isAlsoAccepted;
+
+          // Skip wrong cards with no reasoning so we don't render empty boxes.
+          if (isWrong && !wrongReasonText) return null;
+
+          const palette = isWrong ? PALETTES.wrong : PALETTES.correct;
+          const Icon = isWrong ? XCircle : CheckCircle2;
+          const headerLabel = isCorrect
+            ? ui.correctLabel
+            : isAlsoAccepted
+              ? ui.acceptedLabel
+              : ui.wrongLabel;
+
+          const rawBody = isCorrect ? explanation : wrongReasonText ?? "";
+          const bodyText = injectCitationAnchors(rawBody, questionId, citationCount);
+          const sectionName = isCorrect ? "EXPLANATION" : `WHY_WRONG_${key}`;
+          const hasBody = bodyText.length > 0;
+
+          return (
+            <div
+              key={key}
+              className={cn(
+                "overflow-hidden rounded-xl border",
+                palette.border,
+                palette.bg,
+              )}
+            >
+              <div
+                className={cn(
+                  "flex items-center gap-2.5 border-b px-4 py-2.5",
+                  palette.headerBorder,
+                  palette.headerBg,
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold",
+                    palette.badge,
+                  )}
+                >
+                  {HEBREW_LETTERS[key]}
+                </span>
+                <Icon className={cn("h-3.5 w-3.5 shrink-0", palette.iconClass)} />
+                <span
+                  className={cn(
+                    "text-[11px] font-bold uppercase tracking-widest",
+                    palette.label,
+                  )}
+                >
+                  {headerLabel}
+                </span>
+              </div>
+              <div className="px-4 py-3 space-y-2">
+                <p className="text-[11px] leading-snug text-muted-foreground/85">
+                  {text}
+                </p>
+                {hasBody && (
+                  <div className="text-foreground/90">
+                    {questionId !== undefined && highlightT ? (
+                      <HighlightableMarkdown
+                        text={bodyText}
+                        section={sectionName}
+                        questionId={questionId}
+                        locale={locale}
+                        highlights={highlights}
+                        t={highlightT}
+                      />
+                    ) : (
+                      <MathMarkdown>{bodyText}</MathMarkdown>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* ── Section 2: Why other options are wrong ────────────── */}
-      {hasWrongReasons && (
-        <div className="overflow-hidden rounded-xl border border-rose-400/30 bg-rose-500/[0.03] dark:bg-rose-400/[0.05]">
-          <div className="flex items-center gap-2 border-b border-rose-400/25 bg-rose-500/[0.08] dark:bg-rose-400/[0.10] px-4 py-2.5">
-            <XCircle className="h-3.5 w-3.5 shrink-0 text-rose-500 dark:text-rose-400" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">
-              {ui.whyWrong}
-            </span>
-          </div>
-          <div className="divide-y divide-rose-400/15 px-4">
-            {wrongOptions.map(({ key, text }) =>
-              wrongReasons[key] ? (
-                <div key={key} className="flex items-start gap-3 py-3">
-                  {/* Hebrew letter badge */}
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-rose-400/50 bg-rose-500/15 text-[11px] font-bold text-rose-600 dark:text-rose-400">
-                    {HEBREW_LETTERS[key]}
-                  </span>
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    {/* Option text (muted) */}
-                    <p className="text-[11px] text-muted-foreground/70 leading-snug line-clamp-2">
-                      {text}
-                    </p>
-                    {/* Why wrong */}
-                    <div className="text-xs leading-relaxed text-foreground/85">
-                      {questionId !== undefined && highlightT ? (
-                        <HighlightableMarkdown
-                          text={wrongReasons[key]!}
-                          section={`WHY_WRONG_${key}`}
-                          questionId={questionId}
-                          locale={locale}
-                          highlights={highlights}
-                          t={highlightT}
-                        />
-                      ) : (
-                        <MathMarkdown>{wrongReasons[key]!}</MathMarkdown>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : null
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Section 3: Textbook evidence ──────────────────────── */}
+      {/* ── Numbered textbook evidence ────────────────────────── */}
       {evidenceCitations && evidenceCitations.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-amber-400/30 bg-amber-400/[0.04] dark:bg-amber-400/[0.06]">
           <div className="flex items-center gap-2 border-b border-amber-400/25 bg-amber-400/[0.10] px-4 py-2.5">
@@ -215,68 +327,75 @@ export function AnswerExplanation({
             </span>
           </div>
           <div className="divide-y divide-amber-400/15 px-4">
-            {evidenceCitations.map((e, i) => (
-              <div key={i} className="py-3">
-                {/* Quote bar + text */}
-                <div className="flex items-start gap-3">
-                  <div
-                    className="mt-1 h-full w-0.5 shrink-0 self-stretch rounded-full bg-amber-400/70"
-                    aria-hidden
-                  />
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="text-xs italic leading-relaxed text-foreground/80">
-                      {questionId !== undefined && highlightT ? (
-                        <HighlightableMarkdown
-                          text={e.quote}
-                          section={`EVIDENCE_${i}`}
-                          questionId={questionId}
-                          locale={locale}
-                          highlights={highlights}
-                          t={highlightT}
-                        />
-                      ) : (
-                        <p dir="auto" className="text-start [unicode-bidi:plaintext]">
-                          &ldquo;{e.quote}&rdquo;
-                        </p>
-                      )}
-                    </div>
-                    <p dir="ltr" className="text-[11px] font-medium text-muted-foreground text-left">
-                      <span className="[unicode-bidi:isolate]">
-                        {ui.chapter} {e.chapterNumber}
-                      </span>
-                      <span dir="auto" className="text-muted-foreground/70 [unicode-bidi:plaintext]">
-                        {" "}
-                        — {e.chapterTitle}
-                      </span>
-                      {e.sectionPath && (
-                        <span
-                          dir="auto"
-                          className="text-muted-foreground/50 [unicode-bidi:plaintext]"
-                        >
+            {evidenceCitations.map((e, i) => {
+              const num = i + 1;
+              const id =
+                questionId !== undefined ? `cite-${questionId}-${num}` : undefined;
+              return (
+                <div
+                  key={i}
+                  id={id}
+                  className="-mx-4 scroll-mt-24 rounded-lg px-4 py-3 transition-shadow"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-400/50 bg-amber-400/15 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                      {num}
+                    </span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="text-xs italic leading-relaxed text-foreground/80">
+                        {questionId !== undefined && highlightT ? (
+                          <HighlightableMarkdown
+                            text={e.quote}
+                            section={`EVIDENCE_${i}`}
+                            questionId={questionId}
+                            locale={locale}
+                            highlights={highlights}
+                            t={highlightT}
+                          />
+                        ) : (
+                          <p dir="auto" className="text-start [unicode-bidi:plaintext]">
+                            &ldquo;{e.quote}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                      <p dir="ltr" className="text-[11px] font-medium text-muted-foreground text-left">
+                        <span className="[unicode-bidi:isolate]">
+                          {ui.chapter} {e.chapterNumber}
+                        </span>
+                        <span dir="auto" className="text-muted-foreground/70 [unicode-bidi:plaintext]">
                           {" "}
-                          › {e.sectionPath}
+                          — {e.chapterTitle}
                         </span>
-                      )}
-                      {e.pageStart != null && (
-                        <span className="text-muted-foreground/60 [unicode-bidi:isolate]">
-                          {" · "}
-                          <CitationPageLink
-                            page={e.pageStart}
-                            notConfiguredLabel={ui.citationNotConfigured}
-                            permissionDeniedLabel={ui.citationPermissionDenied}
-                            notFoundLabel={ui.citationNotFound}
+                        {e.sectionPath && (
+                          <span
+                            dir="auto"
+                            className="text-muted-foreground/50 [unicode-bidi:plaintext]"
                           >
-                            {e.pageEnd != null && e.pageEnd !== e.pageStart
-                              ? `${ui.pages} ${e.pageStart}–${e.pageEnd}`
-                              : `${ui.page} ${e.pageStart}`}
-                          </CitationPageLink>
-                        </span>
-                      )}
-                    </p>
+                            {" "}
+                            › {e.sectionPath}
+                          </span>
+                        )}
+                        {e.pageStart != null && (
+                          <span className="text-muted-foreground/60 [unicode-bidi:isolate]">
+                            {" · "}
+                            <CitationPageLink
+                              page={e.pageStart}
+                              notConfiguredLabel={ui.citationNotConfigured}
+                              permissionDeniedLabel={ui.citationPermissionDenied}
+                              notFoundLabel={ui.citationNotFound}
+                            >
+                              {e.pageEnd != null && e.pageEnd !== e.pageStart
+                                ? `${ui.pages} ${e.pageStart}–${e.pageEnd}`
+                                : `${ui.page} ${e.pageStart}`}
+                            </CitationPageLink>
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

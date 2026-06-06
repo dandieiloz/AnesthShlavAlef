@@ -299,4 +299,37 @@
     display: block;
     margin: 0.5em 0;
   }
+
+  /* ─── Inline citation anchors ───────────────────────────────
+     Markers like [1] in explanation/why-wrong text are pre-processed
+     into markdown links (`[1](#cite-…)`). Style them as compact
+     amber pill superscripts, distinct from regular prose links. */
+  .answer-content a[href*="#cite-"] {
+    display: inline-block;
+    vertical-align: super;
+    line-height: 1;
+    font-size: 0.7em;
+    font-weight: 700;
+    text-decoration: none;
+    margin-inline: 0.15em;
+    padding: 0.05em 0.4em;
+    border-radius: 9999px;
+    background-color: hsl(43 96% 56% / 0.18);
+    color: hsl(35 92% 32%);
+    transition: background-color 120ms ease;
+  }
+  .dark .answer-content a[href*="#cite-"] {
+    background-color: hsl(43 96% 56% / 0.22);
+    color: hsl(45 96% 70%);
+  }
+  .answer-content a[href*="#cite-"]:hover {
+    background-color: hsl(43 96% 56% / 0.34);
+  }
+
+  /* Flash effect when a citation is jumped to from an inline anchor. */
+  .cite-flash {
+    background-color: hsl(43 96% 56% / 0.22) !important;
+    box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.6);
+    transition: box-shadow 200ms ease, background-color 200ms ease;
+  }
 }
