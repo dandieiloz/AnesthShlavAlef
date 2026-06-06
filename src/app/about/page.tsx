@@ -12,7 +12,9 @@ const DEFAULTS: Record<string, string> = {
   about_pearl: `לאחר שנשללו ממנה כל המכשור הרפואי וחומרי ההרדמה, ד"ר פרל סיכנה את חייה כדי לבצע ניתוחים בחשאי כשהיא נעזרת בלחישות, באחיזת ידיים ובחמלה עמוקה בלבד כדי ללוות את מטופלותיה מבעד לכאבים מייסרים.
 
 קראנו לפלטפורמה זו על שמה כדי לזכור שאלחוש והרדמה הם הרבה מעבר לפרמקולוגיה ופיזיולוגיה.`,
-  about_yoni: `ד"ר יוני חלטניק הוא רופא מרדים ומפתח פלטפורמת Perl.`,
+  about_yoni: `ד"ר יוני חלאטניק הוא רופא מרדים ומפתח פלטפורמת Perl.
+
+Yonatan@khalatnik.com`,
   about_daniel: `ד"ר דניאל רון אילוז הוא רופא מרדים ומפתח פלטפורמת Perl.`,
 };
 
@@ -158,6 +160,12 @@ export default async function AboutPage() {
               <h3 className="font-display text-xl font-bold text-foreground">
                 {t.yoniName}
               </h3>
+              <a
+                href="mailto:Yonatan@khalatnik.com"
+                className="text-sm text-primary hover:underline break-all"
+              >
+                Yonatan@khalatnik.com
+              </a>
             </div>
             <div className="h-px bg-border" />
             <EditableSection

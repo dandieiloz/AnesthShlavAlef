@@ -18,10 +18,27 @@ export async function updateProfileAction(formData: FormData) {
     fullName: formData.get("fullName"),
     hospitalName: formData.get("hospitalName"),
     residencyYear: formData.get("residencyYear"),
+    marketingOptIn: formData.get("marketingOptIn"),
   });
+  const current = await db.user.findUnique({
+    where: { id: me.id },
+    select: { marketingOptIn: true, marketingOptInAt: true },
+  });
+  const wasOptedIn = current?.marketingOptIn ?? false;
+  const marketingOptInAt = data.marketingOptIn
+    ? wasOptedIn
+      ? (current?.marketingOptInAt ?? new Date())
+      : new Date()
+    : null;
   await db.user.update({
     where: { id: me.id },
-    data,
+    data: {
+      fullName: data.fullName,
+      hospitalName: data.hospitalName,
+      residencyYear: data.residencyYear,
+      marketingOptIn: data.marketingOptIn,
+      marketingOptInAt,
+    },
   });
   revalidatePath("/profile");
 }

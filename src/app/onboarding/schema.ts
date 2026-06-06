@@ -7,4 +7,7 @@ export const ProfileSchema = z.object({
     errorMap: () => ({ message: "יש לבחור בית חולים מהרשימה" }),
   }),
   residencyYear: z.coerce.number().int().min(1).max(5),
+  marketingOptIn: z
+    .preprocess((v) => v === "on" || v === "true" || v === true, z.boolean())
+    .default(false),
 });

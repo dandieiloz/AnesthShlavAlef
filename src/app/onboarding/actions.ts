@@ -10,10 +10,17 @@ export async function saveProfileAction(formData: FormData) {
     fullName: formData.get("fullName"),
     hospitalName: formData.get("hospitalName"),
     residencyYear: formData.get("residencyYear"),
+    marketingOptIn: formData.get("marketingOptIn"),
   });
   await db.user.update({
     where: { id: me.id },
-    data,
+    data: {
+      fullName: data.fullName,
+      hospitalName: data.hospitalName,
+      residencyYear: data.residencyYear,
+      marketingOptIn: data.marketingOptIn,
+      marketingOptInAt: data.marketingOptIn ? new Date() : null,
+    },
   });
   redirect("/study");
 }

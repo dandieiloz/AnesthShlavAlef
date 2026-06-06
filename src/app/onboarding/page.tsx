@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { saveProfileAction } from "./actions";
 import { HOSPITALS } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -87,7 +88,30 @@ export default async function OnboardingPage() {
               </select>
             </div>
 
+            <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-3">
+              <input
+                id="marketingOptIn"
+                name="marketingOptIn"
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="marketingOptIn" className="cursor-pointer font-normal">
+                  {t.marketingConsentLabel}
+                </Label>
+                <p className="text-xs text-muted-foreground">{t.marketingConsentHelp}</p>
+              </div>
+            </div>
+
             <Button type="submit" className="w-full">{t.continue}</Button>
+
+            <p className="text-center text-xs text-muted-foreground">
+              {t.legalPrefix}
+              <Link href="/terms" className="font-medium text-primary hover:underline">
+                {t.legalLinkLabel}
+              </Link>
+              .
+            </p>
           </form>
         </CardContent>
       </Card>

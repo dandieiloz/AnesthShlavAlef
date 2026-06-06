@@ -56,7 +56,7 @@ export default async function ProfilePage({
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { fullName: true, hospitalName: true, residencyYear: true, email: true, role: true },
+    select: { fullName: true, hospitalName: true, residencyYear: true, email: true, role: true, marketingOptIn: true },
   });
 
   if (!user) redirect("/");
@@ -206,6 +206,22 @@ export default async function ProfilePage({
                       <option key={y} value={y}>{t.yearLabels[y]}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-3">
+                  <input
+                    id="marketingOptIn"
+                    name="marketingOptIn"
+                    type="checkbox"
+                    defaultChecked={user.marketingOptIn}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="marketingOptIn" className="cursor-pointer font-normal">
+                      {t.marketingConsentLabel}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">{t.marketingConsentHelp}</p>
+                  </div>
                 </div>
 
                 <Button type="submit" className="w-full sm:w-auto">{t.saveChanges}</Button>

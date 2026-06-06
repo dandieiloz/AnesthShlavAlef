@@ -101,7 +101,9 @@ const SITE_CONTENT: Array<{ key: string; value: string }> = [
   },
   {
     key: "about_yoni",
-    value: `ד"ר יוני חלטניק הוא רופא מרדים ומפתח פלטפורמת Perl.`,
+    value: `ד"ר יוני חלאטניק  הוא רופא מרדים ומפתח פלטפורמת Perl.
+
+Yonatan@khalatnik.com`,
   },
   {
     key: "about_daniel",

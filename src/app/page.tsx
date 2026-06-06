@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { signIn } from "@/lib/auth";
@@ -83,6 +84,13 @@ export default async function Home() {
             </Button>
           </form>
         </div>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          {t.legalPrefix}
+          <Link href="/terms" className="font-medium text-primary hover:underline">
+            {t.legalLinkLabel}
+          </Link>
+          .
+        </p>
       </section>
 
       {/* Feature cards */}

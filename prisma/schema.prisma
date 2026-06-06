@@ -68,6 +68,8 @@ model User {
   examDate         DateTime?
   questionsPerWeek Int?
   lastDailyPopupAt DateTime?
+  marketingOptIn   Boolean   @default(false)
+  marketingOptInAt DateTime?
 
   accounts      Account[]
   sessions      Session[]

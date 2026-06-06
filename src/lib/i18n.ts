@@ -50,7 +50,7 @@ export const DICTIONARIES = {
     },
     footer: {
       tagline: "הרדמה שלב א׳ · מבוסס Miller's Anesthesia",
-      credits: "פלטפורמה זו נבנתה על ידי ד״ר יוני חלטניק וד״ר דניאל רון אילוז",
+      credits: "פלטפורמה זו נבנתה על ידי ד״ר יוני חלאטניק  וד״ר דניאל רון אילוז",
     },
     beta: {
       label: "גרסת בטא",
@@ -63,7 +63,9 @@ export const DICTIONARIES = {
       heroTitleHighlight: "קודם",
       heroSubtitle: "פלטפורמת שאלות אמריקאיות מבוססת מילר 10, עם הסברים מפורטים - בנויה למתמחים בדרך לשלב א׳.",
       ctaSignIn: "הירשמו לגרסת הדמו עם Google",
-      feature1Title: "שאלות ותשובות שאתם באמת יכולים לסמוך עליהן",
+      legalPrefix: "בכניסה אתם מסכימים ל",
+      legalLinkLabel: "תנאי השימוש והפרטיות",
+      feature1Title: "שאלות ותשובות שאפשר באמת לסמוך עליהן",
       feature1Desc: "כל הסבר נבנה ישירות מתוך ספר הלימוד Miller 10 עצמו. תוכלו לראות את הקטעים המדויקים שעליהם מבוססת התשובה, כדי שתוכלו ללמוד ולבדוק את המקור במקום.",
       feature2Title: "למידה פעילה",
       feature2Desc: "הבינו בדיוק למה התשובה הנכונה היא נכונה ולמה כל תשובה שגויה לא, בעזרת ציטוטים מהספר. סמנו במרקר את המשפטים שחשובים לכם, שמרו שאלות בסימניות לחזרה, ודונו בשאלות מורכבות באזור התגובות עם הקהילה הארצית.",
@@ -380,7 +382,7 @@ export const DICTIONARIES = {
       teamEyebrow: "הצוות שלנו",
       teamTitle: "המפתחים",
       anesthesiologist: "מרדים",
-      yoniName: "ד\"ר יוני חלטניק",
+      yoniName: "ד\"ר יוני חלאטניק ",
       danielName: "ד\"ר דניאל רון אילוז",
       editTitle: "ערוך קטע",
       saving: "שומר...",
@@ -399,6 +401,10 @@ export const DICTIONARIES = {
       residencyYear: "שנת התמחות",
       yearPlaceholder: "בחרו שנה",
       continue: "שמירה והמשך",
+      marketingConsentLabel: "אני מסכים לקבל חומרים פרסומיים בהרשמה",
+      marketingConsentHelp: "אופציונלי. תוכלו לבטל בכל עת מתוך עמוד הפרופיל.",
+      legalPrefix: "המשך ההרשמה מהווה הסכמה ל",
+      legalLinkLabel: "תנאי השימוש והפרטיות",
       yearOption: (n: number) => `שנה ${n}`,
       yearLabels: { 1: "שנה א׳", 2: "שנה ב׳", 3: "שנה ג׳", 4: "שנה ד׳", 5: "שנה ה׳" } as Record<number, string>,
     },
@@ -422,6 +428,8 @@ export const DICTIONARIES = {
       residencyYear: "שנת התמחות",
       yearPlaceholder: "בחרו שנה",
       saveChanges: "שמירת שינויים",
+      marketingConsentLabel: "אני מסכים לקבל חומרים פרסומיים בהרשמה",
+      marketingConsentHelp: "אפשר להסיר את הסימון בכל רגע כדי להפסיק לקבל חומרים.",
       yearLabels: { 1: "שנה א׳", 2: "שנה ב׳", 3: "שנה ג׳", 4: "שנה ד׳", 5: "שנה ה׳" } as Record<number, string>,
       languageTitle: "הגדרות שפה",
       uiLanguageLabel: "שפת הממשק",
@@ -539,6 +547,19 @@ export const DICTIONARIES = {
         fiberoptic: { title: "פנטום הפייבר-אופטי",    flavor: "רואה דרכים שאחרים לא רואים" },
       },
     },
+    terms: {
+      title: "תנאי שימוש ופרטיות",
+      subtitle: "מסמך כללי המתאר את אופי השירות, הטיפול במידע והסכמת הדיוור.",
+      educationalHeading: "הצהרה חינוכית",
+      educationalBody:
+        "התוכן באתר נועד ללימוד ולתרגול לקראת בחינת שלב א׳ בהרדמה בלבד ואינו מהווה ייעוץ רפואי. אין להסתמך על השאלות וההסברים לצורך קבלת החלטות קליניות בטיפול במטופלים. למרות שההסברים נשענים על הספר Miller's Anesthesia, ייתכנו טעויות; אנא דווחו עליהן דרך כפתור הדיווח בכל שאלה.",
+      privacyHeading: "פרטיות וטיפול במידע",
+      privacyBody:
+        "אנו אוספים את המידע שמסרתם בהרשמה (שם, בית חולים, שנת התמחות) ומידע על שימושכם בפלטפורמה (שאלות שניסיתם, סימניות, דיווחים) לצורך תפעול השירות והצגת סטטיסטיקות אישיות. ההתחברות מתבצעת דרך Google ואיננו אוגרים סיסמאות. לא נעביר את פרטיכם לצדדים שלישיים ללא הסכמתכם. תוכלו לבקש מחיקת חשבון בכל עת דרך אמצעי הקשר באתר.",
+      marketingHeading: "חומרים פרסומיים",
+      marketingBody:
+        "סימון תיבת \"אני מסכים לקבל חומרים פרסומיים בהרשמה\" מהווה הסכמה לפי סעיף 30א לחוק התקשורת (בזק ושידורים), התשמ\"ב-1982 לקבלת עדכונים ודיוורים פרסומיים מאיתנו. ההסכמה אופציונלית, אינה תנאי לשימוש בשירות, וניתן להסירה בכל עת מתוך עמוד הפרופיל או באמצעות מענה לדיוור עצמו.",
+    },
   },
 
   en: {
@@ -594,6 +615,8 @@ export const DICTIONARIES = {
       heroTitleHighlight: "smarter",
       heroSubtitle: "A multiple-choice question platform grounded in the textbook, with detailed explanations and a learning-usefulness index — built for residents on the way to Step 1.",
       ctaSignIn: "Start now — sign in with Google",
+      legalPrefix: "By signing in you agree to our ",
+      legalLinkLabel: "Terms & Privacy",
       feature1Title: "Questions and answers you can actually trust",
       feature1Desc: "Every explanation is built directly from Miller's Anesthesia, 10th edition. See the exact passages the answer is based on, so you can learn and verify the source in place.",
       feature2Title: "Active learning",
@@ -930,6 +953,10 @@ export const DICTIONARIES = {
       residencyYear: "Residency year",
       yearPlaceholder: "Choose a year",
       continue: "Save and continue",
+      marketingConsentLabel: "I agree to receive marketing materials upon registration",
+      marketingConsentHelp: "Optional. You can opt out at any time from your profile page.",
+      legalPrefix: "Continuing your registration means you agree to our ",
+      legalLinkLabel: "Terms & Privacy",
       yearOption: (n: number) => `Year ${n}`,
       yearLabels: { 1: "Year 1", 2: "Year 2", 3: "Year 3", 4: "Year 4", 5: "Year 5" } as Record<number, string>,
     },
@@ -953,6 +980,8 @@ export const DICTIONARIES = {
       residencyYear: "Residency year",
       yearPlaceholder: "Choose a year",
       saveChanges: "Save changes",
+      marketingConsentLabel: "I agree to receive marketing materials upon registration",
+      marketingConsentHelp: "Uncheck to stop receiving marketing materials at any time.",
       yearLabels: { 1: "Year 1", 2: "Year 2", 3: "Year 3", 4: "Year 4", 5: "Year 5" } as Record<number, string>,
       languageTitle: "Language Settings",
       uiLanguageLabel: "Interface Language",
@@ -1069,6 +1098,19 @@ export const DICTIONARIES = {
         glidescope: { title: "Glidescope Gamer",      flavor: "Every intubation is a level-up" },
         fiberoptic: { title: "Fiberoptic Phantom",    flavor: "Sees the airways no one else can" },
       },
+    },
+    terms: {
+      title: "Terms & Privacy",
+      subtitle: "A general overview of the service, how we handle your data, and the marketing-consent policy.",
+      educationalHeading: "Educational disclaimer",
+      educationalBody:
+        "Content on this site is intended for studying and practising toward the Israeli anesthesiology Step 1 exam only and does not constitute medical advice. Do not rely on the questions or explanations for clinical decisions in patient care. Although explanations are grounded in Miller's Anesthesia, errors are possible — please report any you find using the report button on each question.",
+      privacyHeading: "Privacy & data handling",
+      privacyBody:
+        "We collect the details you provide at registration (name, hospital, residency year) and information about your platform usage (attempted questions, bookmarks, reports) in order to operate the service and display personal statistics. Authentication is handled by Google and we do not store passwords. We will not share your details with third parties without your consent. You may request account deletion at any time via the contact channels on the site.",
+      marketingHeading: "Marketing materials",
+      marketingBody:
+        "Checking \"I agree to receive marketing materials upon registration\" constitutes consent under section 30A of the Israeli Communications Law (Telecommunications and Broadcasting), 1982, to receive updates and marketing communications from us. Consent is optional, is not a condition for using the service, and can be withdrawn at any time from your profile page or by replying to the mailing itself.",
     },
   },
 } as const;
