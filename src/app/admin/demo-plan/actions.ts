@@ -23,3 +23,31 @@ export async function setDemoSourceAllowedAction(source: string, allowed: boolea
 export async function setDemoNullSourceAllowedAction(allowed: boolean) {
   return setDemoSourceAllowedAction(NULL_SOURCE_SENTINEL, allowed);
 }
+
+export async function setDemoSourcesAllowedBulkAction(sources: string[], allowed: boolean) {
+  await requireAdmin();
+  const clean = Array.from(
+    new Set(
+      sources
+        .filter((s): s is string => typeof s === "string")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && s.length <= 200),
+    ),
+  );
+  if (clean.length === 0) return;
+  if (allowed) {
+    await db.$transaction(
+      clean.map((source) =>
+        db.demoAllowedSource.upsert({
+          where: { source },
+          update: {},
+          create: { source },
+        }),
+      ),
+    );
+  } else {
+    await db.demoAllowedSource.deleteMany({ where: { source: { in: clean } } });
+  }
+  invalidateDemoAllowedSources();
+  revalidatePath("/admin/demo-plan");
+}

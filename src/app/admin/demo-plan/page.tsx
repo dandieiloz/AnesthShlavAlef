@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { QUESTION_SOURCES } from "@/lib/hospitals";
+import { HOSPITALS, OFFICIAL_EXAM_SOURCE, UNKNOWN_SOURCE } from "@/lib/hospitals";
 import { AdminNav } from "../AdminNav";
 import { DemoPlanClient, type SourceRow } from "./DemoPlanClient";
 import { NULL_SOURCE_SENTINEL } from "@/lib/plan";
@@ -22,33 +22,55 @@ export default async function DemoPlanPage() {
   ]);
 
   const allowedSet = new Set(allowedRows.map((r) => r.source));
-  const nullSourceAllowed = allowedSet.has(NULL_SOURCE_SENTINEL);
 
   const countMap = new Map<string, number>();
   for (const r of sourceCounts) {
     if (r.source) countMap.set(r.source, r._count._all);
   }
 
-  // Canonical sources from QUESTION_SOURCES, plus any DB sources that don't match the canonical list (legacy / "Institution YYYY").
-  const canonicalSet = new Set<string>(QUESTION_SOURCES);
-  const extraDbSources = [...countMap.keys()].filter((s) => !canonicalSet.has(s)).sort();
+  const sortedHospitals = [...HOSPITALS].sort((a, b) => b.length - a.length);
+
+  function groupOf(source: string): SourceRow["group"] {
+    if (source.startsWith(OFFICIAL_EXAM_SOURCE)) return "official";
+    if (sortedHospitals.some((h) => source === h || source.startsWith(h + " ")))
+      return "hospital";
+    return "other";
+  }
+
+  function labelOf(source: string): string {
+    if (source === NULL_SOURCE_SENTINEL) return "שאלות ללא מקור";
+    if (source === UNKNOWN_SOURCE) return "מקור לא ידוע";
+    return source;
+  }
+
+  // Real sources that actually exist on questions (the allowlist gates by exact
+  // source string, so only real values are meaningful), plus any pre-allowed
+  // source from the DB that currently has no questions, plus the null sentinel.
+  const sourceSet = new Set<string>(countMap.keys());
+  for (const s of allowedSet) {
+    if (s !== NULL_SOURCE_SENTINEL) sourceSet.add(s);
+  }
 
   const rows: SourceRow[] = [
-    ...QUESTION_SOURCES.map((s) => ({
+    ...[...sourceSet].map((s) => ({
       source: s,
+      label: labelOf(s),
       allowed: allowedSet.has(s),
       questionCount: countMap.get(s) ?? 0,
+      group: groupOf(s),
     })),
-    ...extraDbSources.map((s) => ({
-      source: s,
-      allowed: allowedSet.has(s),
-      questionCount: countMap.get(s) ?? 0,
-    })),
+    {
+      source: NULL_SOURCE_SENTINEL,
+      label: labelOf(NULL_SOURCE_SENTINEL),
+      allowed: allowedSet.has(NULL_SOURCE_SENTINEL),
+      questionCount: nullSourceCount,
+      group: "other" as const,
+    },
   ];
 
-  const allowedQuestionTotal =
-    rows.filter((r) => r.allowed).reduce((sum, r) => sum + r.questionCount, 0) +
-    (nullSourceAllowed ? nullSourceCount : 0);
+  const allowedQuestionTotal = rows
+    .filter((r) => r.allowed)
+    .reduce((sum, r) => sum + r.questionCount, 0);
 
   return (
     <div className="space-y-4">
@@ -79,11 +101,7 @@ export default async function DemoPlanPage() {
         </div>
       </div>
 
-      <DemoPlanClient
-        rows={rows}
-        nullSourceAllowed={nullSourceAllowed}
-        nullSourceQuestionCount={nullSourceCount}
-      />
+      <DemoPlanClient rows={rows} />
     </div>
   );
 }

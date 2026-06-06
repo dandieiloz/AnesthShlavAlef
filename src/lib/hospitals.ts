@@ -31,4 +31,6 @@ export const HOSPITALS = [
 
 export const OFFICIAL_EXAM_SOURCE = "מבחן שלב א' רשמי" as const;
 
-export const QUESTION_SOURCES = [...HOSPITALS, OFFICIAL_EXAM_SOURCE] as const;
+export const UNKNOWN_SOURCE = "unknown" as const;
+
+export const QUESTION_SOURCES = [...HOSPITALS, OFFICIAL_EXAM_SOURCE, UNKNOWN_SOURCE] as const;
