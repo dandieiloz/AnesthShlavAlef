@@ -329,14 +329,14 @@ export function AnswerExplanation({
             <div
               key={key}
               className={cn(
-                "overflow-hidden rounded-xl border",
+                "rounded-xl border",
                 palette.border,
                 palette.bg,
               )}
             >
               <div
                 className={cn(
-                  "flex items-center gap-2.5 border-b px-4 py-2.5",
+                  "flex items-center gap-2.5 rounded-t-xl border-b px-4 py-2.5",
                   palette.headerBorder,
                   palette.headerBg,
                 )}
@@ -387,8 +387,8 @@ export function AnswerExplanation({
 
       {/* ── Numbered textbook evidence ────────────────────────── */}
       {evidenceCitations && evidenceCitations.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-amber-400/30 bg-amber-400/[0.04] dark:bg-amber-400/[0.06]">
-          <div className="flex items-center gap-2 border-b border-amber-400/25 bg-amber-400/[0.10] px-4 py-2.5">
+        <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] dark:bg-amber-400/[0.06]">
+          <div className="flex items-center gap-2 rounded-t-xl border-b border-amber-400/25 bg-amber-400/[0.10] px-4 py-2.5">
             <BookMarked className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">
               {ui.evidence}
