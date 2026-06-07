@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { HOSPITALS } from "@/lib/hospitals";
 import { ContributeForm } from "./ContributeForm";
 
@@ -12,6 +13,11 @@ export default async function ContributePage() {
   const session = await auth();
   const isLoggedIn = Boolean(session?.user?.id);
 
+  const chapters = await db.chapter.findMany({
+    orderBy: { number: "asc" },
+    select: { number: true, title: true },
+  });
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="space-y-2">
@@ -22,7 +28,7 @@ export default async function ContributePage() {
           משתמשים מחוברים יכולים גם להעלות קובץ PDF או Word במקום הדבקה.
         </p>
       </header>
-      <ContributeForm isLoggedIn={isLoggedIn} hospitals={HOSPITALS} />
+      <ContributeForm isLoggedIn={isLoggedIn} hospitals={HOSPITALS} chapters={chapters} />
     </div>
   );
 }

@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type Props = { isLoggedIn: boolean; hospitals: readonly string[] };
+type Chapter = { number: number; title: string };
+type Props = { isLoggedIn: boolean; hospitals: readonly string[]; chapters: readonly Chapter[] };
 
-export function ContributeForm({ isLoggedIn, hospitals }: Props) {
+export function ContributeForm({ isLoggedIn, hospitals, chapters }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<"paste" | "upload">("paste");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -79,7 +80,19 @@ export function ContributeForm({ isLoggedIn, hospitals }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chapterHint">פרק / נושא (לא חובה)</Label>
-          <Input id="chapterHint" name="chapterHint" maxLength={200} placeholder="למשל: פרמקולוגיה, נוירואנסתזיה" />
+          <select
+            id="chapterHint"
+            name="chapterHint"
+            defaultValue=""
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">בחרו פרק (לא חובה)</option>
+            {chapters.map((c) => (
+              <option key={c.number} value={`${c.number}. ${c.title}`}>
+                {c.number}. {c.title}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="doctorName">שם הרופא/ה (לא חובה)</Label>

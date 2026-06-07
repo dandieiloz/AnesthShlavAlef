@@ -135,11 +135,21 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
 
       {/* Workflow */}
       {status === "IMPORTED" ? (
-        <div className="flex items-center justify-between rounded bg-green-50 px-3 py-2 text-sm dark:bg-green-950/30">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded bg-green-50 px-3 py-2 text-sm dark:bg-green-950/30">
           <span className="text-green-800 dark:text-green-300">{importedCount} שאלות נוספו למרכז התור</span>
-          <Link href="/admin/queue" className="text-primary hover:underline">
-            למרכז התור →
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={runAnalyze}
+              disabled={analyzing}
+              className="text-primary hover:underline disabled:opacity-50"
+            >
+              {analyzing ? "מנתח..." : "נתח מחדש"}
+            </button>
+            <Link href="/admin/queue" className="text-primary hover:underline">
+              למרכז התור →
+            </Link>
+          </div>
         </div>
       ) : status === "REJECTED" ? (
         <p className="text-sm text-muted-foreground">השליחה נדחתה.</p>
