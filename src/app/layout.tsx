@@ -7,6 +7,7 @@ import { SiteHeaderClient } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BetaBanner } from "@/components/BetaBanner";
 import { DailyPopupGate } from "@/components/DailyPopupGate";
+import { ActivityHeartbeat } from "@/components/ActivityHeartbeat";
 import { Toaster } from "@/components/ui/toaster";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -76,6 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SiteFooter t={dict.footer} />
           <Toaster />
           <DailyPopupGate />
+          {user?.id && <ActivityHeartbeat />}
         </ThemeProvider>
       </body>
     </html>

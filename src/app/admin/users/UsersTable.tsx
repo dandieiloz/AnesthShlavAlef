@@ -18,6 +18,7 @@ export type UserRow = {
   residencyYear: number | null;
   createdAt: string;
   lastActiveAt: string | null;
+  lastVisitAt: string | null;
   attemptCount: number;
 };
 
@@ -160,7 +161,8 @@ export function UsersTable({
           <SortHeader field="hospital" label="בית חולים" />
           <SortHeader field="residencyYear" label="שנה" align="center" />
           <SortHeader field="createdAt" label="הצטרף" />
-          <SortHeader field="lastActive" label="פעיל לאחרונה" />
+          <SortHeader field="lastActive" label="ענה לאחרונה" />
+          <th className="p-2 text-start text-muted-foreground whitespace-nowrap">ביקור אחרון</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרופיל</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">היסטוריה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פעולות</th>
@@ -238,13 +240,26 @@ export function UsersTable({
                 {DATE_FORMATTER.format(new Date(u.createdAt))}
               </td>
 
-              {/* Last active */}
+              {/* Last answered (attempt-based) */}
               <td className="p-2 text-muted-foreground whitespace-nowrap">
                 {u.lastActiveAt ? (
                   <span title={DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))}>
                     {relativeNowMs === null
                       ? DATE_TIME_FORMATTER.format(new Date(u.lastActiveAt))
                       : formatRelativeTime(u.lastActiveAt, relativeNowMs, "he")}
+                  </span>
+                ) : (
+                  <span className="italic text-muted-foreground/50">—</span>
+                )}
+              </td>
+
+              {/* Last visit (any platform page load, ping-based) */}
+              <td className="p-2 text-muted-foreground whitespace-nowrap">
+                {u.lastVisitAt ? (
+                  <span title={DATE_TIME_FORMATTER.format(new Date(u.lastVisitAt))}>
+                    {relativeNowMs === null
+                      ? DATE_TIME_FORMATTER.format(new Date(u.lastVisitAt))
+                      : formatRelativeTime(u.lastVisitAt, relativeNowMs, "he")}
                   </span>
                 ) : (
                   <span className="italic text-muted-foreground/50">—</span>

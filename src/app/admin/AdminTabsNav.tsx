@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const ADMIN_TABS = [
-  { href: "/admin", label: "ניהול פרקים" },
+  { href: "/admin/users", label: "משתמשים" },
+  { href: "/admin/chapters", label: "ניהול פרקים" },
   { href: "/admin/queue", label: "מרכז התור" },
   { href: "/admin/candidates", label: "מועמדי חילול" },
   { href: "/admin/questions", label: "שאלות" },
   { href: "/admin/reports", label: "דיווחים" },
   { href: "/admin/debug-reports", label: "דיווחי באג" },
-  { href: "/admin/users", label: "משתמשים" },
   { href: "/admin/demo-plan", label: "תוכנית דמו" },
   { href: "/admin/announcements", label: "הודעות" },
 ] as const;
@@ -19,10 +19,6 @@ const ADMIN_TABS = [
 export type AdminTabHref = (typeof ADMIN_TABS)[number]["href"];
 
 function isTabActive(pathname: string, href: string) {
-  if (href === "/admin") {
-    return pathname === "/admin" || pathname.startsWith("/admin/chapters");
-  }
-
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

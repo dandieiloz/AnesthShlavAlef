@@ -86,6 +86,7 @@ model User {
   resolvedDebugReports DebugReport[]         @relation("DebugReportResolver")
   adminNotes        QuestionAdminNote[]      @relation("AdminNoteAuthor")
   dailyPopupAcks    DailyPopupAck[]
+  activityPings     ActivityPing[]
 }
 
 model Account {
@@ -361,6 +362,17 @@ model Attempt {
 
   @@index([userId, createdAt])
   @@index([questionId])
+}
+
+model ActivityPing {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model Quiz {

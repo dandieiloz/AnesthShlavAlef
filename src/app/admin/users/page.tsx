@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { UsersTable, type UserRow } from "./UsersTable";
 import { UsersFilters } from "./UsersFilters";
+import { UserActivityChart } from "./UserActivityChart";
 import { AdminNav } from "../AdminNav";
 import { AutoRefresh } from "./AutoRefresh";
 import { Suspense } from "react";
@@ -208,6 +209,19 @@ export default async function AdminUsersPage({
     );
   }
 
+  // Last platform visit (any authenticated page load) for the visible users.
+  // Sourced from ActivityPing, distinct from attempt-based "ענה לאחרונה".
+  // Raw SQL because the Prisma client may not yet expose the new model.
+  const visitRows = userIds.length
+    ? await db.$queryRaw<Array<{ userId: string; max: Date }>>`
+        SELECT "userId", MAX("createdAt") AS max
+        FROM "ActivityPing"
+        WHERE "userId" = ANY(${userIds}::text[])
+        GROUP BY "userId"
+      `
+    : [];
+  const lastVisitByUser = new Map<string, Date>(visitRows.map((r) => [r.userId, r.max]));
+
   const rows: UserRow[] = users.map((u) => ({
     id: u.id,
     name: u.name,
@@ -220,6 +234,7 @@ export default async function AdminUsersPage({
     residencyYear: u.residencyYear,
     createdAt: u.createdAt.toISOString(),
     lastActiveAt: lastActiveByUser.get(u.id)?.toISOString() ?? null,
+    lastVisitAt: lastVisitByUser.get(u.id)?.toISOString() ?? null,
     attemptCount: attemptCountByUser.get(u.id) ?? 0,
   }));
 
@@ -228,6 +243,8 @@ export default async function AdminUsersPage({
       <AutoRefresh />
       <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול משתמשים</h1>
+
+      <UserActivityChart />
 
       {/* Summary stat cards */}
       <div className="grid grid-cols-4 gap-3">
