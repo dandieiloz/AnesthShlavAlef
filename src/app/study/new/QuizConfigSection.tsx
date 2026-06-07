@@ -76,7 +76,9 @@ export function QuizConfigSection({
   const [nameTouched, setNameTouched] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [mode, setMode] = useState<AnswerMode>("immediate");
-  const [includeSeen, setIncludeSeen] = useState(false);
+  // Exam-by-institution quizzes default to the full exam (include already-seen
+  // questions); by-chapter quizzes default to unseen-only.
+  const [includeSeen, setIncludeSeen] = useState(initialMode === "exam");
   const [excludeOfficial, setExcludeOfficial] = useState(false);
   const [setupMode, setSetupMode] = useState<SetupMode>(initialMode);
 
@@ -139,6 +141,7 @@ export function QuizConfigSection({
         (storedSetup === "chapters" || storedSetup === "exam")
       ) {
         setSetupMode(storedSetup);
+        setIncludeSeen(storedSetup === "exam");
       }
     } catch {
       /* ignore */
@@ -157,6 +160,7 @@ export function QuizConfigSection({
 
   function changeSetupMode(next: SetupMode) {
     setSetupMode(next);
+    setIncludeSeen(next === "exam");
     try {
       window.localStorage.setItem(SETUP_MODE_STORAGE_KEY, next);
     } catch {

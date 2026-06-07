@@ -68,6 +68,29 @@ function fisherYatesSample<T>(arr: T[], n: number): T[] {
   return a.slice(0, Math.min(n, a.length));
 }
 
+/**
+ * Sample question ids for a new quiz, prioritizing questions that no user has
+ * ever attempted. Globally-untested questions are placed first (in random
+ * order), then already-attempted ones fill the remainder (also random). The
+ * result is sliced to `limit`, so when enough untested questions exist the quiz
+ * is entirely fresh; otherwise it falls back to previously-seen questions.
+ */
+async function samplePrioritizingUntested(poolIds: number[], limit: number): Promise<number[]> {
+  if (poolIds.length === 0) return [];
+  const attempted = await db.attempt.findMany({
+    where: { questionId: { in: poolIds } },
+    select: { questionId: true },
+    distinct: ["questionId"],
+  });
+  const attemptedSet = new Set(attempted.map((a) => a.questionId));
+  const untested = poolIds.filter((id) => !attemptedSet.has(id));
+  const tested = poolIds.filter((id) => attemptedSet.has(id));
+  return [
+    ...fisherYatesSample(untested, untested.length),
+    ...fisherYatesSample(tested, tested.length),
+  ].slice(0, Math.min(limit, poolIds.length));
+}
+
 async function resolveUniqueName(userId: string, baseName: string): Promise<string> {
   const existing = await db.quiz.findMany({ where: { userId }, select: { name: true } });
   const names = new Set(existing.map((q) => q.name));
@@ -121,7 +144,7 @@ export async function createQuizAction(formData: FormData) {
       redirect(`/study/new?${q.toString()}`);
     }
 
-    const questionIds = fisherYatesSample(
+    const questionIds = await samplePrioritizingUntested(
       pool.map((q) => q.id),
       data.questionLimit ?? pool.length,
     );
@@ -170,7 +193,7 @@ export async function createQuizAction(formData: FormData) {
     redirect("/study/new?empty=1");
   }
 
-  const questionIds = fisherYatesSample(
+  const questionIds = await samplePrioritizingUntested(
     pool.map((q) => q.id),
     data.questionLimit ?? pool.length,
   );
