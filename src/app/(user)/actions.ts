@@ -132,6 +132,7 @@ export async function createQuizAction(formData: FormData) {
         AND: [planGate, hasUsableAnswerWhere],
       },
       select: { id: true },
+      orderBy: { id: "asc" },
     });
 
     if (pool.length === 0) {
@@ -144,10 +145,11 @@ export async function createQuizAction(formData: FormData) {
       redirect(`/study/new?${q.toString()}`);
     }
 
-    const questionIds = await samplePrioritizingUntested(
-      pool.map((q) => q.id),
-      data.questionLimit ?? pool.length,
-    );
+    // A full institutional exam is delivered in its natural question order:
+    // no prioritization and no shuffle, just the exam sequence.
+    const questionIds = pool
+      .map((q) => q.id)
+      .slice(0, data.questionLimit ?? pool.length);
 
     const resolvedName = await resolveUniqueName(me.id, data.name);
     const quiz = await db.quiz.create({
