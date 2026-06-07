@@ -29,7 +29,8 @@ type SortField =
   | "hospital"
   | "residencyYear"
   | "createdAt"
-  | "lastActive";
+  | "lastActive"
+  | "lastVisit";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", { dateStyle: "short" });
@@ -46,6 +47,7 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   residencyYear: "asc",
   createdAt: "desc",
   lastActive: "desc",
+  lastVisit: "desc",
 };
 
 export function UsersTable({
@@ -162,7 +164,7 @@ export function UsersTable({
           <SortHeader field="residencyYear" label="שנה" align="center" />
           <SortHeader field="createdAt" label="הצטרף" />
           <SortHeader field="lastActive" label="ענה לאחרונה" />
-          <th className="p-2 text-start text-muted-foreground whitespace-nowrap">ביקור אחרון</th>
+          <SortHeader field="lastVisit" label="ביקור אחרון" />
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרופיל</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">היסטוריה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פעולות</th>

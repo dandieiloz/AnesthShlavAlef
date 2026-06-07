@@ -16,6 +16,7 @@ const SORT_FIELDS = [
   "residencyYear",
   "createdAt",
   "lastActive",
+  "lastVisit",
 ] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
@@ -126,6 +127,7 @@ export default async function AdminUsersPage({
     createdAt: Date;
   }>;
   let lastActiveByUser: Map<string, Date>;
+  let lastVisitByUser: Map<string, Date> = new Map();
 
   if (sort === "lastActive") {
     const candidateIds = await db.user.findMany({ where, select: { id: true } });
@@ -156,6 +158,35 @@ export default async function AdminUsersPage({
       : [];
     const byId = new Map(fetched.map((u) => [u.id, u]));
     users = pageIds.map((id) => byId.get(id)!).filter(Boolean);
+  } else if (sort === "lastVisit") {
+    // Mirror of the lastActive branch but sourced from ActivityPing via raw SQL
+    // (Prisma client may not yet expose the new model after the migration).
+    const candidateIds = await db.user.findMany({ where, select: { id: true } });
+    const ids = candidateIds.map((u) => u.id);
+    const maxRows = ids.length
+      ? await db.$queryRaw<Array<{ userId: string; max: Date }>>`
+          SELECT "userId", MAX("createdAt") AS max
+          FROM "ActivityPing"
+          WHERE "userId" = ANY(${ids}::text[])
+          GROUP BY "userId"
+        `
+      : [];
+    lastVisitByUser = new Map(maxRows.map((r) => [r.userId, r.max]));
+    const sorted = [...ids].sort((a, b) => {
+      const ta = lastVisitByUser.get(a)?.getTime() ?? null;
+      const tb = lastVisitByUser.get(b)?.getTime() ?? null;
+      if (ta === null && tb === null) return 0;
+      if (ta === null) return 1; // nulls always last
+      if (tb === null) return -1;
+      return order === "asc" ? ta - tb : tb - ta;
+    });
+    const pageIds = sorted.slice(0, LIMIT);
+    const fetched = pageIds.length
+      ? await db.user.findMany({ where: { id: { in: pageIds } }, select: userSelect })
+      : [];
+    const byId = new Map(fetched.map((u) => [u.id, u]));
+    users = pageIds.map((id) => byId.get(id)!).filter(Boolean);
+    lastActiveByUser = new Map();
   } else {
     const orderBy =
       sort === "name"
@@ -212,15 +243,18 @@ export default async function AdminUsersPage({
   // Last platform visit (any authenticated page load) for the visible users.
   // Sourced from ActivityPing, distinct from attempt-based "ענה לאחרונה".
   // Raw SQL because the Prisma client may not yet expose the new model.
-  const visitRows = userIds.length
-    ? await db.$queryRaw<Array<{ userId: string; max: Date }>>`
-        SELECT "userId", MAX("createdAt") AS max
-        FROM "ActivityPing"
-        WHERE "userId" = ANY(${userIds}::text[])
-        GROUP BY "userId"
-      `
-    : [];
-  const lastVisitByUser = new Map<string, Date>(visitRows.map((r) => [r.userId, r.max]));
+  // Skipped when sorting by lastVisit because that branch already populated the map.
+  if (sort !== "lastVisit") {
+    const visitRows = userIds.length
+      ? await db.$queryRaw<Array<{ userId: string; max: Date }>>`
+          SELECT "userId", MAX("createdAt") AS max
+          FROM "ActivityPing"
+          WHERE "userId" = ANY(${userIds}::text[])
+          GROUP BY "userId"
+        `
+      : [];
+    lastVisitByUser = new Map<string, Date>(visitRows.map((r) => [r.userId, r.max]));
+  }
 
   const rows: UserRow[] = users.map((u) => ({
     id: u.id,
