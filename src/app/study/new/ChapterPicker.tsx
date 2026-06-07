@@ -39,7 +39,6 @@ export function ChapterPicker({
 }) {
   const t = getDictionary(locale).studyNew;
   const [query, setQuery] = useState("");
-  const [toneFilter, setToneFilter] = useState<Set<UsefulnessTone>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set(preselected));
 
   useEffect(() => {
@@ -51,19 +50,28 @@ export function ChapterPicker({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return chapters.filter((c) => {
-      if (toneFilter.size > 0 && !toneFilter.has(usefulnessTone(c.learningUsefulnessIndex))) return false;
       if (q) {
         const num = String(c.number);
         if (!num.includes(q) && !c.title.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [chapters, query, toneFilter]);
+  }, [chapters, query]);
 
-  function toggleTone(tone: UsefulnessTone) {
-    setToneFilter((prev) => {
+  function selectTone(tone: UsefulnessTone) {
+    const toneChapters = chapters.filter(
+      (c) => c.questionCount > 0 && usefulnessTone(c.learningUsefulnessIndex) === tone,
+    );
+    if (toneChapters.length === 0) return;
+    setSelected((prev) => {
+      // If every chapter of this tone is already selected, the click deselects
+      // them all; otherwise it selects them all.
+      const allSelected = toneChapters.every((c) => prev.has(c.id));
       const next = new Set(prev);
-      next.has(tone) ? next.delete(tone) : next.add(tone);
+      toneChapters.forEach((c) => {
+        if (allSelected) next.delete(c.id);
+        else next.add(c.id);
+      });
       return next;
     });
   }
@@ -112,16 +120,14 @@ export function ChapterPicker({
         />
       </div>
 
-      {/* Usefulness filter chips */}
+      {/* Usefulness quick-select chips */}
       <div className="flex flex-wrap gap-1.5">
         {ALL_TONES.map((tone) => (
           <button
             key={tone}
             type="button"
-            onClick={() => toggleTone(tone)}
-            className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-opacity ${TONE_CHIP_CLASS[tone]} ${
-              toneFilter.size > 0 && !toneFilter.has(tone) ? "opacity-35" : "opacity-100"
-            }`}
+            onClick={() => selectTone(tone)}
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-transform hover:scale-105 active:scale-95 ${TONE_CHIP_CLASS[tone]}`}
           >
             {toneLabel(tone, locale)}
           </button>
