@@ -45,36 +45,46 @@ export type QuizSession = QuizBatch & {
 
 const DEFAULT_BATCH = 5;
 
-/**
- * Build the Prisma `where` for the quiz's unanswered question pool.
- */
-function buildQuestionFilter(
-  quiz: { chapterIds: number[]; questionIds: number[] },
-  excludeIds: number[],
-  planGate: Record<string, unknown>,
-) {
-  const useFixedSet = quiz.questionIds.length > 0;
-  if (useFixedSet) {
-    return {
-      id: { in: quiz.questionIds, notIn: excludeIds },
-      AND: [planGate, hasUsableAnswerWhere],
-    };
-  }
-  return {
-    chapterIds: { hasSome: quiz.chapterIds },
-    id: { notIn: excludeIds },
-    AND: [planGate, hasUsableAnswerWhere],
+/** Small, fast, deterministic PRNG (mulberry32) seeded from an integer. */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return function () {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/**
+ * Deterministic Fisher-Yates shuffle. Given the same input and seed it always
+ * produces the same order, so legacy chapter quizzes (which have no stored
+ * order) can be delivered in a stable random order across batch refills.
+ */
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const a = arr.slice();
+  const rand = mulberry32(seed);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 /**
  * Load a batch of unanswered questions, fully hydrated for the client
  * (translation, bookmark state, highlights). All per-question work runs in
  * parallel so one batch costs roughly one round of Promise.all, not N.
+ *
+ * Questions are delivered in the quiz's randomized order: fixed-set quizzes
+ * carry their shuffled order in `questionIds` (set at creation), while legacy
+ * chapter quizzes derive a deterministic per-quiz shuffle keyed by the quiz id.
+ * The order is stable across refills, which the client relies on since it
+ * paginates by passing back every served id in `excludeIds`.
  */
 export async function loadQuizBatch(args: {
   user: PlanGatedUser;
-  quiz: { chapterIds: number[]; questionIds: number[] };
+  quiz: { id: number; chapterIds: number[]; questionIds: number[] };
   excludeIds: number[];
   contentLocale: "he" | "en";
   batchSize?: number;
@@ -82,19 +92,49 @@ export async function loadQuizBatch(args: {
 }): Promise<QuizBatch> {
   const batchSize = args.batchSize ?? DEFAULT_BATCH;
   const planGate = args.planGate ?? (await questionAccessWhere(args.user));
-  const filter = buildQuestionFilter(args.quiz, args.excludeIds, planGate);
+  const excludeSet = new Set(args.excludeIds);
+
+  // Establish the stable, randomized delivery order for this quiz.
+  let orderedIds: number[];
+  if (args.quiz.questionIds.length > 0) {
+    orderedIds = args.quiz.questionIds;
+  } else {
+    const poolRows = await db.question.findMany({
+      where: {
+        chapterIds: { hasSome: args.quiz.chapterIds },
+        AND: [planGate, hasUsableAnswerWhere],
+      },
+      select: { id: true },
+    });
+    orderedIds = seededShuffle(poolRows.map((q) => q.id), args.quiz.id);
+  }
+
+  const remaining = orderedIds.filter((id) => !excludeSet.has(id));
+  if (remaining.length === 0) return { questions: [], hasMore: false };
+
+  // Drop ids that no longer pass the access / usable-answer gates while
+  // preserving the randomized order. Ids-only so this pass stays cheap.
+  const usableRows = await db.question.findMany({
+    where: { id: { in: remaining }, AND: [planGate, hasUsableAnswerWhere] },
+    select: { id: true },
+  });
+  const usableSet = new Set(usableRows.map((q) => q.id));
+  const orderedUsable = remaining.filter((id) => usableSet.has(id));
+  if (orderedUsable.length === 0) return { questions: [], hasMore: false };
+
+  const hasMore = orderedUsable.length > batchSize;
+  const windowIds = orderedUsable.slice(0, batchSize);
 
   const rows = await db.question.findMany({
-    where: filter,
-    orderBy: { id: "asc" },
-    take: batchSize + 1,
+    where: { id: { in: windowIds } },
     include: { chapter: true, geminiAnswer: true },
   });
-
-  const hasMore = rows.length > batchSize;
-  const batch = rows.slice(0, batchSize).filter(
-    (q) => q.geminiAnswer || (q.imageUrl && q.correctAnswer),
-  );
+  // Prisma `in` ignores array order, so re-sort rows to the randomized window.
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const batch = windowIds
+    .map((id) => rowById.get(id))
+    .filter((q): q is NonNullable<typeof q> => Boolean(q))
+    .filter((q) => q.geminiAnswer || (q.imageUrl && q.correctAnswer));
   if (batch.length === 0) return { questions: [], hasMore: false };
 
   const ids = batch.map((q) => q.id);

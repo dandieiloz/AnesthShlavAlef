@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { cn } from "@/lib/utils";
 
 type Chapter = { number: number; title: string };
@@ -80,19 +81,14 @@ export function ContributeForm({ isLoggedIn, hospitals, chapters }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chapterHint">פרק / נושא (לא חובה)</Label>
-          <select
+          <SearchableSelect
             id="chapterHint"
             name="chapterHint"
-            defaultValue=""
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="">בחרו פרק (לא חובה)</option>
-            {chapters.map((c) => (
-              <option key={c.number} value={`${c.number}. ${c.title}`}>
-                {c.number}. {c.title}
-              </option>
-            ))}
-          </select>
+            options={chapters.map((c) => `${c.number}. ${c.title}`)}
+            placeholder="בחרו פרק (לא חובה)"
+            searchPlaceholder="חיפוש פרק..."
+            clearable
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="doctorName">שם הרופא/ה (לא חובה)</Label>
