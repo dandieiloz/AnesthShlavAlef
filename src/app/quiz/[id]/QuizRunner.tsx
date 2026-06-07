@@ -804,6 +804,14 @@ export function QuizRunner(props: Props) {
                           }
                         : undefined
                     }
+                    onContextMenu={
+                      canEliminate
+                        ? (e) => {
+                            e.preventDefault();
+                            toggleEliminated(display.id, k);
+                          }
+                        : undefined
+                    }
                     className={[
                       "flex items-start gap-3 rounded-lg border p-3.5 text-sm transition-colors",
                       displayRevealed
