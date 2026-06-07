@@ -10,6 +10,7 @@ const ADMIN_TABS = [
   { href: "/admin/queue", label: "מרכז התור" },
   { href: "/admin/candidates", label: "מועמדי חילול" },
   { href: "/admin/questions", label: "שאלות" },
+  { href: "/admin/submissions", label: "שאלות שנשלחו" },
   { href: "/admin/reports", label: "דיווחים" },
   { href: "/admin/debug-reports", label: "דיווחי באג" },
   { href: "/admin/demo-plan", label: "תוכנית דמו" },

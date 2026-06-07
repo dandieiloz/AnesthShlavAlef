@@ -51,6 +51,7 @@ export const DICTIONARIES = {
     footer: {
       tagline: "הרדמה שלב א׳ · מבוסס Miller's Anesthesia",
       credits: "פלטפורמה זו נבנתה על ידי ד״ר יוני חלאטניק  וד״ר דניאל רון אילוז",
+      contribute: "תרומת שאלות",
     },
     beta: {
       label: "גרסת בטא",
@@ -603,6 +604,7 @@ export const DICTIONARIES = {
     footer: {
       tagline: "Anesthesiology Step 1 · based on Miller's Anesthesia",
       credits: "Built by Dr. Yoni Chaltnik and Dr. Daniel Ron Iluz",
+      contribute: "Contribute questions",
     },
     beta: {
       label: "Beta",

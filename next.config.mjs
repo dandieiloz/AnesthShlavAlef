@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: { serverActions: { bodySizeLimit: "10mb" } },
+  // Node-only libraries used inside server actions for parsing uploaded files.
+  // Keep them external so they are not bundled (they use dynamic require / Node built-ins).
+  serverExternalPackages: ["mammoth", "pdf-parse"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "lh3.googleusercontent.com" },

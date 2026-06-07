@@ -52,6 +52,13 @@ enum DebugReportKind {
   TECHNICAL
 }
 
+enum SubmissionStatus {
+  NEW
+  ANALYZED
+  IMPORTED
+  REJECTED
+}
+
 model User {
   id             String    @id @default(cuid())
   name           String?
@@ -87,6 +94,8 @@ model User {
   adminNotes        QuestionAdminNote[]      @relation("AdminNoteAuthor")
   dailyPopupAcks    DailyPopupAck[]
   activityPings     ActivityPing[]
+  submissions       QuestionSubmission[]     @relation("SubmissionAuthor")
+  reviewedSubmissions QuestionSubmission[]   @relation("SubmissionReviewer")
 }
 
 model Account {
@@ -523,4 +532,36 @@ model AnswerGenerationJob {
 
   @@index([status, queuedAt])
   @@index([questionId])
+}
+
+/// Raw question sets submitted by visitors (including non-authenticated) via /contribute.
+/// Admins review the raw dump, run a Gemini standardization pass, then import the
+/// resulting questions into the generation queue ("מרכז התור").
+model QuestionSubmission {
+  id             String           @id @default(cuid())
+  // Raw content — the analysis source is rawText (paste) or extractedText (uploaded file).
+  rawText        String?          @db.Text // pasted "dump" of questions + answers
+  fileName       String?                   // original uploaded file name (logged-in upload)
+  extractedText  String?          @db.Text // text extracted from an uploaded PDF/Word file
+  // Submitter-provided metadata
+  institute      String                     // required
+  year           Int?
+  chapterHint    String?                    // free-text chapter / topic
+  doctorName     String?
+  // Submitter identity (submittedBy set only when authenticated)
+  submittedById  String?
+  submitterEmail String?
+  // Review workflow
+  status         SubmissionStatus @default(NEW)
+  analysis       Json?                      // StandardizedQuestion[] produced by the Gemini pass
+  analyzedAt     DateTime?
+  importedCount  Int              @default(0)
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  submittedBy User? @relation("SubmissionAuthor", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewedBy  User? @relation("SubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
 }
