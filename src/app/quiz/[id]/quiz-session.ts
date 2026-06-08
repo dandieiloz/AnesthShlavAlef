@@ -41,6 +41,12 @@ export type QuizBatch = {
 export type QuizSession = QuizBatch & {
   quiz: { id: number; name: string; chapterIds: number[]; questionIds: number[] };
   totals: { totalQ: number; answered: number; correct: number };
+  /**
+   * Previously-answered questions for this quiz, fully hydrated and ordered by
+   * the time they were answered. Used to seed the client's "previous question"
+   * back-stack so a resumed quiz can navigate to earlier questions.
+   */
+  answeredHistory: { question: QuestionPayload; chosen: Choice }[];
 };
 
 const DEFAULT_BATCH = 5;
@@ -125,17 +131,41 @@ export async function loadQuizBatch(args: {
   const hasMore = orderedUsable.length > batchSize;
   const windowIds = orderedUsable.slice(0, batchSize);
 
+  const questions = await hydrateQuestionsByIds({
+    user: args.user,
+    ids: windowIds,
+    contentLocale: args.contentLocale,
+  });
+  if (questions.length === 0) return { questions: [], hasMore: false };
+
+  return { questions, hasMore };
+}
+
+/**
+ * Hydrate a list of question ids into fully-rendered client payloads
+ * (translation, bookmark state, highlights, latest report), preserving the
+ * given id order. Questions without a usable answer (no GeminiAnswer and no
+ * image+correctAnswer) are dropped. Shared by batch delivery and the
+ * answered-history seeding used to make "previous question" work on resume.
+ */
+async function hydrateQuestionsByIds(args: {
+  user: PlanGatedUser;
+  ids: number[];
+  contentLocale: "he" | "en";
+}): Promise<QuestionPayload[]> {
+  if (args.ids.length === 0) return [];
+
   const rows = await db.question.findMany({
-    where: { id: { in: windowIds } },
+    where: { id: { in: args.ids } },
     include: { chapter: true, geminiAnswer: true },
   });
-  // Prisma `in` ignores array order, so re-sort rows to the randomized window.
+  // Prisma `in` ignores array order, so re-sort rows to the requested order.
   const rowById = new Map(rows.map((r) => [r.id, r]));
-  const batch = windowIds
+  const batch = args.ids
     .map((id) => rowById.get(id))
     .filter((q): q is NonNullable<typeof q> => Boolean(q))
     .filter((q) => q.geminiAnswer || (q.imageUrl && q.correctAnswer));
-  if (batch.length === 0) return { questions: [], hasMore: false };
+  if (batch.length === 0) return [];
 
   const ids = batch.map((q) => q.id);
 
@@ -232,7 +262,7 @@ export async function loadQuizBatch(args: {
     }),
   );
 
-  return { questions, hasMore };
+  return questions;
 }
 
 /**
@@ -257,7 +287,8 @@ export async function loadQuizSession(args: {
   const [attemptRows, totalQ] = await Promise.all([
     db.attempt.findMany({
       where: { userId: args.user.id, quizId: quiz.id },
-      select: { questionId: true, isCorrect: true },
+      select: { questionId: true, chosen: true, isCorrect: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
     }),
     useFixedSet
       ? Promise.resolve(quiz.questionIds.length)
@@ -278,9 +309,37 @@ export async function loadQuizSession(args: {
     planGate,
   });
 
+  // Seed the client's "previous question" back-stack with already-answered
+  // questions so a resumed quiz can navigate backwards. Only worth hydrating
+  // when there's an active question to return to (otherwise the page shows the
+  // finished screen and never mounts the runner).
+  let answeredHistory: { question: QuestionPayload; chosen: Choice }[] = [];
+  if (batch.questions.length > 0 && attemptRows.length > 0) {
+    // Latest attempt per question, keeping first-answered ordering.
+    const latestByQ = new Map<number, { chosen: Choice; createdAt: Date }>();
+    const firstSeenOrder: number[] = [];
+    for (const a of attemptRows) {
+      if (!latestByQ.has(a.questionId)) firstSeenOrder.push(a.questionId);
+      latestByQ.set(a.questionId, { chosen: a.chosen as Choice, createdAt: a.createdAt });
+    }
+    const payloads = await hydrateQuestionsByIds({
+      user: args.user,
+      ids: firstSeenOrder,
+      contentLocale: args.contentLocale,
+    });
+    const payloadById = new Map(payloads.map((p) => [p.id, p]));
+    answeredHistory = firstSeenOrder
+      .map((id) => {
+        const q = payloadById.get(id);
+        return q ? { question: q, chosen: latestByQ.get(id)!.chosen } : null;
+      })
+      .filter((x): x is { question: QuestionPayload; chosen: Choice } => x !== null);
+  }
+
   return {
     quiz,
     totals: { totalQ, answered: answeredIds.length, correct },
+    answeredHistory,
     ...batch,
   };
 }

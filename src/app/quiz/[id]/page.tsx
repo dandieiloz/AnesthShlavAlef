@@ -64,6 +64,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       initialCorrect={session.totals.correct}
       initialBatch={session.questions}
       initialHasMore={session.hasMore}
+      initialPast={session.answeredHistory}
       uiLocale={uiLocale}
     />
   );

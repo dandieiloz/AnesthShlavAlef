@@ -78,6 +78,9 @@ type Props = {
   initialCorrect: number;
   initialBatch: QuestionPayload[];
   initialHasMore: boolean;
+  // Previously-answered questions (DB-backed), ordered by answer time. Seeds
+  // the back-stack so "previous question" works after resuming a quiz.
+  initialPast: { question: QuestionPayload; chosen: Choice }[];
 };
 
 export function QuizRunner(props: Props) {
@@ -170,6 +173,11 @@ export function QuizRunner(props: Props) {
       } catch {
         /* ignore corrupt / oversized snapshots */
       }
+    } else if (props.initialPast.length > 0) {
+      // Immediate mode (attempts already durable server-side): seed the
+      // back-stack from DB history so "previous question" works on resume.
+      setPast(props.initialPast);
+      for (const p of props.initialPast) servedIds.current.add(p.question.id);
     }
     sessionRestoredRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
