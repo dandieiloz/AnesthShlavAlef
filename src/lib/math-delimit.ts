@@ -17,6 +17,18 @@ export function ensureMathDelimiters(input: string): string {
   return segments.map((seg, i) => (i % 2 === 1 ? seg : wrapMathInSegment(seg))).join("");
 }
 
+// A backslash at index `j` followed by n/t/r that is NOT continued by a
+// lowercase letter is a stray JSON-escape artifact (a literal `\n`/`\t`/`\r`
+// where a newline/tab was intended), not a real LaTeX command — real commands
+// like \nabla, \theta, \rho all continue with lowercase letters. Treating these
+// as commands wrongly wraps surrounding prose in $...$ and KaTeX mangles it.
+function isLiteralEscape(s: string, j: number): boolean {
+  const next = s[j + 1];
+  if (next !== "n" && next !== "t" && next !== "r") return false;
+  const after = s[j + 2] ?? "";
+  return !/[a-z]/.test(after);
+}
+
 function wrapMathInSegment(s: string): string {
   let out = "";
   let i = 0;
@@ -24,7 +36,7 @@ function wrapMathInSegment(s: string): string {
     // Find the next backslash that starts a LaTeX command (\Word).
     let cmd = -1;
     for (let j = i; j < s.length - 1; j++) {
-      if (s[j] === "\\" && /[A-Za-z]/.test(s[j + 1])) {
+      if (s[j] === "\\" && /[A-Za-z]/.test(s[j + 1]) && !isLiteralEscape(s, j)) {
         cmd = j;
         break;
       }

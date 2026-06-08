@@ -13,6 +13,7 @@ const ADMIN_TABS = [
   { href: "/admin/submissions", label: "שאלות שנשלחו" },
   { href: "/admin/reports", label: "דיווחים" },
   { href: "/admin/debug-reports", label: "דיווחי באג" },
+  { href: "/admin/formatting-issues", label: "בעיות עיצוב" },
   { href: "/admin/demo-plan", label: "תוכנית דמו" },
   { href: "/admin/announcements", label: "הודעות" },
 ] as const;
