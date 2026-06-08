@@ -49,7 +49,24 @@ const HEBREW_LETTERS = ["א", "ב", "ג", "ד"];
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 const REFILL_THRESHOLD = 2;
 const MODE_STORAGE_KEY = "quizAnswerMode";
+// Per-quiz localStorage key for the in-progress full-mode draft snapshot.
+// Full mode buffers answers client-side until final submit, so without this a
+// navigation / refresh / browser-back would silently discard every answered
+// question. Immediate mode records each attempt server-side and needs no snapshot.
+const SESSION_STORAGE_PREFIX = "quizFullSession:";
+const SESSION_SNAPSHOT_VERSION = 1;
 type AnswerMode = "immediate" | "full";
+
+type FullSessionSnapshot = {
+  v: number;
+  queue: QuestionPayload[];
+  past: { question: QuestionPayload; chosen: Choice | null }[];
+  draftAnswers: [number, Choice][];
+  unsureIds: number[];
+  answered: number;
+  correct: number;
+  hasMore: boolean;
+};
 
 type Props = {
   quizId: number;
@@ -113,16 +130,50 @@ export function QuizRunner(props: Props) {
   // second recordAttempt for the same question.
   const submittingRef = useRef(false);
   const lastRecordedQuestionId = useRef<number | null>(null);
+  // Becomes true once the mount-time restore has run. Gates the persistence
+  // effect so the initial render can't overwrite a saved snapshot with empty
+  // state before it has been rehydrated.
+  const sessionRestoredRef = useRef(false);
 
-  // Load persisted mode after mount (avoid SSR/CSR mismatch).
+  // Load persisted mode after mount (avoid SSR/CSR mismatch) and, for full
+  // mode, rehydrate any in-progress draft so progress survives navigation,
+  // refresh, accidental back, or a tab/browser crash.
   useEffect(() => {
+    let restoredMode: AnswerMode = "immediate";
     try {
       const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
-      if (stored === "immediate" || stored === "full") setMode(stored);
+      if (stored === "immediate" || stored === "full") restoredMode = stored;
     } catch {
       /* ignore storage errors */
     }
-  }, []);
+    setMode(restoredMode);
+
+    if (restoredMode === "full") {
+      try {
+        const raw = window.localStorage.getItem(SESSION_STORAGE_PREFIX + props.quizId);
+        if (raw) {
+          const snap = JSON.parse(raw) as FullSessionSnapshot;
+          if (snap && snap.v === SESSION_SNAPSHOT_VERSION && Array.isArray(snap.queue)) {
+            setQueue(snap.queue);
+            setPast(snap.past);
+            setDraftAnswers(new Map(snap.draftAnswers));
+            setUnsureIds(new Set(snap.unsureIds));
+            setAnswered(snap.answered);
+            setCorrect(snap.correct);
+            setHasMore(snap.hasMore);
+            servedIds.current = new Set([
+              ...snap.queue.map((q) => q.id),
+              ...snap.past.map((p) => p.question.id),
+            ]);
+          }
+        }
+      } catch {
+        /* ignore corrupt / oversized snapshots */
+      }
+    }
+    sessionRestoredRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.quizId]);
 
   const changeMode = useCallback((next: AnswerMode) => {
     setMode(next);
@@ -132,6 +183,32 @@ export function QuizRunner(props: Props) {
       /* ignore storage errors */
     }
   }, []);
+
+  // Persist the full-mode draft after every change. Keyed per quiz so each
+  // exam recovers independently. Skipped in immediate mode (already durable
+  // server-side) and until the mount-time restore has completed.
+  useEffect(() => {
+    if (!sessionRestoredRef.current) return;
+    if (mode !== "full") return;
+    try {
+      const snap: FullSessionSnapshot = {
+        v: SESSION_SNAPSHOT_VERSION,
+        queue,
+        past,
+        draftAnswers: Array.from(draftAnswers.entries()),
+        unsureIds: Array.from(unsureIds),
+        answered,
+        correct,
+        hasMore,
+      };
+      window.localStorage.setItem(
+        SESSION_STORAGE_PREFIX + props.quizId,
+        JSON.stringify(snap),
+      );
+    } catch {
+      /* ignore storage quota / serialization errors */
+    }
+  }, [mode, queue, past, draftAnswers, unsureIds, answered, correct, hasMore, props.quizId]);
 
   // Track every question id we have served the client (consumed or queued), so
   // refill requests don't redeliver the same one before the server has seen
@@ -633,6 +710,11 @@ export function QuizRunner(props: Props) {
     setFinalizing(true);
     try {
       await submitFullQuizAction({ quizId: props.quizId, answers });
+      try {
+        window.localStorage.removeItem(SESSION_STORAGE_PREFIX + props.quizId);
+      } catch {
+        /* ignore storage errors */
+      }
       router.replace(`/quiz/${props.quizId}/review`);
     } catch (err) {
       console.error("[quiz] failed to submit full quiz", err);
