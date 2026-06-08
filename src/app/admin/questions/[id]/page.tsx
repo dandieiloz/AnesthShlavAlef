@@ -439,6 +439,14 @@ export default async function AdminQuestionPage({
                   ? "✓ ממתין בתור"
                   : "חולל מחדש (+ לתור)"}
               </button>
+              {openJob && (
+                <Link
+                  href="/admin/queue"
+                  className="ml-2 inline-block rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+                >
+                  מעבר למרכז התור →
+                </Link>
+              )}
             </form>
             {pendingCandidate && (
               <div className="mt-3 rounded border-2 border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/30">

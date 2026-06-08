@@ -101,6 +101,7 @@ export function QueueClient({
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [regenPending, setRegenPending] = useState(0);
   const stopRef = useRef(false);
   const [, startTransition] = useTransition();
 
@@ -214,6 +215,7 @@ export function QueueClient({
     stopRef.current = false;
     setRunning(true);
     setStatusMsg(null);
+    setRegenPending(0);
     jobTimingsRef.current = [];
 
     const queue = runnable.map((r) => r.id);
@@ -259,10 +261,11 @@ export function QueueClient({
     setProgress(null);
     if (!stopRef.current) {
       const regenSuffix =
-        regenDone > 0 ? ` · ${regenDone} מועמדי חילול ממתינים לאישור ב/admin/candidates` : "";
+        regenDone > 0 ? ` · ${regenDone} מועמדי חילול ממתינים לאישור` : "";
       setStatusMsg(
         `סיים: ${doneCount} הושלמו${failCount > 0 ? `, ${failCount} נכשלו` : ""}${regenSuffix}`
       );
+      setRegenPending(regenDone);
     }
     // Refresh server data so stats bar / filter counts update
     router.refresh();
@@ -706,8 +709,16 @@ export function QueueClient({
 
       {/* Status message */}
       {statusMsg && !progress && (
-        <div className="rounded border bg-muted px-4 py-2 text-sm text-muted-foreground">
-          {statusMsg}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded border bg-muted px-4 py-2 text-sm text-muted-foreground">
+          <span>{statusMsg}</span>
+          {regenPending > 0 && (
+            <Link
+              href="/admin/candidates"
+              className="shrink-0 rounded bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+            >
+              ממתין לחילול ({regenPending}) →
+            </Link>
+          )}
         </div>
       )}
 

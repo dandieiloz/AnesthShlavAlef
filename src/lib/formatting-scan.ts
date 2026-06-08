@@ -95,6 +95,129 @@ function fixWhitespaceArtifacts(text: string): string {
     .join("");
 }
 
+// Unicode subscript/superscript maps for unwrapping simple inline math like
+// `$N_2O$` (chemical formulae) into plain text `N₂O`. The quiz stem and answer
+// options are NOT KaTeX-rendered, so a `$...$` wrapper shows the literal `$`
+// signs; converting to Unicode renders identically in both plain-text and KaTeX
+// contexts.
+const SUBSCRIPT_MAP: Record<string, string> = {
+  "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇",
+  "8": "₈", "9": "₉", "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎",
+  a: "ₐ", e: "ₑ", h: "ₕ", i: "ᵢ", j: "ⱼ", k: "ₖ", l: "ₗ", m: "ₘ", n: "ₙ", o: "ₒ",
+  p: "ₚ", r: "ᵣ", s: "ₛ", t: "ₜ", u: "ᵤ", v: "ᵥ", x: "ₓ",
+};
+const SUPERSCRIPT_MAP: Record<string, string> = {
+  "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷",
+  "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾",
+  a: "ᵃ", b: "ᵇ", c: "ᶜ", d: "ᵈ", e: "ᵉ", f: "ᶠ", g: "ᵍ", h: "ʰ", i: "ⁱ", j: "ʲ",
+  k: "ᵏ", l: "ˡ", m: "ᵐ", n: "ⁿ", o: "ᵒ", p: "ᵖ", r: "ʳ", s: "ˢ", t: "ᵗ", u: "ᵘ",
+  v: "ᵛ", w: "ʷ", x: "ˣ", y: "ʸ", z: "ᶻ",
+};
+
+// Inline `$...$` (single-dollar, non-empty, single line). `$$display$$` excluded.
+const INLINE_MATH_RE = /(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)/g;
+
+// Convert a simple inline-math body into plain Unicode text, or return null when
+// it contains a LaTeX command or a sub/superscript char with no Unicode mapping —
+// in which case the span is left untouched so real math is never garbled. Requires
+// at least one sub/superscript so bare equations like `$5 = 3 + 2$` are left alone.
+function convertSimpleMathBody(body: string): string | null {
+  if (body.includes("\\")) return null; // real LaTeX command
+  let out = "";
+  let i = 0;
+  let sawScript = false;
+  while (i < body.length) {
+    const c = body[i];
+    if (c === "_" || c === "^") {
+      const map = c === "_" ? SUBSCRIPT_MAP : SUPERSCRIPT_MAP;
+      i++;
+      let token: string;
+      if (body[i] === "{") {
+        const close = body.indexOf("}", i);
+        if (close === -1) return null;
+        token = body.slice(i + 1, close);
+        i = close + 1;
+      } else {
+        token = body[i] ?? "";
+        i++;
+      }
+      if (token.length === 0) return null;
+      for (const ch of token) {
+        const mapped = map[ch];
+        if (!mapped) return null;
+        out += mapped;
+      }
+      sawScript = true;
+    } else if (/[A-Za-z0-9()., +\-=/]/.test(c)) {
+      out += c;
+      i++;
+    } else {
+      return null; // unexpected char → not a simple formula
+    }
+  }
+  return sawScript ? out : null;
+}
+
+function countStrayInlineMath(text: string): number {
+  const noCode = stripCode(text);
+  let n = 0;
+  for (const m of noCode.matchAll(INLINE_MATH_RE)) {
+    if (convertSimpleMathBody(m[1]) != null) n++;
+  }
+  return n;
+}
+
+function fixStrayInlineMath(text: string): string {
+  const segments = text.split(/(```[\s\S]*?```|`[^`\n]*`)/g);
+  return segments
+    .map((seg, i) =>
+      i % 2 === 1
+        ? seg
+        : seg.replace(INLINE_MATH_RE, (full, body: string) => {
+            const conv = convertSimpleMathBody(body);
+            return conv == null ? full : conv;
+          }),
+    )
+    .join("");
+}
+
+// Split text into alternating prose / (code|math) segments. Odd indices are the
+// captured code/math delimiters and must be left untouched.
+function splitProseSegments(text: string): string[] {
+  return text.split(/(```[\s\S]*?```|`[^`\n]*`|\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g);
+}
+
+// Citation markers like `[1, 2]`, `[2,1]`, `[1,2,3]` bundle several references in
+// one bracket. injectCitationAnchors() in AnswerExplanation only linkifies a
+// single-number bracket `[N]`, so the extra numbers stay plain text (one citation
+// "not rendered"). Splitting into adjacent single brackets `[1][2]` lets the
+// existing renderer linkify each one.
+const MULTI_CITATION_RE = /\[\s*\d+(?:\s*,\s*\d+)+\s*\]/g;
+
+function countMultiCitations(text: string): number {
+  const segs = splitProseSegments(text);
+  let n = 0;
+  segs.forEach((seg, i) => {
+    if (i % 2 === 1) return;
+    n += (seg.match(MULTI_CITATION_RE) ?? []).length;
+  });
+  return n;
+}
+
+function fixMultiCitations(text: string): string {
+  const segs = splitProseSegments(text);
+  return segs
+    .map((seg, i) =>
+      i % 2 === 1
+        ? seg
+        : seg.replace(MULTI_CITATION_RE, (m) => {
+            const nums = m.replace(/[[\]\s]/g, "").split(",").filter(Boolean);
+            return nums.map((num) => `[${num}]`).join("");
+          }),
+    )
+    .join("");
+}
+
 // --- Rule registry --------------------------------------------------------
 
 export const RULES: RuleDef[] = [
@@ -132,6 +255,26 @@ export const RULES: RuleDef[] = [
     severity: "warning",
     fixKind: "gemini",
     count: countUnbalancedBraces,
+  },
+  {
+    id: "STRAY_MATH_DELIMITER",
+    label: "תוחמי $ מיותרים סביב נוסחה פשוטה",
+    description:
+      "ביטוי כמו $N_2O$ עטוף בתוחמי $; בשדות שאינם מרונדרים ב-KaTeX (כמו גוף השאלה והתשובות) מוצגים סימני ה-$ כפשוטם. התיקון ממיר ל-Unicode (למשל N₂O).",
+    severity: "warning",
+    fixKind: "auto",
+    count: countStrayInlineMath,
+    autoFix: fixStrayInlineMath,
+  },
+  {
+    id: "MULTI_CITATION",
+    label: "סימון ציטוט מרובה בסוגר אחד ([1, 2])",
+    description:
+      "סימון כמו [1, 2] או [2,1] אורז כמה הפניות בסוגר אחד; הרינדור מקשר רק סוגר עם מספר יחיד, ולכן רק ציטוט אחד הופך לקישור והשאר מוצגים כטקסט. התיקון מפצל ל-[1][2] כך שכל מספר יקושר בנפרד.",
+    severity: "warning",
+    fixKind: "auto",
+    count: countMultiCitations,
+    autoFix: fixMultiCitations,
   },
   {
     id: "WHITESPACE_ARTIFACT",
@@ -205,6 +348,10 @@ export function issueSnippet(text: string, ruleId: string, radius = 60): string 
       ? new RegExp(LITERAL_ESCAPE_RE.source)
       : ruleId === "CONTROL_CHAR"
       ? new RegExp(CONTROL_CHAR_RE.source)
+      : ruleId === "STRAY_MATH_DELIMITER"
+      ? new RegExp(INLINE_MATH_RE.source)
+      : ruleId === "MULTI_CITATION"
+      ? new RegExp(MULTI_CITATION_RE.source)
       : ruleId === "WHITESPACE_ARTIFACT"
       ? new RegExp(WHITESPACE_ARTIFACT_RE.source, "m")
       : null;

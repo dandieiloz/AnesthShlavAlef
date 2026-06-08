@@ -104,14 +104,29 @@ function injectCitationAnchors(
   citationCount: number,
 ): string {
   if (questionId === undefined || citationCount === 0 || !text) return text;
+  const linkFor = (n: string): string | null => {
+    const num = parseInt(n, 10);
+    if (num < 1 || num > citationCount) return null;
+    return `[${n}](#cite-${questionId}-${num})`;
+  };
   const parts = text.split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g);
   return parts
     .map((part, idx) => {
       if (idx % 2 === 1) return part;
-      return part.replace(/(?<!\[)\[(\d+)\](?!\()/g, (m, n) => {
-        const num = parseInt(n, 10);
-        if (num < 1 || num > citationCount) return m;
-        return `[${n}](#cite-${questionId}-${num})`;
+      // Single `[N]` and multi-number `[1, 2]` / `[2,1]` markers. Each number is
+      // linkified independently; out-of-range numbers stay as plain text so a
+      // mistyped reference never breaks the surrounding markup.
+      return part.replace(/(?<!\[)\[\s*\d+(?:\s*,\s*\d+)*\s*\](?!\()/g, (m) => {
+        const nums = m.replace(/[[\]\s]/g, "").split(",").filter(Boolean);
+        let anyLinked = false;
+        const out = nums
+          .map((n) => {
+            const link = linkFor(n);
+            if (link) anyLinked = true;
+            return link ?? `[${n}]`;
+          })
+          .join("");
+        return anyLinked ? out : m;
       });
     })
     .join("");
