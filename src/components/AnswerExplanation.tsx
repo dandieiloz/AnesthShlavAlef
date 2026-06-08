@@ -84,7 +84,7 @@ const UI = {
   },
 };
 
-const PDF_SETUP_HREF = "/profile?tab=settings";
+const PDF_SETUP_HREF = "/profile?tab=settings#local-pdf";
 
 function parseWhyOthersWrong(raw: string): Partial<Record<Choice, string>> {
   const map: Partial<Record<Choice, string>> = {};

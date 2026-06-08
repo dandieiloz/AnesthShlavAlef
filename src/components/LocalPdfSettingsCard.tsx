@@ -81,7 +81,7 @@ export function LocalPdfSettingsCard({ t }: { t: Strings }) {
   const hasFile = state.kind !== "none";
 
   return (
-    <Card>
+    <Card id="local-pdf" className="scroll-mt-24">
       <CardHeader>
         <CardTitle>{t.title}</CardTitle>
         <CardDescription>{t.description}</CardDescription>
