@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { openPdfAtPage, LocalPdfError, type GetFileError } from "@/lib/local-pdf";
+import { openPdfAtPage, getStoredState, LocalPdfError, type GetFileError } from "@/lib/local-pdf";
 
 type Props = {
   page: number;
@@ -24,6 +24,17 @@ export function CitationPageLink({
   setupLabel,
 }: Props) {
   const [error, setError] = useState<GetFileError | null>(null);
+  const [hasPdf, setHasPdf] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getStoredState().then((state) => {
+      if (active) setHasPdf(state.kind !== "none");
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function onClick() {
     setError(null);
@@ -36,6 +47,10 @@ export function CitationPageLink({
     }
   }
 
+  // Show the "no PDF set" notice automatically when none is configured, even
+  // before the user clicks. A click error still wins (e.g. permission/not-found).
+  const showNotConfigured = error === "no-handle" || (error === null && hasPdf === false);
+
   return (
     <>
       <button
@@ -45,7 +60,7 @@ export function CitationPageLink({
       >
         {children}
       </button>
-      {error === "no-handle" && (
+      {showNotConfigured && (
         <span className="ms-1 text-[10px] text-muted-foreground">
           {notConfiguredLabel}{" "}
           <Link
