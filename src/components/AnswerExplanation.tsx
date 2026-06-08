@@ -62,7 +62,8 @@ const UI = {
     chapter: "פרק",
     page: "עמ׳",
     pages: "עמ׳׳",
-    citationNotConfigured: "לא הוגדר PDF",
+    citationNotConfigured: "לא הוגדר קובץ PDF.",
+    citationSetup: "הגדירו עכשיו",
     citationPermissionDenied: "גישה נדחתה",
     citationNotFound: "הקובץ לא נמצא",
   },
@@ -76,11 +77,14 @@ const UI = {
     chapter: "Chapter",
     page: "p.",
     pages: "pp.",
-    citationNotConfigured: "No PDF set",
+    citationNotConfigured: "No PDF set.",
+    citationSetup: "Set it up",
     citationPermissionDenied: "Access denied",
     citationNotFound: "File not found",
   },
 };
+
+const PDF_SETUP_HREF = "/profile?tab=settings";
 
 function parseWhyOthersWrong(raw: string): Partial<Record<Choice, string>> {
   const map: Partial<Record<Choice, string>> = {};
@@ -466,6 +470,8 @@ export function AnswerExplanation({
                               notConfiguredLabel={ui.citationNotConfigured}
                               permissionDeniedLabel={ui.citationPermissionDenied}
                               notFoundLabel={ui.citationNotFound}
+                              setupHref={PDF_SETUP_HREF}
+                              setupLabel={ui.citationSetup}
                             >
                               {e.pageEnd != null && e.pageEnd !== e.pageStart
                                 ? `${ui.pages} ${e.pageStart}–${e.pageEnd}`
@@ -590,6 +596,8 @@ function CitePreviewCard({
                   notConfiguredLabel={ui.citationNotConfigured}
                   permissionDeniedLabel={ui.citationPermissionDenied}
                   notFoundLabel={ui.citationNotFound}
+                  setupHref={PDF_SETUP_HREF}
+                  setupLabel={ui.citationSetup}
                 >
                   {citation.pageEnd != null && citation.pageEnd !== citation.pageStart
                     ? `${ui.pages} ${citation.pageStart}–${citation.pageEnd}`

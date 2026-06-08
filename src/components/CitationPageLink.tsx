@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { openPdfAtPage, LocalPdfError } from "@/lib/local-pdf";
+import Link from "next/link";
+import { openPdfAtPage, LocalPdfError, type GetFileError } from "@/lib/local-pdf";
 
 type Props = {
   page: number;
@@ -9,6 +10,8 @@ type Props = {
   notConfiguredLabel: string;
   permissionDeniedLabel: string;
   notFoundLabel: string;
+  setupHref: string;
+  setupLabel: string;
 };
 
 export function CitationPageLink({
@@ -17,8 +20,10 @@ export function CitationPageLink({
   notConfiguredLabel,
   permissionDeniedLabel,
   notFoundLabel,
+  setupHref,
+  setupLabel,
 }: Props) {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<GetFileError | null>(null);
 
   async function onClick() {
     setError(null);
@@ -26,10 +31,7 @@ export function CitationPageLink({
       await openPdfAtPage(page);
     } catch (err) {
       if (err instanceof LocalPdfError) {
-        if (err.code === "no-handle") setError(notConfiguredLabel);
-        else if (err.code === "permission-denied") setError(permissionDeniedLabel);
-        else if (err.code === "not-found") setError(notFoundLabel);
-        else setError(permissionDeniedLabel);
+        setError(err.code === "unknown" ? "permission-denied" : err.code);
       }
     }
   }
@@ -43,8 +45,22 @@ export function CitationPageLink({
       >
         {children}
       </button>
-      {error && (
-        <span className="ms-1 text-[10px] text-destructive">{error}</span>
+      {error === "no-handle" && (
+        <span className="ms-1 text-[10px] text-muted-foreground">
+          {notConfiguredLabel}{" "}
+          <Link
+            href={setupHref}
+            className="text-primary underline underline-offset-2 hover:no-underline"
+          >
+            {setupLabel}
+          </Link>
+        </span>
+      )}
+      {error === "permission-denied" && (
+        <span className="ms-1 text-[10px] text-destructive">{permissionDeniedLabel}</span>
+      )}
+      {error === "not-found" && (
+        <span className="ms-1 text-[10px] text-destructive">{notFoundLabel}</span>
       )}
     </>
   );
