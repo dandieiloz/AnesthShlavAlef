@@ -1337,7 +1337,7 @@ function ProgressSummaryDialog({
   const [fullProgress, setFullProgress] = useState<{
     totalQ: number;
     answered: number;
-    questions: Array<{ id: number; chapter: number; answered: boolean }>;
+    questions: Array<{ id: number; chapter: number; answered: boolean; stem: string }>;
   } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -1391,13 +1391,13 @@ function ProgressSummaryDialog({
           </div>
         ) : fullProgress ? (
           <div className="flex-1 overflow-y-auto border rounded-lg">
-            <table className="w-full text-xs">
+            <table className="w-full table-fixed text-xs">
               <thead className="sticky top-0 bg-muted border-b">
                 <tr>
-                  <th className="px-2 py-1 text-start font-semibold w-12">#</th>
-                  <th className="px-2 py-1 text-start font-semibold w-12">{chapterLabel}</th>
-                  <th className="px-2 py-1 text-start font-semibold flex-1">Status</th>
-                  <th className="px-2 py-1 text-end font-semibold w-20">Action</th>
+                  <th className="px-2 py-1 text-start font-semibold w-10">#</th>
+                  <th className="px-2 py-1 text-start font-semibold w-10">{chapterLabel}</th>
+                  <th className="px-2 py-1 text-start font-semibold">Status</th>
+                  <th className="px-2 py-1 text-end font-semibold w-16">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -1479,26 +1479,33 @@ function ProgressSummaryDialog({
                       <td className="px-2 py-1 font-medium text-xs">{idx + 1}</td>
                       <td className="px-2 py-1 text-muted-foreground text-xs">{item.chapter}</td>
                       <td className="px-2 py-1">
-                        <div className="flex items-center gap-1 flex-wrap">
+                        <div className="flex items-center gap-1">
                           {item.answered ? (
-                            <Badge variant="default" className="bg-green-500/20 text-green-700 text-[10px] px-1.5 py-0">
+                            <Badge variant="default" className="shrink-0 bg-green-500/20 text-green-700 text-[10px] px-1.5 py-0">
                               ✓
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-muted-foreground text-[10px] px-1.5 py-0">
+                            <Badge variant="outline" className="shrink-0 text-muted-foreground text-[10px] px-1.5 py-0">
                               -
                             </Badge>
                           )}
                           {unsureIds.has(item.id) && (
-                            <Badge variant="outline" className="text-orange-600 text-[10px] px-1.5 py-0">
+                            <Badge variant="outline" className="shrink-0 text-orange-600 text-[10px] px-1.5 py-0">
                               לא בטוח
                             </Badge>
                           )}
                           {isCurrentQuestion && (
-                            <span className="text-[9px] font-semibold bg-primary/10 text-primary rounded px-1 py-0.5">
+                            <span className="shrink-0 text-[9px] font-semibold bg-primary/10 text-primary rounded px-1 py-0.5">
                               כאן
                             </span>
                           )}
+                          <span
+                            dir="auto"
+                            title={item.stem}
+                            className="min-w-0 flex-1 truncate text-muted-foreground/90"
+                          >
+                            {item.stem}
+                          </span>
                         </div>
                       </td>
                       <td className="px-2 py-1 text-end">{actionBtn}</td>

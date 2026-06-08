@@ -698,7 +698,7 @@ export async function loadQuestionAttemptAction(
 export async function loadFullQuizProgressAction(quizId: number): Promise<{
   totalQ: number;
   answered: number;
-  questions: Array<{ id: number; chapter: number; answered: boolean }>;
+  questions: Array<{ id: number; chapter: number; answered: boolean; stem: string }>;
 }> {
   const me = await requireUser();
   const quiz = await db.quiz.findFirst({
@@ -717,7 +717,7 @@ export async function loadFullQuizProgressAction(quizId: number): Promise<{
     where: useFixedSet
       ? { id: { in: quiz.questionIds }, AND: [planGate, hasUsableAnswerWhere] }
       : { chapterIds: { hasSome: quiz.chapterIds }, AND: [planGate, hasUsableAnswerWhere] },
-    select: { id: true, chapter: { select: { number: true } } },
+    select: { id: true, stem: true, chapter: { select: { number: true } } },
     orderBy: { id: "asc" },
   });
 
@@ -738,6 +738,7 @@ export async function loadFullQuizProgressAction(quizId: number): Promise<{
       id: q.id,
       chapter: q.chapter.number,
       answered: answeredIds.has(q.id),
+      stem: q.stem,
     })),
   };
 }
