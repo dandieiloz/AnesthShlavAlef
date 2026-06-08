@@ -27,6 +27,9 @@ export function SiteFooter({ t }: FooterProps) {
         </div>
         <span>© {new Date().getFullYear()}</span>
       </div>
+      <div className="mx-auto max-w-6xl px-4 pb-4 text-[10px] text-muted-foreground/70">
+        {process.env.NEXT_PUBLIC_APP_VERSION}
+      </div>
     </footer>
   );
 }
