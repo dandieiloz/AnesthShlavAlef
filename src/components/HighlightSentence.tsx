@@ -13,5 +13,10 @@ const TRAILING_BULLET_RE = /[\s\n]*[-*]\s*$/;
 
 export function HighlightSentence({ text }: { text: string }) {
   const cleaned = text.replace(CITE_LINK_RE, "[$1]").replace(TRAILING_BULLET_RE, "").trim();
-  return <MathMarkdown>{cleaned}</MathMarkdown>;
+  // Strip the prose paragraph margins so a single highlighted sentence stays compact.
+  return (
+    <div className="text-sm leading-snug [&_.answer-content]:!text-sm [&_p]:!my-0 [&_ul]:!my-0 [&_ol]:!my-0">
+      <MathMarkdown>{cleaned}</MathMarkdown>
+    </div>
+  );
 }

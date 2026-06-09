@@ -12,7 +12,6 @@ type Props = {
   note: string | null;
   locale: "he" | "en";
   t: {
-    addNote: string;
     editNote: string;
     noteTitle: string;
     notePlaceholder: string;
@@ -44,7 +43,7 @@ export function HighlightNoteEditor({ highlightId, note, locale, t }: Props) {
   return (
     <>
       {current ? (
-        <div className="flex items-start gap-1.5 rounded border border-amber-300/40 bg-background/50 px-2 py-1 text-xs">
+        <div className="flex items-start gap-1 rounded border border-amber-300/40 bg-background/50 px-1.5 py-0.5 text-xs">
           <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
           <span dir="auto" className="flex-1 text-foreground/85 whitespace-pre-wrap break-words [unicode-bidi:plaintext]">
             {current}
@@ -58,16 +57,7 @@ export function HighlightNoteEditor({ highlightId, note, locale, t }: Props) {
             <Pencil className="h-3 w-3" />
           </button>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={openEditor}
-          className="flex items-center gap-1.5 rounded p-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <StickyNote className="h-3 w-3 shrink-0" />
-          {t.addNote}
-        </button>
-      )}
+      ) : null}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir={locale === "he" ? "rtl" : "ltr"}>

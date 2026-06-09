@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireCompletedProfile } from "@/lib/auth";
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +60,7 @@ export default async function BookmarksPage() {
 
   const planGate = await questionAccessWhere(me);
 
-  const [bookmarks, highlights] = await Promise.all([
+  const [bookmarks, allHighlights] = await Promise.all([
     db.bookmark.findMany({
       where: { userId: me.id, question: planGate },
       orderBy: { createdAt: "desc" },
@@ -86,80 +87,69 @@ export default async function BookmarksPage() {
     db.sentenceHighlight.findMany({
       where: { userId: me.id, locale: contentLocale, question: planGate },
       orderBy: [{ questionId: "desc" }, { section: "asc" }, { sentenceIndex: "asc" }],
-      include: {
-        question: {
-          select: {
-            id: true,
-            stem: true,
-            chapter: { select: { number: true, title: true } },
-          },
-        },
+      select: {
+        id: true,
+        questionId: true,
+        section: true,
+        sentenceIndex: true,
+        colorId: true,
+        sentenceHash: true,
+        sentenceText: true,
+        note: true,
       },
     }),
   ]);
 
-  const bookmarkedQuestionIds = bookmarks.map((b) => b.question.id);
-  const bookmarkHighlights = bookmarkedQuestionIds.length
-    ? await db.sentenceHighlight.findMany({
-        where: {
-          userId: me.id,
-          locale: contentLocale,
-          questionId: { in: bookmarkedQuestionIds },
-        },
-        select: {
-          id: true,
-          questionId: true,
-          section: true,
-          sentenceIndex: true,
-          colorId: true,
-          sentenceHash: true,
-          sentenceText: true,
-          note: true,
-        },
-      })
-    : [];
-  const bookmarkHighlightsByQ = new Map<number, typeof bookmarkHighlights>();
-  for (const h of bookmarkHighlights) {
-    const arr = bookmarkHighlightsByQ.get(h.questionId) ?? [];
-    arr.push(h);
-    bookmarkHighlightsByQ.set(h.questionId, arr);
-  }
-
-  const translated = await Promise.all(
-    bookmarks.map((b) =>
-      getTranslatedFields(
-        "Question",
-        String(b.question.id),
-        {
-          stem: b.question.stem,
-          optionA: b.question.optionA,
-          optionB: b.question.optionB,
-          optionC: b.question.optionC,
-          optionD: b.question.optionD,
-          chapterTitle: b.question.chapter.title,
-        },
-        contentLocale,
-      ),
-    ),
-  );
-
-  const highlightsByQ = new Map<number, typeof highlights>();
-  for (const h of highlights) {
+  const highlightsByQ = new Map<number, typeof allHighlights>();
+  for (const h of allHighlights) {
     const arr = highlightsByQ.get(h.questionId) ?? [];
     arr.push(h);
     highlightsByQ.set(h.questionId, arr);
   }
-  const hQuestions = [...highlightsByQ.entries()].map(([qid, hs]) => ({
-    qid,
-    hs,
-    question: hs[0].question,
-  }));
-  const hTranslated = await Promise.all(
-    hQuestions.map(({ question }) =>
+
+  const bookmarkedIds = new Set(bookmarks.map((b) => b.question.id));
+  const highlightedOnlyIds = [...highlightsByQ.keys()].filter((id) => !bookmarkedIds.has(id));
+
+  const extraQuestions = highlightedOnlyIds.length
+    ? await db.question.findMany({
+        where: { AND: [{ id: { in: highlightedOnlyIds } }, planGate as Prisma.QuestionWhereInput] },
+        select: {
+          id: true,
+          stem: true,
+          optionA: true,
+          optionB: true,
+          optionC: true,
+          optionD: true,
+          correctAnswer: true,
+          acceptedAnswers: true,
+          imageUrl: true,
+          imageAlt: true,
+          videoUrl: true,
+          chapter: { select: { number: true, title: true } },
+          geminiAnswer: true,
+        },
+      })
+    : [];
+
+  type CardQuestion = (typeof bookmarks)[number]["question"];
+  const entries: { question: CardQuestion; isBookmarked: boolean; savedOn: Date | null }[] = [
+    ...bookmarks.map((b) => ({ question: b.question, isBookmarked: true, savedOn: b.createdAt })),
+    ...extraQuestions.map((question) => ({ question, isBookmarked: false, savedOn: null })),
+  ];
+
+  const translated = await Promise.all(
+    entries.map(({ question }) =>
       getTranslatedFields(
         "Question",
         String(question.id),
-        { stem: question.stem, chapterTitle: question.chapter.title },
+        {
+          stem: question.stem,
+          optionA: question.optionA,
+          optionB: question.optionB,
+          optionC: question.optionC,
+          optionD: question.optionD,
+          chapterTitle: question.chapter.title,
+        },
         contentLocale,
       ),
     ),
@@ -173,306 +163,210 @@ export default async function BookmarksPage() {
           {t.title}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t.subtitle(bookmarks.length)}
+          {t.subtitle(entries.length)}
         </p>
       </div>
 
-      <Tabs defaultValue="questions" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="questions" className="gap-1.5">
-            <Bookmark className="h-3.5 w-3.5" />
-            {t.tabQuestions}
-            <span className="text-[10px] opacity-60">({bookmarks.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="highlights" className="gap-1.5">
-            <Highlighter className="h-3.5 w-3.5" />
-            {t.tabHighlights}
-            <span className="text-[10px] opacity-60">({highlights.length})</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <BookmarksSearch placeholder={t.searchPlaceholder} rtl={locale === "he"}>
-
-        <TabsContent value="questions" className="mt-4">
-          {bookmarks.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-                <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">{t.empty}</p>
-                <Button asChild size="sm">
-                  <Link href="/study/new">{t.startQuiz}</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <ul className="space-y-3" data-search-group>
-              {bookmarks.map((b, i) => {
-                const q = b.question;
-                const qT = translated[i];
-                const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
-                const correctAnswer = q.geminiAnswer?.correctAnswer;
-                const searchText = [
-                  qT.stem,
-                  qT.optionA,
-                  qT.optionB,
-                  qT.optionC,
-                  qT.optionD,
-                  qT.chapterTitle,
-                  `${dict.common.chapter} ${q.chapter.number}`,
-                  ...(bookmarkHighlightsByQ.get(q.id) ?? []).flatMap((h) => [h.sentenceText, h.note ?? ""]),
-                ].join(" ");
-                return (
-                <li key={b.id} data-search-text={searchText}>
-                  <Card className="transition-all hover:shadow-sm">
-                    <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="secondary" className="text-xs shrink-0">
-                              {dict.common.chapter} {q.chapter.number}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground line-clamp-1" data-search-highlight>
-                              {qT.chapterTitle}
-                            </span>
-                          </div>
-                          <p dir="auto" className="text-sm font-medium leading-relaxed [unicode-bidi:plaintext]" data-search-highlight>
-                            {qT.stem}
-                          </p>
+      <BookmarksSearch placeholder={t.searchPlaceholder} rtl={locale === "he"}>
+        {entries.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
+              <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">{t.empty}</p>
+              <Button asChild size="sm">
+                <Link href="/study/new">{t.startQuiz}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <ul className="space-y-3" data-search-group>
+            {entries.map(({ question: q, isBookmarked, savedOn }, i) => {
+              const qT = translated[i];
+              const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
+              const correctAnswer = q.geminiAnswer?.correctAnswer;
+              const qHighlights = highlightsByQ.get(q.id) ?? [];
+              const searchText = [
+                qT.stem,
+                qT.optionA,
+                qT.optionB,
+                qT.optionC,
+                qT.optionD,
+                qT.chapterTitle,
+                `${dict.common.chapter} ${q.chapter.number}`,
+                ...qHighlights.flatMap((h) => [h.sentenceText, h.note ?? ""]),
+              ].join(" ");
+              return (
+              <li key={q.id} data-search-text={searchText}>
+                <Card className="transition-all hover:shadow-sm">
+                  <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {dict.common.chapter} {q.chapter.number}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground line-clamp-1" data-search-highlight>
+                            {qT.chapterTitle}
+                          </span>
                         </div>
-                        <form action={toggleBookmarkAction}>
-                          <input type="hidden" name="questionId" value={q.id} />
-                          <button
-                            type="submit"
-                            title={t.removeBookmark}
-                            className="shrink-0 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-amber-500 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          >
-                            <BookmarkX className="h-3.5 w-3.5" />
-                            {t.remove}
-                          </button>
-                        </form>
+                        <p dir="auto" className="text-sm font-medium leading-relaxed [unicode-bidi:plaintext]" data-search-highlight>
+                          {qT.stem}
+                        </p>
                       </div>
-                      <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
-                      <QuestionVideo url={q.videoUrl} />
+                      <form action={toggleBookmarkAction}>
+                        <input type="hidden" name="questionId" value={q.id} />
+                        <button
+                          type="submit"
+                          title={isBookmarked ? t.removeBookmark : t.addBookmark}
+                          className={
+                            isBookmarked
+                              ? "shrink-0 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-amber-500 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              : "shrink-0 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                          }
+                        >
+                          {isBookmarked ? <BookmarkX className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
+                          {isBookmarked ? t.remove : t.addBookmark}
+                        </button>
+                      </form>
+                    </div>
+                    <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
+                    <QuestionVideo url={q.videoUrl} />
 
-                      {/* Answer options */}
-                      <div className="space-y-1.5">
-                        {OPTION_KEYS.map((k, idx) => {
-                          const isCorrect =
-                            correctAnswer === k || q.acceptedAnswers.includes(k);
-                          const rowClass = isCorrect
-                            ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
-                            : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
-                          const letterClass = isCorrect
-                            ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-success text-white"
-                            : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-muted text-muted-foreground";
-                          return (
-                            <div key={k} className={rowClass}>
-                              <span className={letterClass}>{letters[idx]}</span>
-                              <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]" data-search-highlight>
-                                {optionTexts[idx]}
-                              </span>
-                              {isCorrect && (
-                                <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Full answer / explanation */}
-                      {q.geminiAnswer && (
-                        <>
-                          <Separator className="opacity-40" />
-                          <details className="group">
-                            <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
-                              <BookOpen className="h-3.5 w-3.5 shrink-0" />
-                              {dict.review.detailedExplanation}
-                            </summary>
-                            <div className="mt-3">
-                              <AnswerExplanation
-                                explanation={q.geminiAnswer.explanation}
-                                evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
-                                whyOthersWrong={q.geminiAnswer.whyOthersWrong}
-                                correctAnswer={q.geminiAnswer.correctAnswer}
-                                acceptedAnswers={q.acceptedAnswers}
-                                options={[
-                                  { key: "A", text: q.optionA },
-                                  { key: "B", text: q.optionB },
-                                  { key: "C", text: q.optionC },
-                                  { key: "D", text: q.optionD },
-                                ]}
-                                insufficientEvidence={q.geminiAnswer.insufficientEvidence}
-                                locale={contentLocale}
-                                questionId={q.id}
-                                highlights={bookmarkHighlightsByQ.get(q.id) ?? []}
-                                highlightT={dict.highlights}
-                              />
-                            </div>
-                          </details>
-                        </>
-                      )}
-
-                      {/* User's highlighted sentences for this question */}
-                      {(() => {
-                        const qHighlights = bookmarkHighlightsByQ.get(q.id) ?? [];
-                        if (qHighlights.length === 0) return null;
+                    {/* Answer options */}
+                    <div className="space-y-1.5">
+                      {OPTION_KEYS.map((k, idx) => {
+                        const isCorrect =
+                          correctAnswer === k || q.acceptedAnswers.includes(k);
+                        const rowClass = isCorrect
+                          ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
+                          : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
+                        const letterClass = isCorrect
+                          ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-success text-white"
+                          : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-muted text-muted-foreground";
                         return (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                              <Highlighter className="h-3.5 w-3.5 shrink-0" />
-                              {t.tabHighlights}
-                            </div>
-                            <ul className="space-y-2">
-                              {qHighlights.map((h) => (
-                                <li
-                                  key={h.id}
-                                  className={`rounded-md border border-border/60 px-3 py-2 ${COLOR_BG[h.colorId] ?? ""}`}
-                                  dir={contentLocale === "he" ? "rtl" : "ltr"}
-                                >
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                      <span
-                                        className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${COLOR_SWATCH[h.colorId] ?? ""}`}
-                                      />
-                                      <span>{sectionLabel(h.section, t, letters)}</span>
-                                    </div>
-                                    <div data-search-highlight>
-                                      <HighlightSentence text={h.sentenceText} />
-                                    </div>
-                                    <HighlightNoteEditor
-                                      highlightId={h.id}
-                                      note={h.note}
-                                      locale={contentLocale}
-                                      t={dict.highlights}
-                                    />
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
+                          <div key={k} className={rowClass}>
+                            <span className={letterClass}>{letters[idx]}</span>
+                            <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]" data-search-highlight>
+                              {optionTexts[idx]}
+                            </span>
+                            {isCorrect && (
+                              <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                            )}
                           </div>
                         );
-                      })()}
+                      })}
+                    </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          {t.savedOn} {b.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
-                        </span>
-                        <Button asChild size="sm" variant="secondary" className="gap-1.5">
-                          <Link href={`/history/${q.id}`}>
-                            <BookOpen className="h-3.5 w-3.5" />
-                            {t.openQuestion}
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </li>
-                );
-              })}
-              <li data-search-empty hidden>
-                <Card>
-                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                    {t.noMatches}
-                  </CardContent>
-                </Card>
-              </li>
-            </ul>
-          )}
-        </TabsContent>
+                    {/* Full answer / explanation */}
+                    {q.geminiAnswer && (
+                      <>
+                        <Separator className="opacity-40" />
+                        <details className="group">
+                          <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
+                            <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                            {dict.review.detailedExplanation}
+                          </summary>
+                          <div className="mt-3">
+                            <AnswerExplanation
+                              explanation={q.geminiAnswer.explanation}
+                              evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
+                              whyOthersWrong={q.geminiAnswer.whyOthersWrong}
+                              correctAnswer={q.geminiAnswer.correctAnswer}
+                              acceptedAnswers={q.acceptedAnswers}
+                              options={[
+                                { key: "A", text: q.optionA },
+                                { key: "B", text: q.optionB },
+                                { key: "C", text: q.optionC },
+                                { key: "D", text: q.optionD },
+                              ]}
+                              insufficientEvidence={q.geminiAnswer.insufficientEvidence}
+                              locale={contentLocale}
+                              questionId={q.id}
+                              highlights={qHighlights}
+                              highlightT={dict.highlights}
+                            />
+                          </div>
+                        </details>
+                      </>
+                    )}
 
-        <TabsContent value="highlights" className="mt-4">
-          {hQuestions.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-                <Highlighter className="h-10 w-10 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">{t.highlightsEmpty}</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <ul className="space-y-4" data-search-group>
-              {hQuestions.map(({ qid, hs }, qi) => {
-                const searchText = [
-                  hTranslated[qi].stem,
-                  hTranslated[qi].chapterTitle,
-                  `${dict.common.chapter} ${hs[0].question.chapter.number}`,
-                  ...hs.flatMap((h) => [h.sentenceText, h.note ?? ""]),
-                ].join(" ");
-                return (
-                <li key={qid} data-search-text={searchText}>
-                  <Card>
-                    <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs shrink-0">
-                          {dict.common.chapter} {hs[0].question.chapter.number}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground line-clamp-1" data-search-highlight>
-                          {hTranslated[qi].chapterTitle}
-                        </span>
-                        <Button asChild size="sm" variant="secondary" className="gap-1.5 ms-auto shrink-0">
-                          <Link href={`/history/${qid}`}>
-                            <BookOpen className="h-3.5 w-3.5" />
-                            {t.openQuestion}
-                          </Link>
-                        </Button>
-                      </div>
-                      <p dir="auto" className="text-sm font-medium line-clamp-2 [unicode-bidi:plaintext]" data-search-highlight>{hTranslated[qi].stem}</p>
-
-                      <ul className="space-y-2">
-                        {hs.map((h) => (
-                          <li
-                            key={h.id}
-                            className={`rounded-md border border-border/60 px-3 py-2 ${COLOR_BG[h.colorId] ?? ""}`}
-                            dir={contentLocale === "he" ? "rtl" : "ltr"}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0 space-y-1.5">
-                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                  <span
-                                    className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${COLOR_SWATCH[h.colorId] ?? ""}`}
+                    {/* User's highlighted sentences for this question */}
+                    {qHighlights.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <Highlighter className="h-3.5 w-3.5 shrink-0" />
+                          {t.tabHighlights}
+                        </div>
+                        <ul className="space-y-1.5">
+                          {qHighlights.map((h) => (
+                            <li
+                              key={h.id}
+                              className={`rounded-md border border-border/60 px-2.5 py-1.5 ${COLOR_BG[h.colorId] ?? ""}`}
+                              dir={contentLocale === "he" ? "rtl" : "ltr"}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0 space-y-1.5">
+                                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                    <span
+                                      className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${COLOR_SWATCH[h.colorId] ?? ""}`}
+                                    />
+                                    <span>{sectionLabel(h.section, t, letters)}</span>
+                                  </div>
+                                  <div data-search-highlight>
+                                    <HighlightSentence text={h.sentenceText} />
+                                  </div>
+                                  <HighlightNoteEditor
+                                    highlightId={h.id}
+                                    note={h.note}
+                                    locale={contentLocale}
+                                    t={dict.highlights}
                                   />
-                                  <span>{sectionLabel(h.section, t, letters)}</span>
                                 </div>
-                                <div data-search-highlight>
-                                  <HighlightSentence text={h.sentenceText} />
-                                </div>
-                                <HighlightNoteEditor
-                                  highlightId={h.id}
-                                  note={h.note}
-                                  locale={contentLocale}
-                                  t={dict.highlights}
-                                />
+                                <form action={removeHighlightByIdAction}>
+                                  <input type="hidden" name="id" value={h.id} />
+                                  <button
+                                    type="submit"
+                                    title={t.remove}
+                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </form>
                               </div>
-                              <form action={removeHighlightByIdAction}>
-                                <input type="hidden" name="id" value={h.id} />
-                                <button
-                                  type="submit"
-                                  title={t.remove}
-                                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </form>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                </li>
-                );
-              })}
-              <li data-search-empty hidden>
-                <Card>
-                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                    {t.noMatches}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {savedOn
+                          ? `${t.savedOn} ${savedOn.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}`
+                          : ""}
+                      </span>
+                      <Button asChild size="sm" variant="secondary" className="gap-1.5">
+                        <Link href={`/history/${q.id}`}>
+                          <BookOpen className="h-3.5 w-3.5" />
+                          {t.openQuestion}
+                        </Link>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </li>
-            </ul>
-          )}
-        </TabsContent>
-        </BookmarksSearch>
-      </Tabs>
+              );
+            })}
+            <li data-search-empty hidden>
+              <Card>
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  {t.noMatches}
+                </CardContent>
+              </Card>
+            </li>
+          </ul>
+        )}
+      </BookmarksSearch>
     </div>
   );
 }
