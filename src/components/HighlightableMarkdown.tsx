@@ -216,6 +216,19 @@ export function HighlightableMarkdown({
                   aria-label={t.editNote}
                 />
               ) : null}
+              {h?.note ? (
+                <span
+                  className="mt-1 flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/[0.08] px-2 py-1 text-[11px] leading-snug text-amber-800 dark:text-amber-200"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveIndex(null);
+                    setNoteEditing({ index: i, value: h.note ?? "" });
+                  }}
+                >
+                  <StickyNote className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                  <span className="whitespace-pre-wrap break-words">{h.note}</span>
+                </span>
+              ) : null}
               {isActive && (
                 <span
                   className={`absolute z-30 mt-1 flex items-center gap-1 rounded-md border bg-popover p-1.5 shadow-lg ${

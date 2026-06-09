@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { CitationPageLink } from "@/components/CitationPageLink";
 import { QuestionImage } from "@/components/QuestionImage";
-import { BookMarked, XCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { BookMarked, XCircle, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const HEBREW_LETTERS: Record<string, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
@@ -38,6 +38,13 @@ type Props = {
   locale?: "he" | "en";
   questionId?: number;
   highlights?: HighlightRecord[];
+  /**
+   * When true, each answer/evidence section is collapsible and only sections
+   * that contain a saved highlight start expanded. Used on the bookmarks page
+   * so highlighted sentences surface inside their original section. Defaults to
+   * false, preserving the always-expanded layout everywhere else.
+   */
+  collapsibleSections?: boolean;
   highlightT?: {
     pickColor: string;
     removeHighlight: string;
@@ -188,6 +195,7 @@ export function AnswerExplanation({
   locale = "he",
   questionId,
   highlights = [],
+  collapsibleSections = false,
   highlightT,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -295,6 +303,29 @@ export function AnswerExplanation({
   const dir = locale === "en" ? "ltr" : "rtl";
   const citationCount = evidenceCitations?.length ?? 0;
 
+  // Sections that start expanded when `collapsibleSections` is on: any section
+  // the user has highlighted in. Evidence quotes use `EVIDENCE_<n>` section
+  // names but share a single collapsible block keyed "EVIDENCE".
+  const initiallyOpenSections = useMemo(() => {
+    const open = new Set<string>();
+    for (const h of highlights) {
+      open.add(h.section.startsWith("EVIDENCE_") ? "EVIDENCE" : h.section);
+    }
+    return open;
+  }, [highlights]);
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(initiallyOpenSections),
+  );
+  const isSectionOpen = (name: string) =>
+    !collapsibleSections || openSections.has(name);
+  const toggleSection = (name: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+
   return (
     <div ref={containerRef} className="space-y-3 text-sm" dir={dir}>
       {/* Insufficient evidence warning */}
@@ -352,6 +383,7 @@ export function AnswerExplanation({
           const bodyText = injectCitationAnchors(rawBody, questionId, citationCount);
           const sectionName = isCorrect ? "EXPLANATION" : `WHY_WRONG_${key}`;
           const hasBody = bodyText.length > 0;
+          const open = isSectionOpen(sectionName);
 
           return (
             <div
@@ -364,10 +396,24 @@ export function AnswerExplanation({
             >
               <div
                 className={cn(
-                  "flex items-center gap-2.5 rounded-t-xl border-b px-4 py-2.5",
+                  "flex items-center gap-2.5 px-4 py-2.5",
+                  open && "rounded-t-xl border-b",
                   palette.headerBorder,
                   palette.headerBg,
                 )}
+                {...(collapsibleSections
+                  ? {
+                      role: "button" as const,
+                      tabIndex: 0,
+                      onClick: () => toggleSection(sectionName),
+                      onKeyDown: (e: ReactKeyboardEvent) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleSection(sectionName);
+                        }
+                      },
+                    }
+                  : {})}
               >
                 <span
                   className={cn(
@@ -386,31 +432,41 @@ export function AnswerExplanation({
                 >
                   {headerLabel}
                 </span>
-              </div>
-              <div className="px-4 py-3 space-y-2">
-                <p className="text-[11px] leading-snug text-muted-foreground/85">
-                  {text}
-                </p>
-                {hasBody && (
-                  <div className="text-foreground/90">
-                    {questionId !== undefined && highlightT ? (
-                      <HighlightableMarkdown
-                        text={bodyText}
-                        section={sectionName}
-                        questionId={questionId}
-                        locale={locale}
-                        highlights={highlights}
-                        t={highlightT}
-                      />
-                    ) : (
-                      <MathMarkdown>{bodyText}</MathMarkdown>
+                {collapsibleSections && (
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0 transition-transform ms-auto text-muted-foreground",
+                      open && "rotate-180",
                     )}
-                  </div>
-                )}
-                {isCorrect && explanationImageUrl && (
-                  <QuestionImage url={explanationImageUrl} alt={explanationImageAlt} />
+                  />
                 )}
               </div>
+              {open && (
+                <div className="px-4 py-3 space-y-2">
+                  <p className="text-[11px] leading-snug text-muted-foreground/85">
+                    {text}
+                  </p>
+                  {hasBody && (
+                    <div className="text-foreground/90">
+                      {questionId !== undefined && highlightT ? (
+                        <HighlightableMarkdown
+                          text={bodyText}
+                          section={sectionName}
+                          questionId={questionId}
+                          locale={locale}
+                          highlights={highlights}
+                          t={highlightT}
+                        />
+                      ) : (
+                        <MathMarkdown>{bodyText}</MathMarkdown>
+                      )}
+                    </div>
+                  )}
+                  {isCorrect && explanationImageUrl && (
+                    <QuestionImage url={explanationImageUrl} alt={explanationImageAlt} />
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -419,12 +475,40 @@ export function AnswerExplanation({
       {/* ── Numbered textbook evidence ────────────────────────── */}
       {evidenceCitations && evidenceCitations.length > 0 && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] dark:bg-amber-400/[0.06]">
-          <div className="flex items-center gap-2 rounded-t-xl border-b border-amber-400/25 bg-amber-400/[0.10] px-4 py-2.5">
+          <div
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5",
+              isSectionOpen("EVIDENCE") && "rounded-t-xl border-b border-amber-400/25",
+              "bg-amber-400/[0.10]",
+            )}
+            {...(collapsibleSections
+              ? {
+                  role: "button" as const,
+                  tabIndex: 0,
+                  onClick: () => toggleSection("EVIDENCE"),
+                  onKeyDown: (e: ReactKeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleSection("EVIDENCE");
+                    }
+                  },
+                }
+              : {})}
+          >
             <BookMarked className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">
               {ui.evidence}
             </span>
+            {collapsibleSections && (
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 transition-transform ms-auto text-amber-600/80 dark:text-amber-400/80",
+                  isSectionOpen("EVIDENCE") && "rotate-180",
+                )}
+              />
+            )}
           </div>
+          {isSectionOpen("EVIDENCE") && (
           <div className="divide-y divide-amber-400/15 px-4">
             {evidenceCitations.map((e, i) => {
               const num = i + 1;
@@ -498,6 +582,7 @@ export function AnswerExplanation({
               );
             })}
           </div>
+          )}
         </div>
       )}
 

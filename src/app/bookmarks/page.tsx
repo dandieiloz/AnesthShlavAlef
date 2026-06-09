@@ -6,50 +6,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toggleBookmarkAction } from "@/app/(user)/actions";
-import { removeHighlightByIdAction } from "@/app/(user)/highlight-actions";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
-import { HighlightNoteEditor } from "@/components/HighlightNoteEditor";
-import { HighlightSentence } from "@/components/HighlightSentence";
 import { BookmarksSearch } from "@/components/BookmarksSearch";
-import { Bookmark, BookmarkX, BookOpen, CheckCircle2, Highlighter, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkX, BookOpen, CheckCircle2 } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
-
-const COLOR_SWATCH: Record<number, string> = {
-  1: "bg-yellow-300 dark:bg-yellow-400",
-  2: "bg-green-300 dark:bg-green-400",
-  3: "bg-pink-300 dark:bg-pink-400",
-  4: "bg-blue-300 dark:bg-blue-400",
-};
-const COLOR_BG: Record<number, string> = {
-  1: "bg-yellow-100/70 dark:bg-yellow-400/15",
-  2: "bg-green-100/70 dark:bg-green-400/15",
-  3: "bg-pink-100/70 dark:bg-pink-400/15",
-  4: "bg-blue-100/70 dark:bg-blue-400/15",
-};
-
-function sectionLabel(
-  section: string,
-  t: { sectionExplanation: string; sectionWhyWrong: (letter: string) => string; sectionEvidence: string },
-  letters: string[],
-): string {
-  if (section === "EXPLANATION") return t.sectionExplanation;
-  const ww = section.match(/^WHY_WRONG_([ABCD])$/);
-  if (ww) {
-    const idx = ["A", "B", "C", "D"].indexOf(ww[1]);
-    return t.sectionWhyWrong(letters[idx] ?? ww[1]);
-  }
-  if (/^EVIDENCE_\d+$/.test(section)) return t.sectionEvidence;
-  return section;
-}
 
 export default async function BookmarksPage() {
   const me = await requireCompletedProfile();
@@ -261,7 +229,7 @@ export default async function BookmarksPage() {
                     {q.geminiAnswer && (
                       <>
                         <Separator className="opacity-40" />
-                        <details className="group">
+                        <details className="group" open={qHighlights.length > 0}>
                           <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
                             <BookOpen className="h-3.5 w-3.5 shrink-0" />
                             {dict.review.detailedExplanation}
@@ -286,59 +254,11 @@ export default async function BookmarksPage() {
                               questionId={q.id}
                               highlights={qHighlights}
                               highlightT={dict.highlights}
+                              collapsibleSections={qHighlights.length > 0}
                             />
                           </div>
                         </details>
                       </>
-                    )}
-
-                    {/* User's highlighted sentences for this question */}
-                    {qHighlights.length > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                          <Highlighter className="h-3.5 w-3.5 shrink-0" />
-                          {t.tabHighlights}
-                        </div>
-                        <ul className="space-y-1.5">
-                          {qHighlights.map((h) => (
-                            <li
-                              key={h.id}
-                              className={`rounded-md border border-border/60 px-2.5 py-1.5 ${COLOR_BG[h.colorId] ?? ""}`}
-                              dir={contentLocale === "he" ? "rtl" : "ltr"}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0 space-y-1.5">
-                                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                    <span
-                                      className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${COLOR_SWATCH[h.colorId] ?? ""}`}
-                                    />
-                                    <span>{sectionLabel(h.section, t, letters)}</span>
-                                  </div>
-                                  <div data-search-highlight>
-                                    <HighlightSentence text={h.sentenceText} />
-                                  </div>
-                                  <HighlightNoteEditor
-                                    highlightId={h.id}
-                                    note={h.note}
-                                    locale={contentLocale}
-                                    t={dict.highlights}
-                                  />
-                                </div>
-                                <form action={removeHighlightByIdAction}>
-                                  <input type="hidden" name="id" value={h.id} />
-                                  <button
-                                    type="submit"
-                                    title={t.remove}
-                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </form>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
                     )}
 
                     <div className="flex items-center justify-between">
