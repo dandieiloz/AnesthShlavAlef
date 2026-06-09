@@ -295,6 +295,8 @@ export const DICTIONARIES = {
       sectionEvidence: "ראיות מהספר",
       noteLabel: "הערה",
       openQuestion: "פתח שאלה",
+      searchPlaceholder: "חיפוש בשאלות, בהדגשות ובהערות…",
+      noMatches: "לא נמצאו תוצאות לחיפוש.",
     },
     studyNew: {
       backToStudy: "חזרה ללימוד",
@@ -849,6 +851,8 @@ export const DICTIONARIES = {
       sectionEvidence: "Textbook evidence",
       noteLabel: "Note",
       openQuestion: "Open question",
+      searchPlaceholder: "Search questions, highlights and notes…",
+      noMatches: "No results match your search.",
     },
     studyNew: {
       backToStudy: "Back to study",

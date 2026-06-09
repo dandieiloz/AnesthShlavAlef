@@ -11,7 +11,10 @@ import { removeHighlightByIdAction } from "@/app/(user)/highlight-actions";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
-import { Bookmark, BookmarkX, BookOpen, CheckCircle2, Highlighter, StickyNote, Trash2 } from "lucide-react";
+import { HighlightNoteEditor } from "@/components/HighlightNoteEditor";
+import { HighlightSentence } from "@/components/HighlightSentence";
+import { BookmarksSearch } from "@/components/BookmarksSearch";
+import { Bookmark, BookmarkX, BookOpen, CheckCircle2, Highlighter, Trash2 } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
@@ -188,6 +191,8 @@ export default async function BookmarksPage() {
           </TabsTrigger>
         </TabsList>
 
+        <BookmarksSearch placeholder={t.searchPlaceholder} rtl={locale === "he"}>
+
         <TabsContent value="questions" className="mt-4">
           {bookmarks.length === 0 ? (
             <Card>
@@ -200,14 +205,24 @@ export default async function BookmarksPage() {
               </CardContent>
             </Card>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-3" data-search-group>
               {bookmarks.map((b, i) => {
                 const q = b.question;
                 const qT = translated[i];
                 const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
                 const correctAnswer = q.geminiAnswer?.correctAnswer;
+                const searchText = [
+                  qT.stem,
+                  qT.optionA,
+                  qT.optionB,
+                  qT.optionC,
+                  qT.optionD,
+                  qT.chapterTitle,
+                  `${dict.common.chapter} ${q.chapter.number}`,
+                  ...(bookmarkHighlightsByQ.get(q.id) ?? []).flatMap((h) => [h.sentenceText, h.note ?? ""]),
+                ].join(" ");
                 return (
-                <li key={b.id}>
+                <li key={b.id} data-search-text={searchText}>
                   <Card className="transition-all hover:shadow-sm">
                     <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
                       <div className="flex items-start justify-between gap-3">
@@ -321,17 +336,13 @@ export default async function BookmarksPage() {
                                       />
                                       <span>{sectionLabel(h.section, t, letters)}</span>
                                     </div>
-                                    <p dir="auto" className="text-sm leading-relaxed [unicode-bidi:plaintext]">
-                                      {h.sentenceText}
-                                    </p>
-                                    {h.note && (
-                                      <div className="flex items-start gap-1.5 rounded border border-amber-300/40 bg-background/50 px-2 py-1 text-xs">
-                                        <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
-                                        <span dir="auto" className="text-foreground/85 whitespace-pre-wrap break-words [unicode-bidi:plaintext]">
-                                          {h.note}
-                                        </span>
-                                      </div>
-                                    )}
+                                    <HighlightSentence text={h.sentenceText} />
+                                    <HighlightNoteEditor
+                                      highlightId={h.id}
+                                      note={h.note}
+                                      locale={contentLocale}
+                                      t={dict.highlights}
+                                    />
                                   </div>
                                 </li>
                               ))}
@@ -356,6 +367,13 @@ export default async function BookmarksPage() {
                 </li>
                 );
               })}
+              <li data-search-empty hidden>
+                <Card>
+                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                    {t.noMatches}
+                  </CardContent>
+                </Card>
+              </li>
             </ul>
           )}
         </TabsContent>
@@ -369,9 +387,16 @@ export default async function BookmarksPage() {
               </CardContent>
             </Card>
           ) : (
-            <ul className="space-y-4">
-              {hQuestions.map(({ qid, hs }, qi) => (
-                <li key={qid}>
+            <ul className="space-y-4" data-search-group>
+              {hQuestions.map(({ qid, hs }, qi) => {
+                const searchText = [
+                  hTranslated[qi].stem,
+                  hTranslated[qi].chapterTitle,
+                  `${dict.common.chapter} ${hs[0].question.chapter.number}`,
+                  ...hs.flatMap((h) => [h.sentenceText, h.note ?? ""]),
+                ].join(" ");
+                return (
+                <li key={qid} data-search-text={searchText}>
                   <Card>
                     <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
                       <div className="flex items-center gap-2">
@@ -405,15 +430,13 @@ export default async function BookmarksPage() {
                                   />
                                   <span>{sectionLabel(h.section, t, letters)}</span>
                                 </div>
-                                <p dir="auto" className="text-sm leading-relaxed [unicode-bidi:plaintext]">{h.sentenceText}</p>
-                                {h.note && (
-                                  <div className="flex items-start gap-1.5 rounded border border-amber-300/40 bg-background/50 px-2 py-1 text-xs">
-                                    <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
-                                    <span dir="auto" className="text-foreground/85 whitespace-pre-wrap break-words [unicode-bidi:plaintext]">
-                                      {h.note}
-                                    </span>
-                                  </div>
-                                )}
+                                <HighlightSentence text={h.sentenceText} />
+                                <HighlightNoteEditor
+                                  highlightId={h.id}
+                                  note={h.note}
+                                  locale={contentLocale}
+                                  t={dict.highlights}
+                                />
                               </div>
                               <form action={removeHighlightByIdAction}>
                                 <input type="hidden" name="id" value={h.id} />
@@ -432,10 +455,19 @@ export default async function BookmarksPage() {
                     </CardContent>
                   </Card>
                 </li>
-              ))}
+                );
+              })}
+              <li data-search-empty hidden>
+                <Card>
+                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                    {t.noMatches}
+                  </CardContent>
+                </Card>
+              </li>
             </ul>
           )}
         </TabsContent>
+        </BookmarksSearch>
       </Tabs>
     </div>
   );

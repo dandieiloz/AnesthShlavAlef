@@ -132,3 +132,19 @@ export async function removeHighlightByIdAction(formData: FormData) {
   await db.sentenceHighlight.deleteMany({ where: { id, userId: me.id } });
   revalidatePath("/bookmarks");
 }
+
+const NoteByIdSchema = z.object({
+  id: z.number().int().positive(),
+  note: z.string().max(2000).nullable(),
+});
+
+export async function setHighlightNoteByIdAction(input: z.infer<typeof NoteByIdSchema>) {
+  const me = await requireUser();
+  const data = NoteByIdSchema.parse(input);
+  const note = data.note && data.note.trim() ? data.note.trim() : null;
+  await db.sentenceHighlight.updateMany({
+    where: { id: data.id, userId: me.id },
+    data: { note },
+  });
+  revalidatePath("/bookmarks");
+}
