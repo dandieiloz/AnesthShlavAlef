@@ -15,6 +15,11 @@ import {
   enqueueInitialJobAction,
   enqueueRegenerationAction,
 } from "@/app/admin/queue/actions";
+import {
+  resolveReportAction,
+  reopenReportAction,
+  updateAnswerReportResponseAction,
+} from "@/app/admin/reports/actions";
 import { deleteCommentAction, postCommentAction } from "@/app/(user)/actions";
 import { DeleteQuestionButton } from "./DeleteQuestionButton";
 import { DisableQuestionButton } from "./DisableQuestionButton";
@@ -77,6 +82,17 @@ export default async function AdminQuestionPage({
     include: { user: { select: { name: true, email: true, hospitalName: true } } },
     orderBy: { createdAt: "desc" },
   });
+
+  // User-submitted reports (דיווחים) on this question's answer
+  const reports = await db.answerReport.findMany({
+    where: { questionId: q.id },
+    include: {
+      user: { select: { name: true, email: true } },
+      resolver: { select: { name: true, email: true } },
+    },
+    orderBy: { id: "desc" },
+  });
+  const openReportsCount = reports.filter((r) => r.status === "OPEN").length;
 
   // Per-question attempt stats
   const [attemptTotal, attemptCorrect, uniqueUsersGroup] = await Promise.all([
@@ -552,6 +568,107 @@ export default async function AdminQuestionPage({
           )}
         </details>
       </section>
+
+      {reports.length > 0 && (
+        <section className="mt-8 rounded border bg-card p-4">
+          <h2 className="text-base font-semibold">
+            דיווחי משתמשים ({reports.length}
+            {openReportsCount > 0 ? ` · ${openReportsCount} פתוחים` : ""})
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            דיווחים ששלחו משתמשים על תשובה זו. ניתן להגיב למשתמש, לסמן כטופל, או לדחות.
+          </p>
+          <ul className="mt-4 space-y-4">
+            {reports.map((r) => {
+              const statusLabel =
+                r.status === "RESOLVED" ? "טופל" : r.status === "REJECTED" ? "נדחה" : "פתוח";
+              const statusClass =
+                r.status === "RESOLVED"
+                  ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-200"
+                  : r.status === "REJECTED"
+                  ? "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  : "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-200";
+              return (
+                <li key={r.id} className="rounded border bg-background/60 p-3">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className={`rounded px-2 py-0.5 ${statusClass}`}>{statusLabel}</span>
+                    <span>
+                      דווח על ידי {r.user.name ?? r.user.email} · {r.createdAt.toLocaleString("he-IL")}
+                    </span>
+                    {r.status !== "OPEN" && r.resolver && (
+                      <span>· נסגר על ידי {r.resolver.name ?? r.resolver.email}</span>
+                    )}
+                  </div>
+                  <p className="mt-2 rounded bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-200 p-2 text-sm whitespace-pre-wrap" dir="rtl">
+                    <strong>תוכן הדיווח:</strong> {r.explanation}
+                  </p>
+
+                  {r.status === "OPEN" ? (
+                    <form action={resolveReportAction} className="mt-3 space-y-2">
+                      <input type="hidden" name="id" value={r.id} />
+                      <label className="block text-xs font-medium text-muted-foreground">
+                        תגובה למשתמש (לא חובה — תוצג למשתמש שדיווח)
+                      </label>
+                      <textarea
+                        name="response"
+                        rows={3}
+                        placeholder="תגובה אופציונלית למשתמש שדיווח (למשל: הסבר תוקן, או הסבר מדוע התשובה נכונה)"
+                        className="w-full rounded border bg-background p-2 text-sm"
+                        dir="rtl"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          name="status"
+                          value="RESOLVED"
+                          className="rounded bg-green-600 px-3 py-1 text-sm text-white"
+                        >
+                          סמן כטופל ושלח תגובה
+                        </button>
+                        <button
+                          name="status"
+                          value="REJECTED"
+                          className="rounded bg-slate-500 px-3 py-1 text-sm text-white"
+                        >
+                          דחה
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {r.adminResponse && (
+                        <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-sm dark:border-emerald-700 dark:bg-emerald-950/40">
+                          <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                            תגובת הצוות {r.adminResponseAt && `(${r.adminResponseAt.toLocaleString("he-IL")})`}
+                          </div>
+                          <p className="whitespace-pre-wrap text-emerald-900 dark:text-emerald-100" dir="rtl">{r.adminResponse}</p>
+                        </div>
+                      )}
+                      <form action={updateAnswerReportResponseAction} className="space-y-2">
+                        <input type="hidden" name="id" value={r.id} />
+                        <textarea
+                          name="response"
+                          rows={2}
+                          defaultValue={r.adminResponse ?? ""}
+                          placeholder="ערוך תגובה למשתמש"
+                          className="w-full rounded border bg-background p-2 text-sm"
+                          dir="rtl"
+                        />
+                        <button className="rounded border bg-card px-3 py-1 text-sm hover:bg-muted">
+                          עדכן תגובה
+                        </button>
+                      </form>
+                      <form action={reopenReportAction}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <button className="rounded border px-3 py-1 text-sm hover:bg-muted">פתח מחדש</button>
+                      </form>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-8 rounded border bg-card p-4">
         <h2 className="text-base font-semibold">תגובות קהילה ({comments.length})</h2>
