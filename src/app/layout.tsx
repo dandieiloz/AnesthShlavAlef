@@ -7,6 +7,7 @@ import { SiteHeaderClient } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BetaBanner } from "@/components/BetaBanner";
 import { DailyPopupGate } from "@/components/DailyPopupGate";
+import { HospitalReminderGate } from "@/components/HospitalReminderGate";
 import { ActivityHeartbeat } from "@/components/ActivityHeartbeat";
 import { Toaster } from "@/components/ui/toaster";
 import { PWA } from "@/components/PWA";
@@ -94,6 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <SiteFooter t={dict.footer} />
             <Toaster />
             <DailyPopupGate />
+            <HospitalReminderGate />
             {user?.id && <ActivityHeartbeat />}
             <PWA locale={locale} />
           </PwaProvider>

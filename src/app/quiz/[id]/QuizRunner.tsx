@@ -1440,9 +1440,8 @@ function ProgressSummaryDialog({
                         className="h-6 px-1.5 text-xs"
                         onClick={() => {
                           if (isPastEntry) {
-                            mode === "full"
-                              ? onRequeueAnswered(item.id)
-                              : onJumpToPast(item.id);
+                            if (mode === "full") onRequeueAnswered(item.id);
+                            else onJumpToPast(item.id);
                           } else {
                             // In queue
                             const qIdx = queue.findIndex((q) => q.id === item.id);
@@ -1465,7 +1464,9 @@ function ProgressSummaryDialog({
                         className="h-6 px-1.5 text-xs"
                         onClick={() => {
                           if (isPastEntry) {
-                            onRequeueSkipped((sessionQ as any).question);
+                            onRequeueSkipped(
+                              (sessionQ as { question: QuestionPayload }).question,
+                            );
                           } else {
                             const qIdx = queue.findIndex((q) => q.id === item.id);
                             if (qIdx > 0) onJumpToUpcoming(item.id);

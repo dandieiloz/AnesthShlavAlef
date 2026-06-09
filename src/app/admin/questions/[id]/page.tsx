@@ -444,7 +444,7 @@ export default async function AdminQuestionPage({
                   </summary>
                   <p className="mt-2 text-xs text-muted-foreground">
                     הסבר בקצרה למה ההסבר הקיים שגוי כדי לעזור למודל לחולל תשובה טובה יותר. לדוגמה:
-                    "התשובה הנכונה היא B כי...", "המודל התעלם מהשפעת...", "המקור הנכון נמצא בפרק X".
+                    &quot;התשובה הנכונה היא B כי...&quot;, &quot;המודל התעלם מהשפעת...&quot;, &quot;המקור הנכון נמצא בפרק X&quot;.
                     הראיות עדיין חייבות להגיע מקטעי המקור.
                   </p>
                   <textarea
@@ -511,8 +511,8 @@ export default async function AdminQuestionPage({
                   הוסף הערה / רמז למודל (אופציונלי)
                 </summary>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  עזור למודל כבר בחילול הראשון. לדוגמה: "התשובה הנכונה היא B כי...",
-                  "שים לב להבחנה בין X ל-Y", "המקור הנכון נמצא בפרק X". הראיות עדיין
+                  עזור למודל כבר בחילול הראשון. לדוגמה: &quot;התשובה הנכונה היא B כי...&quot;,
+                  &quot;שים לב להבחנה בין X ל-Y&quot;, &quot;המקור הנכון נמצא בפרק X&quot;. הראיות עדיין
                   חייבות להגיע מקטעי המקור.
                 </p>
                 <textarea

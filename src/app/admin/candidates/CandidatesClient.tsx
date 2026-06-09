@@ -55,7 +55,8 @@ export function CandidatesClient({ rows }: { rows: CandidateRow[] }) {
   function toggle(qid: number) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(qid) ? next.delete(qid) : next.add(qid);
+      if (next.has(qid)) next.delete(qid);
+      else next.add(qid);
       return next;
     });
   }
@@ -63,7 +64,8 @@ export function CandidatesClient({ rows }: { rows: CandidateRow[] }) {
   function toggleSelected(qid: number) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(qid) ? next.delete(qid) : next.add(qid);
+      if (next.has(qid)) next.delete(qid);
+      else next.add(qid);
       return next;
     });
   }
