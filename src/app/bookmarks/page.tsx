@@ -231,11 +231,11 @@ export default async function BookmarksPage() {
                             <Badge variant="secondary" className="text-xs shrink-0">
                               {dict.common.chapter} {q.chapter.number}
                             </Badge>
-                            <span className="text-xs text-muted-foreground line-clamp-1">
+                            <span className="text-xs text-muted-foreground line-clamp-1" data-search-highlight>
                               {qT.chapterTitle}
                             </span>
                           </div>
-                          <p dir="auto" className="text-sm font-medium leading-relaxed [unicode-bidi:plaintext]">
+                          <p dir="auto" className="text-sm font-medium leading-relaxed [unicode-bidi:plaintext]" data-search-highlight>
                             {qT.stem}
                           </p>
                         </div>
@@ -268,7 +268,7 @@ export default async function BookmarksPage() {
                           return (
                             <div key={k} className={rowClass}>
                               <span className={letterClass}>{letters[idx]}</span>
-                              <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]">
+                              <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]" data-search-highlight>
                                 {optionTexts[idx]}
                               </span>
                               {isCorrect && (
@@ -336,7 +336,9 @@ export default async function BookmarksPage() {
                                       />
                                       <span>{sectionLabel(h.section, t, letters)}</span>
                                     </div>
-                                    <HighlightSentence text={h.sentenceText} />
+                                    <div data-search-highlight>
+                                      <HighlightSentence text={h.sentenceText} />
+                                    </div>
                                     <HighlightNoteEditor
                                       highlightId={h.id}
                                       note={h.note}
@@ -403,7 +405,7 @@ export default async function BookmarksPage() {
                         <Badge variant="secondary" className="text-xs shrink-0">
                           {dict.common.chapter} {hs[0].question.chapter.number}
                         </Badge>
-                        <span className="text-xs text-muted-foreground line-clamp-1">
+                        <span className="text-xs text-muted-foreground line-clamp-1" data-search-highlight>
                           {hTranslated[qi].chapterTitle}
                         </span>
                         <Button asChild size="sm" variant="secondary" className="gap-1.5 ms-auto shrink-0">
@@ -413,7 +415,7 @@ export default async function BookmarksPage() {
                           </Link>
                         </Button>
                       </div>
-                      <p dir="auto" className="text-sm font-medium line-clamp-2 [unicode-bidi:plaintext]">{hTranslated[qi].stem}</p>
+                      <p dir="auto" className="text-sm font-medium line-clamp-2 [unicode-bidi:plaintext]" data-search-highlight>{hTranslated[qi].stem}</p>
 
                       <ul className="space-y-2">
                         {hs.map((h) => (
@@ -430,7 +432,9 @@ export default async function BookmarksPage() {
                                   />
                                   <span>{sectionLabel(h.section, t, letters)}</span>
                                 </div>
-                                <HighlightSentence text={h.sentenceText} />
+                                <div data-search-highlight>
+                                  <HighlightSentence text={h.sentenceText} />
+                                </div>
                                 <HighlightNoteEditor
                                   highlightId={h.id}
                                   note={h.note}

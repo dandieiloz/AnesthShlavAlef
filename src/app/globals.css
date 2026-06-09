@@ -326,6 +326,17 @@
     background-color: hsl(43 96% 56% / 0.34);
   }
 
+  /* Search-match highlight on the bookmarks page. */
+  mark.search-hit {
+    background-color: hsl(48 96% 60% / 0.45);
+    color: inherit;
+    border-radius: 0.2em;
+    padding: 0 0.05em;
+  }
+  .dark mark.search-hit {
+    background-color: hsl(48 96% 60% / 0.35);
+  }
+
   /* Flash effect when a citation is jumped to from an inline anchor. */
   .cite-flash {
     background-color: hsl(43 96% 56% / 0.22) !important;
