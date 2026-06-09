@@ -92,7 +92,10 @@ const PDF_SETUP_HREF = "/profile?tab=settings#local-pdf";
 
 function parseWhyOthersWrong(raw: string): Partial<Record<Choice, string>> {
   const map: Partial<Record<Choice, string>> = {};
-  const parts = raw.split(/\n\n(?=[A-D]\.)/);
+  // Split before each `A.`/`B.`/`C.`/`D.` marker that starts a line. We accept a
+  // single newline (not only a blank line) so sections that were stored without
+  // a blank-line separator still break into their own per-option cards.
+  const parts = raw.split(/\n+(?=[A-D]\.\s)/);
   for (const part of parts) {
     const m = part.match(/^([A-D])\.\s*([\s\S]+)$/);
     if (m) map[m[1] as Choice] = m[2].trim();
