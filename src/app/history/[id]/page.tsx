@@ -8,6 +8,7 @@ import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
 import { CommentItem } from "@/components/CommentItem";
 import { SubmitButton } from "@/components/SubmitButton";
+import { BookmarkButton } from "./BookmarkButton";
 import { postCommentAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ export default async function HistoryQuestionPage({
   const t = dict.review;
   const letters = t.labels[contentLocale] ?? ["A", "B", "C", "D"];
 
-  const [question, attempts, highlightRows, latestUserReport, comments] = await Promise.all([
+  const [question, attempts, highlightRows, latestUserReport, comments, bookmark] = await Promise.all([
     db.question.findUnique({
       where: { id: questionId },
       include: {
@@ -75,6 +76,10 @@ export default async function HistoryQuestionPage({
       where: { questionId },
       include: { user: { select: { name: true, image: true, hospitalName: true } } },
       orderBy: { createdAt: "asc" },
+    }),
+    db.bookmark.findUnique({
+      where: { userId_questionId: { userId: me.id, questionId } },
+      select: { id: true },
     }),
   ]);
 
@@ -118,6 +123,18 @@ export default async function HistoryQuestionPage({
             {question.source && (
               <span className="text-xs text-muted-foreground">· {question.source}</span>
             )}
+            <div className="ms-auto">
+              <BookmarkButton
+                questionId={question.id}
+                initialBookmarked={bookmark !== null}
+                labels={{
+                  add: t.addBookmark,
+                  remove: t.removeBookmark,
+                  bookmarked: t.bookmarked,
+                  bookmark: t.bookmark,
+                }}
+              />
+            </div>
           </div>
 
           <p dir="auto" className="text-base font-medium leading-relaxed [unicode-bidi:plaintext]">
