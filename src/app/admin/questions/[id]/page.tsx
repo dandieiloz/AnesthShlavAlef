@@ -102,7 +102,16 @@ export default async function AdminQuestionPage({
         ← פרק {q.chapter.number}
       </Link>
       <div className="flex items-center justify-between mt-2">
-        <h1 className="text-xl font-bold">שאלה #{q.id}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold">שאלה #{q.id}</h1>
+          <Link
+            href={`/history/${q.id}`}
+            target="_blank"
+            className="text-sm text-primary hover:underline"
+          >
+            צפייה בעמוד השאלה ↗
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           {q.disabled ? (
             <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
