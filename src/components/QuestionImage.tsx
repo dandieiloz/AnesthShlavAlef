@@ -38,7 +38,7 @@ export function QuestionImage({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group relative block cursor-zoom-in rounded border bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="group relative block max-w-full cursor-zoom-in rounded border bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={alt ? `${alt} — הגדל תמונה` : "הגדל תמונה"}
       >
         <Image
@@ -46,7 +46,7 @@ export function QuestionImage({
           alt={alt ?? ""}
           width={800}
           height={600}
-          className="max-h-[420px] w-auto rounded object-contain"
+          className="max-h-[420px] w-auto max-w-full rounded object-contain"
           unoptimized
         />
         <span className="pointer-events-none absolute bottom-2 end-2 flex items-center gap-1 rounded bg-black/55 px-1.5 py-0.5 text-[11px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">

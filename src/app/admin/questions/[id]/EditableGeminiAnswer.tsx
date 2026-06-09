@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { saveGeminiAnswerFieldsAction } from "@/app/admin/actions";
 
@@ -38,6 +39,17 @@ export function EditableGeminiAnswer({
   const [imgAlt, setImgAlt] = useState(explanationImageAlt ?? "");
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
+  const [state, formAction] = useActionState(saveGeminiAnswerFieldsAction, null);
+
+  // On a successful save the server has revalidated this route, so the
+  // surrounding card re-renders with fresh data. Close the editor to surface it.
+  useEffect(() => {
+    if (state?.ok) {
+      setNewImagePreview(null);
+      setRemoveImage(false);
+      setEditing(false);
+    }
+  }, [state]);
 
   function cancel() {
     setExp(explanation);
@@ -91,10 +103,16 @@ export function EditableGeminiAnswer({
   }
 
   return (
-    <form action={saveGeminiAnswerFieldsAction} className="space-y-4 rounded border bg-card p-4">
+    <form action={formAction} className="space-y-4 rounded border bg-card p-4">
       <input type="hidden" name="questionId" value={questionId} />
       <input type="hidden" name="evidenceCitationsJson" value={JSON.stringify(cites)} />
       {removeImage && <input type="hidden" name="removeExplanationImage" value="1" />}
+
+      {state?.ok === false && (
+        <p className="rounded border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          שמירה נכשלה: {state.error}
+        </p>
+      )}
 
       <div>
         <label className="block text-xs font-semibold mb-1">הסבר</label>
@@ -272,7 +290,7 @@ export function EditableGeminiAnswer({
       </div>
 
       <div className="flex gap-2">
-        <button className="rounded bg-slate-900 px-4 py-2 text-sm text-white">שמור</button>
+        <SaveButton />
         <button
           type="button"
           onClick={cancel}
@@ -282,5 +300,18 @@ export function EditableGeminiAnswer({
         </button>
       </div>
     </form>
+  );
+}
+
+function SaveButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60"
+    >
+      {pending ? "שומר…" : "שמור"}
+    </button>
   );
 }
