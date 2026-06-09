@@ -75,28 +75,50 @@ export async function removeHighlightAction(input: z.infer<typeof RemoveSchema>)
   revalidatePath("/bookmarks");
 }
 
+// Default highlight color applied when a note is saved on a sentence that has
+// no highlight yet (keeps colorId required while letting notes stand alone).
+const DEFAULT_NOTE_COLOR = 1;
+
 const NoteSchema = z.object({
   questionId: z.number().int().positive(),
   locale: z.enum(["he", "en"]),
   section: z.string().regex(SECTION_RE),
   sentenceIndex: z.number().int().min(0).max(500),
   note: z.string().max(2000).nullable(),
+  sentenceHash: z.string().length(16),
+  sentenceText: z.string().min(1).max(2000),
 });
 
 export async function setHighlightNoteAction(input: z.infer<typeof NoteSchema>) {
   const me = await requireUser();
   const data = NoteSchema.parse(input);
+  const note = data.note && data.note.trim() ? data.note.trim() : null;
 
-  // Only updates an existing highlight; creating a note without a color is a no-op.
-  await db.sentenceHighlight.updateMany({
+  // Upsert: create a default-colored highlight when none exists yet (so a
+  // note-only sentence still surfaces under "משפטים מסומנים"); otherwise just
+  // update the note text while preserving the existing color.
+  await db.sentenceHighlight.upsert({
     where: {
+      userId_questionId_locale_section_sentenceIndex: {
+        userId: me.id,
+        questionId: data.questionId,
+        locale: data.locale,
+        section: data.section,
+        sentenceIndex: data.sentenceIndex,
+      },
+    },
+    create: {
       userId: me.id,
       questionId: data.questionId,
       locale: data.locale,
       section: data.section,
       sentenceIndex: data.sentenceIndex,
+      colorId: DEFAULT_NOTE_COLOR,
+      sentenceHash: data.sentenceHash,
+      sentenceText: data.sentenceText,
+      note,
     },
-    data: { note: data.note && data.note.trim() ? data.note.trim() : null },
+    update: { note },
   });
 
   revalidatePath("/bookmarks");

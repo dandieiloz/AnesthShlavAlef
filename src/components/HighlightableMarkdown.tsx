@@ -59,6 +59,9 @@ const COLOR_SWATCH: Record<number, string> = {
   4: "bg-blue-300 dark:bg-blue-400",
 };
 
+// Color applied when a note is saved on a sentence that has no highlight yet.
+const DEFAULT_NOTE_COLOR = 1;
+
 export function HighlightableMarkdown({
   text,
   section,
@@ -143,12 +146,22 @@ export function HighlightableMarkdown({
   function saveNote() {
     if (!noteEditing) return;
     const { index, value } = noteEditing;
+    const sentenceText = sentences[index];
+    const sentenceHash = hashSentence(sentenceText);
+    const note = value.trim() || null;
     const prev = state.get(index);
-    if (prev) {
-      const newMap = new Map(state);
-      newMap.set(index, { ...prev, note: value.trim() || null });
-      setState(newMap);
-    }
+    const newMap = new Map(state);
+    // Saving a note auto-creates a default-colored highlight when none exists,
+    // so the sentence shows up under "משפטים מסומנים".
+    newMap.set(index, {
+      id: prev?.id ?? -1,
+      section,
+      sentenceIndex: index,
+      colorId: prev?.colorId ?? DEFAULT_NOTE_COLOR,
+      sentenceHash,
+      note,
+    });
+    setState(newMap);
     startTransition(() => {
       setHighlightNoteAction({
         questionId,
@@ -156,6 +169,8 @@ export function HighlightableMarkdown({
         section,
         sentenceIndex: index,
         note: value,
+        sentenceHash,
+        sentenceText,
       });
     });
     setNoteEditing(null);
@@ -229,19 +244,17 @@ export function HighlightableMarkdown({
                     );
                   })}
                   <span className="mx-1 h-4 w-px bg-border" />
-                  {h && (
-                    <button
-                      type="button"
-                      title={h.note ? t.editNote : t.addNote}
-                      onClick={() => {
-                        setActiveIndex(null);
-                        setNoteEditing({ index: i, value: h.note ?? "" });
-                      }}
-                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      {h.note ? <Pencil className="h-3.5 w-3.5" /> : <StickyNote className="h-3.5 w-3.5" />}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    title={h?.note ? t.editNote : t.addNote}
+                    onClick={() => {
+                      setActiveIndex(null);
+                      setNoteEditing({ index: i, value: h?.note ?? "" });
+                    }}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    {h?.note ? <Pencil className="h-3.5 w-3.5" /> : <StickyNote className="h-3.5 w-3.5" />}
+                  </button>
                   {h && (
                     <button
                       type="button"

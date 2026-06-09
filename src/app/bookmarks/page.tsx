@@ -110,6 +110,7 @@ export default async function BookmarksPage() {
           sentenceIndex: true,
           colorId: true,
           sentenceHash: true,
+          sentenceText: true,
           note: true,
         },
       })
@@ -235,7 +236,6 @@ export default async function BookmarksPage() {
                           </button>
                         </form>
                       </div>
-
                       <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
                       <QuestionVideo url={q.videoUrl} />
 
@@ -297,10 +297,59 @@ export default async function BookmarksPage() {
                         </>
                       )}
 
+                      {/* User's highlighted sentences for this question */}
+                      {(() => {
+                        const qHighlights = bookmarkHighlightsByQ.get(q.id) ?? [];
+                        if (qHighlights.length === 0) return null;
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                              <Highlighter className="h-3.5 w-3.5 shrink-0" />
+                              {t.tabHighlights}
+                            </div>
+                            <ul className="space-y-2">
+                              {qHighlights.map((h) => (
+                                <li
+                                  key={h.id}
+                                  className={`rounded-md border border-border/60 px-3 py-2 ${COLOR_BG[h.colorId] ?? ""}`}
+                                  dir={contentLocale === "he" ? "rtl" : "ltr"}
+                                >
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                      <span
+                                        className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${COLOR_SWATCH[h.colorId] ?? ""}`}
+                                      />
+                                      <span>{sectionLabel(h.section, t, letters)}</span>
+                                    </div>
+                                    <p dir="auto" className="text-sm leading-relaxed [unicode-bidi:plaintext]">
+                                      {h.sentenceText}
+                                    </p>
+                                    {h.note && (
+                                      <div className="flex items-start gap-1.5 rounded border border-amber-300/40 bg-background/50 px-2 py-1 text-xs">
+                                        <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
+                                        <span dir="auto" className="text-foreground/85 whitespace-pre-wrap break-words [unicode-bidi:plaintext]">
+                                          {h.note}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           {t.savedOn} {b.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
                         </span>
+                        <Button asChild size="sm" variant="secondary" className="gap-1.5">
+                          <Link href={`/history/${q.id}`}>
+                            <BookOpen className="h-3.5 w-3.5" />
+                            {t.openQuestion}
+                          </Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -332,6 +381,12 @@ export default async function BookmarksPage() {
                         <span className="text-xs text-muted-foreground line-clamp-1">
                           {hTranslated[qi].chapterTitle}
                         </span>
+                        <Button asChild size="sm" variant="secondary" className="gap-1.5 ms-auto shrink-0">
+                          <Link href={`/history/${qid}`}>
+                            <BookOpen className="h-3.5 w-3.5" />
+                            {t.openQuestion}
+                          </Link>
+                        </Button>
                       </div>
                       <p dir="auto" className="text-sm font-medium line-clamp-2 [unicode-bidi:plaintext]">{hTranslated[qi].stem}</p>
 
