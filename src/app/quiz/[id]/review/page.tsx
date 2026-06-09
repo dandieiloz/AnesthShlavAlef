@@ -355,7 +355,9 @@ export default async function QuizReviewPage({
                       const optionText = optionTexts[idx];
                       const isChosen = attempt.chosen === k;
                       const isCorrectAnswer =
-                        q.geminiAnswer?.correctAnswer === k || q.acceptedAnswers.includes(k);
+                        (q.geminiAnswer?.correctAnswer ?? q.correctAnswer) === k ||
+                        q.acceptedAnswers.includes(k);
+                      const isEliminated = attempt.eliminated.includes(k);
 
                       let rowClass =
                         "flex items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors ";
@@ -372,6 +374,9 @@ export default async function QuizReviewPage({
                         rowClass += "border-border bg-background text-muted-foreground";
                         letterClass += "bg-muted text-muted-foreground";
                       }
+                      // Keep the strike-through on options the user eliminated,
+                      // regardless of the correct/wrong highlight.
+                      if (isEliminated) rowClass += " line-through";
 
                       return (
                         <div key={k} className={rowClass}>

@@ -218,11 +218,13 @@ const RecordAttemptSchema = z.object({
   quizId: z.number().int(),
   questionId: z.number().int(),
   chosen: z.enum(["A", "B", "C", "D"]),
+  eliminated: z.array(z.enum(["A", "B", "C", "D"])).max(4).default([]),
 });
 export async function recordAttemptAction(input: {
   quizId: number;
   questionId: number;
   chosen: "A" | "B" | "C" | "D";
+  eliminated?: ("A" | "B" | "C" | "D")[];
 }): Promise<{ ok: true; isCorrect: boolean }> {
   const me = await requireUser();
   const data = RecordAttemptSchema.parse(input);
@@ -261,6 +263,7 @@ export async function recordAttemptAction(input: {
         questionId: data.questionId,
         chosen: data.chosen as Choice,
         isCorrect,
+        eliminated: data.eliminated as Choice[],
       },
     });
   }
@@ -281,6 +284,7 @@ const SubmitFullQuizSchema = z.object({
       z.object({
         questionId: z.number().int(),
         chosen: z.enum(["A", "B", "C", "D"]),
+        eliminated: z.array(z.enum(["A", "B", "C", "D"])).max(4).default([]),
       }),
     )
     .min(1)
@@ -288,7 +292,7 @@ const SubmitFullQuizSchema = z.object({
 });
 export async function submitFullQuizAction(input: {
   quizId: number;
-  answers: { questionId: number; chosen: "A" | "B" | "C" | "D" }[];
+  answers: { questionId: number; chosen: "A" | "B" | "C" | "D"; eliminated?: ("A" | "B" | "C" | "D")[] }[];
 }): Promise<{ ok: true; recorded: number; correct: number }> {
   const me = await requireUser();
   const data = SubmitFullQuizSchema.parse(input);
@@ -323,7 +327,7 @@ export async function submitFullQuizAction(input: {
   }
   const alreadyRecorded = new Set(existing.map((a) => a.questionId));
 
-  const rows: { userId: string; quizId: number; questionId: number; chosen: Choice; isCorrect: boolean }[] = [];
+  const rows: { userId: string; quizId: number; questionId: number; chosen: Choice; isCorrect: boolean; eliminated: Choice[] }[] = [];
   let correctCount = 0;
   for (const a of data.answers) {
     if (alreadyRecorded.has(a.questionId)) continue;
@@ -337,6 +341,7 @@ export async function submitFullQuizAction(input: {
       questionId: a.questionId,
       chosen: a.chosen as Choice,
       isCorrect,
+      eliminated: a.eliminated as Choice[],
     });
   }
 

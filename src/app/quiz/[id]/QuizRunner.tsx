@@ -54,7 +54,7 @@ const MODE_STORAGE_KEY = "quizAnswerMode";
 // navigation / refresh / browser-back would silently discard every answered
 // question. Immediate mode records each attempt server-side and needs no snapshot.
 const SESSION_STORAGE_PREFIX = "quizFullSession:";
-const SESSION_SNAPSHOT_VERSION = 1;
+const SESSION_SNAPSHOT_VERSION = 2;
 type AnswerMode = "immediate" | "full";
 
 type FullSessionSnapshot = {
@@ -63,6 +63,7 @@ type FullSessionSnapshot = {
   past: { question: QuestionPayload; chosen: Choice | null }[];
   draftAnswers: [number, Choice][];
   unsureIds: number[];
+  eliminated: [number, Choice[]][];
   answered: number;
   correct: number;
   hasMore: boolean;
@@ -161,6 +162,7 @@ export function QuizRunner(props: Props) {
             setPast(snap.past);
             setDraftAnswers(new Map(snap.draftAnswers));
             setUnsureIds(new Set(snap.unsureIds));
+            setEliminated(Object.fromEntries(snap.eliminated ?? []));
             setAnswered(snap.answered);
             setCorrect(snap.correct);
             setHasMore(snap.hasMore);
@@ -205,6 +207,7 @@ export function QuizRunner(props: Props) {
         past,
         draftAnswers: Array.from(draftAnswers.entries()),
         unsureIds: Array.from(unsureIds),
+        eliminated: Object.entries(eliminated).map(([id, ks]) => [Number(id), ks]),
         answered,
         correct,
         hasMore,
@@ -216,7 +219,7 @@ export function QuizRunner(props: Props) {
     } catch {
       /* ignore storage quota / serialization errors */
     }
-  }, [mode, queue, past, draftAnswers, unsureIds, answered, correct, hasMore, props.quizId]);
+  }, [mode, queue, past, draftAnswers, unsureIds, eliminated, answered, correct, hasMore, props.quizId]);
 
   // Track every question id we have served the client (consumed or queued), so
   // refill requests don't redeliver the same one before the server has seen
@@ -485,17 +488,16 @@ export function QuizRunner(props: Props) {
     const isCorrect = chosen === current!.answer.correctAnswer;
     setAnswered((n) => n + 1);
     if (isCorrect) setCorrect((n) => n + 1);
-    // Drop eliminations for this question — it's answered now.
-    setEliminated((prev) => {
-      if (!(questionId in prev)) return prev;
-      const { [questionId]: _drop, ...rest } = prev;
-      return rest;
-    });
 
     if (mode === "immediate") {
       setRevealed(true);
       setRevealedQuestionId(questionId);
-      const payload = { quizId: props.quizId, questionId, chosen };
+      const payload = {
+        quizId: props.quizId,
+        questionId,
+        chosen,
+        eliminated: eliminated[questionId] ?? [],
+      };
       startTransition(() => {
         recordAttemptAction(payload)
           .catch((err) => console.error("[quiz] failed to record attempt", err))
@@ -713,6 +715,7 @@ export function QuizRunner(props: Props) {
     const answers = Array.from(draftAnswers.entries()).map(([questionId, chosen]) => ({
       questionId,
       chosen,
+      eliminated: eliminated[questionId] ?? [],
     }));
     if (answers.length === 0) return;
     setFinalizing(true);
@@ -868,10 +871,16 @@ export function QuizRunner(props: Props) {
             >
               {OPTION_KEYS.map((k, i) => {
                 const isChosen = displayChosen === k;
-                const isCorrectOption = displayRevealed && k === correctChoice;
-                const isWrongChosen = displayRevealed && isChosen && k !== correctChoice;
-                const isEliminated =
-                  !displayRevealed && (eliminated[display.id]?.includes(k) ?? false);
+                const isCorrectOption =
+                  displayRevealed && (k === correctChoice || acceptedChoices.includes(k));
+                const isWrongChosen =
+                  displayRevealed &&
+                  isChosen &&
+                  k !== correctChoice &&
+                  !acceptedChoices.includes(k);
+                // Whether the user struck out this option. Shown even after the
+                // answer is revealed, but toggling is disabled once revealed.
+                const isEliminated = eliminated[display.id]?.includes(k) ?? false;
                 const canEliminate = !displayRevealed && !isViewingPast;
                 // In full mode while viewing a past answered question, allow
                 // the user to switch their answer in place (no reveal).
@@ -918,6 +927,9 @@ export function QuizRunner(props: Props) {
                         : isChosen
                         ? "border-primary bg-primary/5"
                         : "border-border bg-background",
+                      // Keep the strike-through on eliminated options even when the
+                      // correct/wrong color highlight takes precedence above.
+                      isEliminated ? "line-through" : "",
                     ].join(" ")}
                   >
                     <input
@@ -947,6 +959,14 @@ export function QuizRunner(props: Props) {
                       {HEBREW_LETTERS[i]}
                     </span>
                     <span className="flex-1 leading-snug pt-0.5">{optionText}</span>
+                    {/* Explicit correct / wrong marker so the right answer is
+                        unmistakable even when the user crossed it out. */}
+                    {isCorrectOption && (
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-success mt-0.5" />
+                    )}
+                    {isWrongChosen && (
+                      <XCircle className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
+                    )}
                     {canEliminate && (
                       <button
                         type="button"

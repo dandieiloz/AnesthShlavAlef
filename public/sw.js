@@ -4,7 +4,7 @@
  *  - Static assets (Next /_next/static, icons, fonts): stale-while-revalidate.
  *  - Never caches API/auth/non-GET requests.
  */
-const VERSION = "perl-pwa-v1";
+const VERSION = "perl-pwa-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const OFFLINE_URL = "/offline";

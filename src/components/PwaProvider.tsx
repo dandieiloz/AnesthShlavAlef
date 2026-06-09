@@ -33,6 +33,18 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
   // Register the service worker once the page has loaded.
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    // In development the SW's stale-while-revalidate caching serves outdated
+    // JS chunks, masking code changes. Unregister any existing SW and purge
+    // its caches instead of registering, so dev always runs fresh code.
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        for (const reg of regs) reg.unregister();
+      });
+      if ("caches" in window) {
+        caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+      }
+      return;
+    }
     const onLoad = () => {
       navigator.serviceWorker.register("/sw.js").catch(() => {
         // best-effort: the app still works without the SW
