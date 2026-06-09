@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { invalidateTranslations } from "@/lib/translate";
+import { uploadQuestionImage, deleteQuestionImage, ImageValidationError } from "@/lib/question-image";
 
 const QuestionSchema = z.object({
   id: z.coerce.number().optional(),
@@ -273,15 +274,45 @@ export async function saveGeminiAnswerFieldsAction(formData: FormData) {
   }
   const existing = await db.geminiAnswer.findUnique({
     where: { questionId: data.questionId },
-    select: { id: true, explanation: true, whyOthersWrong: true },
+    select: { id: true, explanation: true, whyOthersWrong: true, explanationImagePath: true },
   });
   if (!existing) throw new Error("No GeminiAnswer to edit for this question");
+
+  // Optional explanation image: upload a new file, remove the current one, or
+  // leave it untouched. Alt text is always synced from the form.
+  const explanationImageAlt = String(formData.get("explanationImageAlt") ?? "").trim() || null;
+  const removeExplanationImage = formData.get("removeExplanationImage") === "1";
+  const explanationImageFile = formData.get("explanationImage");
+  const imageData: {
+    explanationImageUrl?: string | null;
+    explanationImagePath?: string | null;
+    explanationImageAlt: string | null;
+  } = { explanationImageAlt };
+
+  if (explanationImageFile instanceof File && explanationImageFile.size > 0) {
+    try {
+      const uploaded = await uploadQuestionImage(explanationImageFile, "explanations");
+      imageData.explanationImageUrl = uploaded.url;
+      imageData.explanationImagePath = uploaded.path;
+    } catch (e) {
+      if (e instanceof ImageValidationError) throw e;
+      throw new Error(`העלאת התמונה נכשלה: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (existing.explanationImagePath) await deleteQuestionImage(existing.explanationImagePath);
+  } else if (removeExplanationImage) {
+    imageData.explanationImageUrl = null;
+    imageData.explanationImagePath = null;
+    imageData.explanationImageAlt = null;
+    if (existing.explanationImagePath) await deleteQuestionImage(existing.explanationImagePath);
+  }
+
   await db.geminiAnswer.update({
     where: { id: existing.id },
     data: {
       explanation: data.explanation,
       whyOthersWrong: data.whyOthersWrong,
       evidenceCitations: parsedCitations,
+      ...imageData,
     },
   });
   const changed: string[] = [];

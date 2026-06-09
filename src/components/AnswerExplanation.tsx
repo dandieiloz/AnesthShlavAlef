@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { CitationPageLink } from "@/components/CitationPageLink";
+import { QuestionImage } from "@/components/QuestionImage";
 import { BookMarked, XCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,9 @@ type Props = {
   userChoice?: Choice;
   options: { key: Choice; text: string }[];
   insufficientEvidence?: boolean;
+  /** Optional image an admin manually attached to the explanation; shown in the correct-answer card. */
+  explanationImageUrl?: string | null;
+  explanationImageAlt?: string | null;
   locale?: "he" | "en";
   questionId?: number;
   highlights?: HighlightRecord[];
@@ -176,6 +180,8 @@ export function AnswerExplanation({
   userChoice,
   options,
   insufficientEvidence,
+  explanationImageUrl,
+  explanationImageAlt,
   locale = "he",
   questionId,
   highlights = [],
@@ -397,6 +403,9 @@ export function AnswerExplanation({
                       <MathMarkdown>{bodyText}</MathMarkdown>
                     )}
                   </div>
+                )}
+                {isCorrect && explanationImageUrl && (
+                  <QuestionImage url={explanationImageUrl} alt={explanationImageAlt} />
                 )}
               </div>
             </div>

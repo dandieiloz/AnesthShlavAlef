@@ -423,6 +423,8 @@ export default async function QuizReviewPage({
                               { key: "D", text: q.optionD },
                             ]}
                             insufficientEvidence={q.geminiAnswer.insufficientEvidence}
+                            explanationImageUrl={q.geminiAnswer.explanationImageUrl}
+                            explanationImageAlt={q.geminiAnswer.explanationImageAlt}
                             locale={contentLocale}
                             questionId={q.id}
                             highlights={highlightsByQ.get(q.id) ?? []}

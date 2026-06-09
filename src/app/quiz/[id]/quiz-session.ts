@@ -27,6 +27,8 @@ export type QuestionPayload = {
     whyOthersWrong: string;
     evidenceCitations: EvidenceCitationDisplay[] | null;
     insufficientEvidence: boolean;
+    explanationImageUrl: string | null;
+    explanationImageAlt: string | null;
   };
   bookmarked: boolean;
   latestReport: { status: "OPEN" | "RESOLVED" | "REJECTED"; adminResponse: string | null } | null;
@@ -254,6 +256,8 @@ async function hydrateQuestionsByIds(args: {
             ? ((g.evidenceCitations as EvidenceCitationDisplay[] | null) ?? null)
             : null,
           insufficientEvidence: g?.insufficientEvidence ?? false,
+          explanationImageUrl: g?.explanationImageUrl ?? null,
+          explanationImageAlt: g?.explanationImageAlt ?? null,
         },
         bookmarked: bookmarkedSet.has(q.id),
         latestReport: latestReportByQ.get(q.id) ?? null,

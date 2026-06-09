@@ -15,7 +15,7 @@ const EXT_BY_MIME: Record<string, string> = {
 
 export class ImageValidationError extends Error {}
 
-export async function uploadQuestionImage(file: File): Promise<{ url: string; path: string }> {
+export async function uploadQuestionImage(file: File, folder = "questions"): Promise<{ url: string; path: string }> {
   if (!ALLOWED_MIME.has(file.type)) {
     throw new ImageValidationError(`סוג קובץ לא נתמך: ${file.type || "לא ידוע"}`);
   }
@@ -24,7 +24,7 @@ export async function uploadQuestionImage(file: File): Promise<{ url: string; pa
   }
 
   const ext = EXT_BY_MIME[file.type];
-  const path = `questions/${nanoid()}.${ext}`;
+  const path = `${folder}/${nanoid()}.${ext}`;
   const bucket = getAdminBucket();
   const buf = Buffer.from(await file.arrayBuffer());
 

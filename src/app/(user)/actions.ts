@@ -688,6 +688,8 @@ export async function loadQuestionAttemptAction(
         ? ((g.evidenceCitations as EvidenceCitationDisplay[] | null) ?? null)
         : null,
       insufficientEvidence: g?.insufficientEvidence ?? false,
+      explanationImageUrl: g?.explanationImageUrl ?? null,
+      explanationImageAlt: g?.explanationImageAlt ?? null,
     },
     bookmarked,
     latestReport,

@@ -1137,6 +1137,8 @@ export function QuizRunner(props: Props) {
                       { key: "D", text: display.optionD },
                     ]}
                     insufficientEvidence={display.answer.insufficientEvidence}
+                    explanationImageUrl={display.answer.explanationImageUrl}
+                    explanationImageAlt={display.answer.explanationImageAlt}
                     locale={props.contentLocale}
                     questionId={display.id}
                     highlights={display.highlights}

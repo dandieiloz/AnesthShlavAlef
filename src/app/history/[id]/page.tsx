@@ -189,6 +189,8 @@ export default async function HistoryQuestionPage({
                   { key: "D", text: question.optionD },
                 ]}
                 insufficientEvidence={question.geminiAnswer.insufficientEvidence}
+                explanationImageUrl={question.geminiAnswer.explanationImageUrl}
+                explanationImageAlt={question.geminiAnswer.explanationImageAlt}
                 locale={contentLocale}
                 questionId={question.id}
                 highlights={highlightRows}

@@ -425,6 +425,8 @@ export default async function AdminQuestionPage({
                 ]}
                 insufficientEvidence={q.geminiAnswer.insufficientEvidence}
                 defaultChapterNumber={q.chapter.number}
+                explanationImageUrl={q.geminiAnswer.explanationImageUrl}
+                explanationImageAlt={q.geminiAnswer.explanationImageAlt}
               />
             </div>
             <form

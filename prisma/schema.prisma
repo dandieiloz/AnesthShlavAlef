@@ -231,6 +231,10 @@ model GeminiAnswer {
   confidence         Float?
   escalated          Boolean  @default(false)
   insufficientEvidence Boolean @default(false)
+  // Optional image an admin manually attaches to the explanation (Firebase Storage)
+  explanationImageUrl  String?  // public URL for the attached explanation image
+  explanationImagePath String?  // storage object path, used to delete/replace
+  explanationImageAlt  String?  // optional alt text for accessibility
   generatedAt        DateTime @default(now())
 
   question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)

@@ -15,6 +15,8 @@ type Props = {
   options: { key: Choice; text: string }[];
   insufficientEvidence: boolean;
   defaultChapterNumber: number;
+  explanationImageUrl: string | null;
+  explanationImageAlt: string | null;
 };
 
 export function EditableGeminiAnswer({
@@ -26,16 +28,24 @@ export function EditableGeminiAnswer({
   options,
   insufficientEvidence,
   defaultChapterNumber,
+  explanationImageUrl,
+  explanationImageAlt,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [exp, setExp] = useState(explanation);
   const [why, setWhy] = useState(whyOthersWrong);
   const [cites, setCites] = useState<EvidenceCitationDisplay[]>(evidenceCitations);
+  const [imgAlt, setImgAlt] = useState(explanationImageAlt ?? "");
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
 
   function cancel() {
     setExp(explanation);
     setWhy(whyOthersWrong);
     setCites(evidenceCitations);
+    setImgAlt(explanationImageAlt ?? "");
+    setNewImagePreview(null);
+    setRemoveImage(false);
     setEditing(false);
   }
 
@@ -73,6 +83,8 @@ export function EditableGeminiAnswer({
           correctAnswer={correctAnswer}
           options={options}
           insufficientEvidence={insufficientEvidence}
+          explanationImageUrl={explanationImageUrl}
+          explanationImageAlt={explanationImageAlt}
         />
       </div>
     );
@@ -82,6 +94,7 @@ export function EditableGeminiAnswer({
     <form action={saveGeminiAnswerFieldsAction} className="space-y-4 rounded border bg-card p-4">
       <input type="hidden" name="questionId" value={questionId} />
       <input type="hidden" name="evidenceCitationsJson" value={JSON.stringify(cites)} />
+      {removeImage && <input type="hidden" name="removeExplanationImage" value="1" />}
 
       <div>
         <label className="block text-xs font-semibold mb-1">הסבר</label>
@@ -93,6 +106,59 @@ export function EditableGeminiAnswer({
           className="w-full rounded border p-2 bg-background text-foreground font-mono text-xs"
           dir="rtl"
         />
+      </div>
+
+      <div className="rounded border bg-muted/20 p-3 space-y-2">
+        <label className="block text-xs font-semibold">תמונה להסבר (אופציונלי)</label>
+        <input
+          type="file"
+          name="explanationImage"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            setNewImagePreview(file ? URL.createObjectURL(file) : null);
+            if (file) setRemoveImage(false);
+          }}
+          className="block text-sm"
+        />
+        <p className="text-[11px] text-muted-foreground">PNG / JPEG / WebP / GIF · עד 5MB</p>
+        {newImagePreview ? (
+          <div className="space-y-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={newImagePreview} alt="תצוגה מקדימה" className="max-h-48 rounded border bg-background" />
+            <p className="text-[11px] text-muted-foreground">תמונה חדשה תוחלף בעת השמירה.</p>
+          </div>
+        ) : explanationImageUrl && !removeImage ? (
+          <div className="space-y-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={explanationImageUrl} alt={explanationImageAlt ?? ""} className="max-h-48 rounded border bg-background" />
+            <button
+              type="button"
+              onClick={() => setRemoveImage(true)}
+              className="text-xs text-destructive hover:underline"
+            >
+              הסר תמונה
+            </button>
+          </div>
+        ) : removeImage ? (
+          <p className="text-[11px] text-destructive">
+            התמונה תוסר בעת השמירה.{" "}
+            <button type="button" onClick={() => setRemoveImage(false)} className="underline">
+              ביטול
+            </button>
+          </p>
+        ) : null}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">טקסט חלופי לתמונה (alt)</label>
+          <input
+            type="text"
+            name="explanationImageAlt"
+            value={imgAlt}
+            onChange={(e) => setImgAlt(e.target.value)}
+            className="w-full rounded border p-1.5 text-sm bg-background text-foreground"
+            dir="rtl"
+          />
+        </div>
       </div>
 
       <div>
