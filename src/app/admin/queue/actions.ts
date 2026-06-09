@@ -50,7 +50,7 @@ export async function runJobAction(jobId: number): Promise<RunJobResult> {
 
   try {
     await generateExplanationForQuestion(job.questionId, {
-      hint: job.kind === "REGENERATE" ? job.regenerationHint ?? undefined : undefined,
+      hint: job.regenerationHint ?? undefined,
       mode: job.kind === "REGENERATE" ? "candidate" : "answer",
       jobId: job.id,
     });
@@ -95,7 +95,10 @@ export async function retryJobsAction(jobIds: number[]): Promise<void> {
 
 // ─── Enqueue initial job for a question that has no answer yet ────────────────
 
-export async function enqueueInitialJobAction(questionId: number): Promise<EnqueueResult> {
+export async function enqueueInitialJobAction(
+  questionId: number,
+  hint?: string | null,
+): Promise<EnqueueResult> {
   await requireAdmin();
 
   // Guard: only one open job per question
@@ -105,7 +108,7 @@ export async function enqueueInitialJobAction(questionId: number): Promise<Enque
   if (existing) return { ok: false, error: "כבר יש משימה פתוחה לשאלה זו" };
 
   const job = await db.answerGenerationJob.create({
-    data: { questionId, kind: "INITIAL" },
+    data: { questionId, kind: "INITIAL", regenerationHint: sanitizeHint(hint) },
   });
   revalidatePath("/admin/queue");
   revalidatePath(`/admin/questions/${questionId}`);

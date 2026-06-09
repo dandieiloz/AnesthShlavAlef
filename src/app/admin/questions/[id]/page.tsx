@@ -497,7 +497,33 @@ export default async function AdminQuestionPage({
             )}
           </>
         ) : (
-          <form action={async () => { "use server"; await enqueueInitialJobAction(q.id); }} className="mt-2">
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              const hint = String(formData.get("hint") ?? "");
+              await enqueueInitialJobAction(q.id, hint);
+            }}
+            className="mt-2 space-y-2"
+          >
+            {!openJob && (
+              <details className="rounded border bg-muted/30 px-3 py-2 text-sm">
+                <summary className="cursor-pointer text-primary hover:underline">
+                  הוסף הערה / רמז למודל (אופציונלי)
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  עזור למודל כבר בחילול הראשון. לדוגמה: "התשובה הנכונה היא B כי...",
+                  "שים לב להבחנה בין X ל-Y", "המקור הנכון נמצא בפרק X". הראיות עדיין
+                  חייבות להגיע מקטעי המקור.
+                </p>
+                <textarea
+                  name="hint"
+                  rows={4}
+                  maxLength={2000}
+                  className="mt-2 w-full rounded border p-2 text-sm bg-background text-foreground"
+                  placeholder="הערה למודל (עד 2000 תווים)..."
+                />
+              </details>
+            )}
             <button className="rounded bg-blue-600 px-4 py-2 text-white">
               {openJob ? "✓ ממתין בתור לחילול" : "הוסף לתור לחילול"}
             </button>
