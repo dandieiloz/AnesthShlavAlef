@@ -14,6 +14,7 @@ import {
   toggleDailyPopupAction,
   deleteDailyPopupAction,
   resetAcksDailyPopupAction,
+  forceShowDailyPopupAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +91,9 @@ export default async function AdminDailyPopupsPage() {
                       {p.enabled ? "פעיל" : "מושבת"}
                     </Badge>
                     <Badge variant="outline">{p._count.acks} אישורים</Badge>
+                    {p.forcedAt && (
+                      <Badge variant="destructive">מוצג בכפייה</Badge>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground">
                     נוצר: {p.createdAt.toLocaleString("he-IL")}
@@ -155,6 +159,12 @@ export default async function AdminDailyPopupsPage() {
                     <input type="hidden" name="id" value={p.id} />
                     <Button type="submit" variant="outline" size="sm">
                       אפס אישורים (הצג שוב לכולם)
+                    </Button>
+                  </form>
+                  <form action={forceShowDailyPopupAction}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <Button type="submit" size="sm">
+                      אלץ הצגה מיידית לכולם
                     </Button>
                   </form>
                   <form action={deleteDailyPopupAction}>

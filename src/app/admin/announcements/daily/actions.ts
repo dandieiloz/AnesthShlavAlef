@@ -89,3 +89,30 @@ export async function resetAcksDailyPopupAction(formData: FormData) {
   await db.dailyPopupAck.deleteMany({ where: { popupId: id } });
   invalidate();
 }
+
+/**
+ * Forcefully re-show a specific daily popup to *every* user right now.
+ *
+ * Unlike `resetAcksDailyPopupAction`, this guarantees the popup actually
+ * surfaces again by:
+ *  1. Marking it as forced (`forcedAt`) so it bypasses the daily rotation and
+ *     takes priority over every other enabled popup.
+ *  2. Ensuring it's enabled.
+ *  3. Clearing all acknowledgements so previously-dismissed users see it again.
+ *  4. Clearing the once-per-day gate (`User.lastDailyPopupAt`) for everyone so
+ *     it appears immediately, even for users who already saw a popup today.
+ */
+export async function forceShowDailyPopupAction(formData: FormData) {
+  await requireAdmin();
+  const id = formData.get("id") as string;
+  if (!id) throw new Error("Missing id");
+  await db.$transaction([
+    // Only one popup is forced at a time.
+    db.dailyPopup.updateMany({ where: { id: { not: id } }, data: { forcedAt: null } }),
+    db.dailyPopup.update({ where: { id }, data: { forcedAt: new Date(), enabled: true } }),
+    db.dailyPopupAck.deleteMany({ where: { popupId: id } }),
+    db.user.updateMany({ data: { lastDailyPopupAt: null } }),
+  ]);
+  invalidate();
+}
+

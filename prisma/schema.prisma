@@ -321,6 +321,9 @@ model DailyPopup {
   ctaLabel  String?
   ctaHref   String?
   enabled   Boolean  @default(true)
+  /// When set (by an admin "force show" action), this popup takes priority over
+  /// the daily rotation and is shown to every eligible user that hasn't acked it.
+  forcedAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

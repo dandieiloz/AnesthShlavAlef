@@ -49,7 +49,14 @@ export async function getDailyPopupForCurrentUser(): Promise<DailyPopupView | nu
     db.dailyPopup.findMany({
       where: { enabled: true },
       orderBy: { createdAt: "asc" },
-      select: { id: true, title: true, body: true, ctaLabel: true, ctaHref: true },
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        ctaLabel: true,
+        ctaHref: true,
+        forcedAt: true,
+      },
     }),
     db.dailyPopupAck.findMany({
       where: { userId },
@@ -61,6 +68,13 @@ export async function getDailyPopupForCurrentUser(): Promise<DailyPopupView | nu
   const eligible = popups.filter((p) => !ackedSet.has(p.id));
   if (eligible.length === 0) return null;
 
-  const idx = utcDayOfYear(now) % eligible.length;
-  return eligible[idx];
+  // A popup an admin chose to "force show" takes priority over the daily
+  // rotation. If several are forced, the most recently forced one wins.
+  const forced = eligible
+    .filter((p) => p.forcedAt != null)
+    .sort((a, b) => b.forcedAt!.getTime() - a.forcedAt!.getTime());
+
+  const { forcedAt: _forcedAt, ...selected } =
+    forced.length > 0 ? forced[0] : eligible[utcDayOfYear(now) % eligible.length];
+  return selected;
 }
