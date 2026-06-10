@@ -20,6 +20,8 @@ export type UserRow = {
   lastActiveAt: string | null;
   lastVisitAt: string | null;
   attemptCount: number;
+  localPdfSet: boolean;
+  successPercent: number | null;
 };
 
 type SortField =
@@ -166,6 +168,8 @@ export function UsersTable({
           <SortHeader field="lastActive" label="ענה לאחרונה" />
           <SortHeader field="lastVisit" label="ביקור אחרון" />
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרופיל</th>
+          <th className="p-2 text-center text-muted-foreground whitespace-nowrap">PDF</th>
+          <th className="p-2 text-center text-muted-foreground whitespace-nowrap">אחוז הצלחה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">היסטוריה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פעולות</th>
         </tr>
@@ -279,6 +283,28 @@ export function UsersTable({
                 >
                   {profileComplete ? "מלא" : "חסר"}
                 </span>
+              </td>
+
+              {/* Local PDF configured */}
+              <td className="p-2 text-center">
+                <span
+                  className={`text-xs rounded px-2 py-0.5 ${
+                    u.localPdfSet
+                      ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {u.localPdfSet ? "מוגדר" : "לא מוגדר"}
+                </span>
+              </td>
+
+              {/* Success percentage */}
+              <td className="p-2 text-center text-muted-foreground whitespace-nowrap">
+                {u.successPercent !== null ? (
+                  <span className="font-mono text-xs tabular-nums">{u.successPercent}%</span>
+                ) : (
+                  <span className="italic text-muted-foreground/50">—</span>
+                )}
               </td>
 
               {/* History link */}

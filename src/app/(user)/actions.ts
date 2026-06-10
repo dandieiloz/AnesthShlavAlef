@@ -44,6 +44,19 @@ export async function updateProfileAction(formData: FormData) {
   revalidatePath("/profile");
 }
 
+/**
+ * Records whether the current user has a local textbook PDF configured.
+ * The PDF handle itself lives only in the browser (IndexedDB), so the client
+ * reports its presence here purely so admins can see who has set one up.
+ */
+export async function setLocalPdfStateAction(hasPdf: boolean) {
+  const me = await requireUser();
+  await db.user.update({
+    where: { id: me.id },
+    data: { localPdfSetAt: hasPdf ? new Date() : null },
+  });
+}
+
 const QuizSchema = z.object({
   name: z.string().min(1).max(200),
   chapterIds: z.array(z.coerce.number()).min(1),

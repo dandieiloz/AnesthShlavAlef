@@ -109,6 +109,7 @@ export default async function AdminUsersPage({
     hospitalName: true,
     residencyYear: true,
     createdAt: true,
+    localPdfSetAt: true,
   } as const;
 
   // When sorting by lastActive we need to compute max(Attempt.createdAt) per
@@ -125,6 +126,7 @@ export default async function AdminUsersPage({
     hospitalName: string | null;
     residencyYear: number | null;
     createdAt: Date;
+    localPdfSetAt: Date | null;
   }>;
   let lastActiveByUser: Map<string, Date>;
   let lastVisitByUser: Map<string, Date> = new Map();
@@ -232,6 +234,17 @@ export default async function AdminUsersPage({
   const attemptCountByUser = new Map<string, number>(
     attemptStats.map((row) => [row.userId, row._count._all]),
   );
+  // Correct-answer counts per visible user, to derive a success percentage.
+  const correctStats = userIds.length
+    ? await db.attempt.groupBy({
+        by: ["userId"],
+        where: { userId: { in: userIds }, isCorrect: true },
+        _count: { _all: true },
+      })
+    : [];
+  const correctCountByUser = new Map<string, number>(
+    correctStats.map((row) => [row.userId, row._count._all]),
+  );
   if (sort !== "lastActive") {
     lastActiveByUser = new Map(
       attemptStats
@@ -270,6 +283,12 @@ export default async function AdminUsersPage({
     lastActiveAt: lastActiveByUser.get(u.id)?.toISOString() ?? null,
     lastVisitAt: lastVisitByUser.get(u.id)?.toISOString() ?? null,
     attemptCount: attemptCountByUser.get(u.id) ?? 0,
+    localPdfSet: u.localPdfSetAt !== null,
+    successPercent: (() => {
+      const total = attemptCountByUser.get(u.id) ?? 0;
+      if (total === 0) return null;
+      return Math.round(((correctCountByUser.get(u.id) ?? 0) / total) * 100);
+    })(),
   }));
 
   return (

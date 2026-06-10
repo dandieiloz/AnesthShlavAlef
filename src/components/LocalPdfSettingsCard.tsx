@@ -15,6 +15,7 @@ import {
   setPageOffset,
   type LocalPdfState,
 } from "@/lib/local-pdf";
+import { setLocalPdfStateAction } from "@/app/(user)/actions";
 
 type Strings = {
   title: string;
@@ -42,7 +43,11 @@ export function LocalPdfSettingsCard({ t }: { t: Strings }) {
 
   useEffect(() => {
     setSupported(isFsaSupported());
-    void getStoredState().then(setState);
+    void getStoredState().then((s) => {
+      setState(s);
+      // Backfill server-side tracking for users who set a PDF before tracking existed.
+      if (s.kind !== "none") void setLocalPdfStateAction(true).catch(() => {});
+    });
     setOffset(String(getPageOffset()));
   }, []);
 
@@ -59,6 +64,7 @@ export function LocalPdfSettingsCard({ t }: { t: Strings }) {
         try {
           const next = await pickPdf();
           setState(next);
+          void setLocalPdfStateAction(true).catch(() => {});
         } catch (err) {
           const name = (err as { name?: string })?.name;
           if (name !== "AbortError" && (err as Error)?.message !== "cancelled") {
@@ -74,6 +80,7 @@ export function LocalPdfSettingsCard({ t }: { t: Strings }) {
       void (async () => {
         await clearPdf();
         setState({ kind: "none" });
+        void setLocalPdfStateAction(false).catch(() => {});
       })();
     });
   }
