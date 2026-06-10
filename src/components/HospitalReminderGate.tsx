@@ -11,12 +11,16 @@ export async function HospitalReminderGate() {
   const user = await db.user
     .findUnique({
       where: { id: userId },
-      select: { hospitalName: true },
+      select: { hospitalName: true, residencyYear: true },
     })
     .catch(() => null);
 
+  // Skip brand-new users still in the sign-up/onboarding flow (they pick a
+  // hospital there). `residencyYear` is only set once onboarding completes.
+  if (!user || user.residencyYear == null) return null;
+
   // Only prompt users who haven't picked a hospital yet.
-  if (!user || user.hospitalName) return null;
+  if (user.hospitalName) return null;
 
   return <HospitalReminderDialog hospitals={HOSPITALS} />;
 }
