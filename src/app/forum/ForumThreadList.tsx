@@ -123,7 +123,7 @@ function ThreadRow({
                 {th.body}
               </p>
             )}
-            {th.lastReply && (
+            {th.lastReply && !open && (
               <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2 flex items-start gap-1.5">
                 <MessageSquare className="h-3 w-3 shrink-0 mt-0.5" />
                 <span className="min-w-0">
