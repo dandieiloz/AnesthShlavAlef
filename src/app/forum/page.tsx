@@ -9,8 +9,8 @@ import { NewThreadForm } from "./NewThreadForm";
 import { ForumThreadList, type ForumThreadListItem } from "./ForumThreadList";
 
 export const metadata: Metadata = {
-  title: "פורום",
-  description: "פורום הקהילה — שאלות, דיונים ושיתוף בין מתמחים",
+  title: "חדר מתמחים",
+  description: "חדר המתמחים — שאלות, דיונים ושיתוף בין מתמחים",
 };
 
 function snippet(s: string, max = 120): string {
@@ -24,16 +24,24 @@ export default async function ForumPage() {
   const dict = getDictionary(locale);
   const t = dict.forum;
 
+  // Timestamp of the user's previous visit — used to flag threads with activity
+  // they haven't seen yet. Read it before we update it below.
+  const profile = await db.user.findUnique({
+    where: { id: me.id },
+    select: { forumLastVisitedAt: true },
+  });
+  const lastVisit = profile?.forumLastVisitedAt ?? null;
+
   const threads = await db.forumThread.findMany({
     orderBy: { lastReplyAt: "desc" },
     include: {
       question: { select: { id: true, stem: true } },
-      author: { select: { name: true } },
+      author: { select: { name: true, image: true } },
       _count: { select: { replies: true } },
       replies: {
         orderBy: { createdAt: "desc" },
         take: 1,
-        include: { author: { select: { name: true } } },
+        include: { author: { select: { name: true, image: true } } },
       },
     },
     take: 100,
@@ -42,20 +50,41 @@ export default async function ForumPage() {
   const items: ForumThreadListItem[] = threads.map((th) => {
     const isQuestion = th.questionId !== null;
     const lastReply = th.replies[0];
+    // The author of the most recent activity (newest reply, or the thread itself).
+    const lastActivityAuthorId = lastReply ? lastReply.authorId : th.authorId;
+    const isNew =
+      lastVisit !== null &&
+      th.lastReplyAt > lastVisit &&
+      lastActivityAuthorId !== me.id;
     return {
       id: th.id,
       isQuestion,
+      isNew,
       title: isQuestion
         ? snippet(th.question?.stem ?? t.questionDiscussionTitle)
         : th.title ?? "",
       body: isQuestion ? null : th.body,
       authorName: th.author?.name ?? null,
+      authorImage: th.author?.image ?? null,
       replyCount: th._count.replies,
       questionId: th.questionId,
+      createdAtISO: th.createdAt.toISOString(),
+      lastReplyAtISO: th.lastReplyAt.toISOString(),
       lastReply: lastReply
-        ? { authorName: lastReply.author?.name ?? null, body: snippet(lastReply.body) }
+        ? {
+            authorName: lastReply.author?.name ?? null,
+            authorImage: lastReply.author?.image ?? null,
+            body: snippet(lastReply.body),
+            createdAtISO: lastReply.createdAt.toISOString(),
+          }
         : null,
     };
+  });
+
+  // Mark this visit so the next load compares against now.
+  await db.user.update({
+    where: { id: me.id },
+    data: { forumLastVisitedAt: new Date() },
   });
 
   return (
@@ -89,7 +118,14 @@ export default async function ForumPage() {
           </CardContent>
         </Card>
       ) : (
-        <ForumThreadList threads={items} meId={me.id} meRole={me.role} locale={locale} />
+        <ForumThreadList
+          threads={items}
+          meId={me.id}
+          meName={me.name ?? null}
+          meImage={me.image ?? null}
+          meRole={me.role}
+          locale={locale}
+        />
       )}
     </div>
   );

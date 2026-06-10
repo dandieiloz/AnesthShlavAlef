@@ -14,7 +14,7 @@ import { PWA } from "@/components/PWA";
 import { PwaProvider } from "@/components/PwaProvider";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
-import { countUnseenAdminResponses } from "@/lib/notifications";
+import { countUnseenAdminResponses, countUnreadForumThreads } from "@/lib/notifications";
 import { getUserProgress } from "@/lib/user-progress";
 import { buildProgressMiniViewModel } from "@/components/progress/ProgressBarMini";
 
@@ -62,8 +62,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = session?.user as { name?: string | null; image?: string | null; role?: string; plan?: string; id?: string } | undefined;
   const locale = await getLocale();
   const dict = getDictionary(locale);
-  const [unseenResponseCount, progress] = await Promise.all([
+  const [unseenResponseCount, unreadForumCount, progress] = await Promise.all([
     user?.id ? countUnseenAdminResponses(user.id) : Promise.resolve(0),
+    user?.id ? countUnreadForumThreads(user.id) : Promise.resolve(0),
     user?.id ? getUserProgress(user.id) : Promise.resolve(null),
   ]);
   const progressMini = progress ? buildProgressMiniViewModel(progress, dict.progress) : null;
@@ -89,7 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen font-sans flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <PwaProvider>
-            <SiteHeaderClient user={user} unseenResponseCount={unseenResponseCount} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} progressMini={progressMini} />
+            <SiteHeaderClient user={user} unseenResponseCount={unseenResponseCount} unreadForumCount={unreadForumCount} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} progressMini={progressMini} />
             <BetaBanner t={dict.beta} locale={locale} />
             <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
             <SiteFooter t={dict.footer} />

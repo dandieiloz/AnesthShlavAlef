@@ -29,6 +29,7 @@ interface NavUser {
 interface SiteHeaderClientProps {
   user?: NavUser;
   unseenResponseCount?: number;
+  unreadForumCount?: number;
   signInAction: () => Promise<void>;
   signOutAction: () => Promise<void>;
   progressMini?: ProgressMiniViewModel | null;
@@ -48,6 +49,7 @@ interface SiteHeaderClientProps {
     adminBadge: string;
     demoBadge: string;
     adminResponseTitle?: string;
+    forumUnreadTitle?: string;
     fontSize: {
       increase: string;
       decrease: string;
@@ -68,7 +70,7 @@ function buildNavLinks(nav: SiteHeaderClientProps["nav"]) {
   ];
 }
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({ href, label, badge, badgeTitle }: { href: string; label: string; badge?: number; badgeTitle?: string }) {
   const pathname = usePathname();
   const active = pathname === href || pathname.startsWith(href + "/");
   return (
@@ -81,14 +83,27 @@ function NavLink({ href, label }: { href: string; label: string }) {
       )}
     >
       {label}
+      {badge && !active ? (
+        <span
+          className="absolute -top-2 -end-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground ring-2 ring-card"
+          title={badgeTitle}
+          aria-label={badgeTitle}
+        >
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
 
-export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, signOutAction, nav, progressMini }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ user, unseenResponseCount = 0, unreadForumCount = 0, signInAction, signOutAction, nav, progressMini }: SiteHeaderClientProps) {
+  const pathname = usePathname();
   const NAV_LINKS = buildNavLinks(nav);
   const hasUnseen = unseenResponseCount > 0;
   const responseTitle = nav.adminResponseTitle ?? "יש תגובה מהצוות לדיווח שלך";
+  const forumUnreadTitle = nav.forumUnreadTitle ?? "דיונים חדשים בחדר המתמחים";
+  const onForum = pathname === "/forum" || pathname.startsWith("/forum/");
+  const showForumBadge = unreadForumCount > 0 && !onForum;
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
@@ -103,7 +118,13 @@ export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, 
           {user && (
             <nav className="hidden items-center gap-5 sm:flex">
               {NAV_LINKS.map((l) => (
-                <NavLink key={l.href} href={l.href} label={l.label} />
+                <NavLink
+                  key={l.href}
+                  href={l.href}
+                  label={l.label}
+                  badge={l.href === "/forum" ? unreadForumCount : undefined}
+                  badgeTitle={l.href === "/forum" ? forumUnreadTitle : undefined}
+                />
               ))}
               {user.role === "ADMIN" && (
                 <NavLink href="/admin" label={nav.admin} />
@@ -138,6 +159,14 @@ export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, 
                       {unseenResponseCount}
                     </span>
                   )}
+                  {/* Mobile-only cue: the forum link lives inside this menu on small screens. */}
+                  {showForumBadge && (
+                    <span
+                      className="absolute -bottom-0.5 -start-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-card sm:hidden"
+                      title={forumUnreadTitle}
+                      aria-label={forumUnreadTitle}
+                    />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
@@ -165,6 +194,15 @@ export function SiteHeaderClient({ user, unseenResponseCount = 0, signInAction, 
                       <Link href={l.href} className="flex items-center gap-2 cursor-pointer">
                         <l.icon className="h-4 w-4" />
                         {l.label}
+                        {l.href === "/forum" && showForumBadge && (
+                          <span
+                            className="ms-auto inline-flex items-center justify-center rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-foreground"
+                            title={forumUnreadTitle}
+                            aria-label={forumUnreadTitle}
+                          >
+                            {unreadForumCount}
+                          </span>
+                        )}
                       </Link>
                     </DropdownMenuItem>
                   ))}

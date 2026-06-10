@@ -78,6 +78,7 @@ model User {
   marketingOptIn   Boolean   @default(false)
   marketingOptInAt DateTime?
   localPdfSetAt    DateTime? // last time the user selected a local textbook PDF (client-reported)
+  forumLastVisitedAt DateTime? // last time the user opened חדר מתמחים (for new-thread highlighting)
 
   accounts      Account[]
   sessions      Session[]

@@ -5,7 +5,14 @@ import { createThreadAction } from "./actions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { PlusCircle } from "lucide-react";
 
 type Strings = {
   newTopic: string;
@@ -37,50 +44,56 @@ export function NewThreadForm({ t }: { t: Strings }) {
       }
       formRef.current?.reset();
       setOpen(false);
-      if (r.threadId) router.push(`/forum/${r.threadId}`);
-      else router.refresh();
+      // Stay on the single-page list and refresh in place (no navigation).
+      router.refresh();
     });
   }
 
-  if (!open) {
-    return (
-      <Button onClick={() => setOpen(true)} size="sm" className="gap-1.5">
-        <PlusCircle className="h-3.5 w-3.5" />
-        {t.newTopic}
-      </Button>
-    );
-  }
-
   return (
-    <form
-      ref={formRef}
-      onSubmit={handleSubmit}
-      className="space-y-3 rounded-lg border bg-card p-4"
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setError(null);
+      }}
     >
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{t.newTopicTitle}</h2>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-muted-foreground hover:text-foreground"
-          aria-label={t.cancel}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">{t.titleLabel}</label>
-        <Input name="title" required maxLength={200} placeholder={t.titlePlaceholder} dir="auto" />
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">{t.bodyLabel}</label>
-        <Textarea name="body" rows={4} maxLength={5000} placeholder={t.bodyPlaceholder} dir="auto" />
-      </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      <Button type="submit" size="sm" disabled={pending} className="gap-1.5">
-        <PlusCircle className="h-3.5 w-3.5" />
-        {t.post}
-      </Button>
-    </form>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5">
+          <PlusCircle className="h-3.5 w-3.5" />
+          {t.newTopic}
+        </Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl" className="text-right">
+        <DialogHeader>
+          <DialogTitle>{t.newTopicTitle}</DialogTitle>
+        </DialogHeader>
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">{t.titleLabel}</label>
+            <Input name="title" required maxLength={200} placeholder={t.titlePlaceholder} dir="auto" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">{t.bodyLabel}</label>
+            <Textarea name="body" rows={4} maxLength={5000} placeholder={t.bodyPlaceholder} dir="auto" />
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+            >
+              {t.cancel}
+            </Button>
+            <Button type="submit" size="sm" disabled={pending} className="gap-1.5">
+              <PlusCircle className="h-3.5 w-3.5" />
+              {t.post}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

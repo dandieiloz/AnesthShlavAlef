@@ -37,13 +37,22 @@ export function ReplyForm({ threadId, t, onSuccess }: { threadId: string; t: Str
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-2">
       <input type="hidden" name="threadId" value={threadId} />
-      <label className="text-xs font-medium text-muted-foreground">{t.replyLabel}</label>
-      <Textarea name="body" required rows={3} maxLength={2000} placeholder={t.replyPlaceholder} dir="auto" />
+      <Textarea
+        name="body"
+        required
+        rows={2}
+        maxLength={2000}
+        placeholder={t.replyPlaceholder}
+        dir="auto"
+        className="resize-none"
+      />
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <Button type="submit" size="sm" disabled={pending} className="gap-1.5">
-        <Send className="h-3.5 w-3.5" />
-        {t.sendReply}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" disabled={pending} className="gap-1.5">
+          <Send className="h-3.5 w-3.5" />
+          {t.sendReply}
+        </Button>
+      </div>
     </form>
   );
 }

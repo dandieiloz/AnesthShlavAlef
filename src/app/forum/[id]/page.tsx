@@ -20,7 +20,7 @@ import { DeleteThreadButton } from "../DeleteThreadButton";
 import { ArrowRight, FileQuestion, MessageSquare, BookOpen, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "פורום",
+  title: "חדר מתמחים",
 };
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;

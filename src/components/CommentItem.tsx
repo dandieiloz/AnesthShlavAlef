@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar } from "@/components/ui/avatar";
+import { RelativeTime } from "@/lib/relative-time";
 import { Pencil, Trash2, X, Check } from "lucide-react";
 import { editCommentAction, deleteCommentAction } from "@/app/(user)/actions";
 import { getDictionary } from "@/lib/i18n";
@@ -33,6 +35,7 @@ type Props = {
 
 export function CommentItem({ comment: c, meId, meRole, locale }: Props) {
   const t = getDictionary(locale).quiz;
+  const justNow = getDictionary(locale).forum.justNow;
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -49,13 +52,10 @@ export function CommentItem({ comment: c, meId, meRole, locale }: Props) {
   }
 
   return (
-    <Card>
+    <Card className="border-border/60 bg-card/80">
       <CardContent className="p-3 space-y-1">
         <div className="flex items-center gap-2">
-          {c.author.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.author.image} alt="" className="h-5 w-5 rounded-full object-cover" />
-          ) : null}
+          <Avatar name={c.author.name} image={c.author.image} size="sm" />
           <div className="flex flex-col">
             <span className="text-xs font-medium">{c.author.name}</span>
             {c.author.hospitalName && (
@@ -63,7 +63,7 @@ export function CommentItem({ comment: c, meId, meRole, locale }: Props) {
             )}
           </div>
           <span className="text-xs text-muted-foreground ms-auto">
-            {c.createdAt.toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
+            <RelativeTime date={c.createdAt} locale={locale} justNow={justNow} />
             {c.editedAt && <span className="ms-1 italic">({t.commentEdited})</span>}
           </span>
           {canEdit && !editing && (
