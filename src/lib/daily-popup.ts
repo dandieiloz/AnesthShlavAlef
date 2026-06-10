@@ -31,10 +31,14 @@ export async function getDailyPopupForCurrentUser(): Promise<DailyPopupView | nu
   const user = await db.user
     .findUnique({
       where: { id: userId },
-      select: { lastDailyPopupAt: true },
+      select: { lastDailyPopupAt: true, residencyYear: true },
     })
     .catch(() => null);
   if (!user) return null;
+
+  // Don't interrupt the sign-up/onboarding flow with popups. `residencyYear`
+  // is only set once onboarding completes.
+  if (user.residencyYear == null) return null;
 
   const now = new Date();
   if (user.lastDailyPopupAt && isSameUtcDay(user.lastDailyPopupAt, now)) {
