@@ -72,9 +72,9 @@ export default async function HistoryQuestionPage({
       orderBy: { createdAt: "desc" },
       select: { status: true, adminResponse: true },
     }),
-    db.comment.findMany({
-      where: { questionId },
-      include: { user: { select: { name: true, image: true, hospitalName: true } } },
+    db.forumReply.findMany({
+      where: { thread: { questionId } },
+      include: { author: { select: { name: true, image: true, hospitalName: true } } },
       orderBy: { createdAt: "asc" },
     }),
     db.bookmark.findUnique({

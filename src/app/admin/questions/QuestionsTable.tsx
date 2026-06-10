@@ -15,6 +15,8 @@ export type QuestionRow = {
   chapterNumber: number;
   hasExplanation: boolean;
   disabled: boolean;
+  /** Primary correct answer (A/B/C/D), or null when not yet set. */
+  correctAnswer: "A" | "B" | "C" | "D" | null;
   /** Number of admin-marked additionally-accepted answers (excludes the primary). 0 = single-answer question. */
   acceptedAnswersCount: number;
   /** Confidence in [0,1] from the GeminiAnswer, or null when no answer exists. */
@@ -471,6 +473,7 @@ export function QuestionsTable({
               <SortHeader field="stem" label="גוף השאלה" />
               <SortHeader field="source" label="מקור" />
               <SortHeader field="chapter" label="פרק" align="center" />
+              <th className="p-2 text-center text-muted-foreground whitespace-nowrap">תשובה נכונה</th>
               <SortHeader field="hasExplanation" label="הסבר" align="center" />
               <SortHeader field="confidence" label="ביטחון" align="center" />
               <SortHeader field="escalated" label="Escalated" align="center" />
@@ -523,6 +526,16 @@ export function QuestionsTable({
                   {q.source ?? <span className="italic text-muted-foreground/50">—</span>}
                 </td>
                 <td className="p-2 text-center text-muted-foreground">{q.chapterNumber}</td>
+                <td className="p-2 text-center whitespace-nowrap">
+                  {q.correctAnswer === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : (
+                    <span className="text-xs rounded px-2 py-0.5 font-mono font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300">
+                      {q.correctAnswer}
+                      {q.acceptedAnswersCount > 0 ? "+" : ""}
+                    </span>
+                  )}
+                </td>
                 <td className="p-2 text-center">
                   <span
                     className={`text-xs rounded px-2 py-0.5 ${

@@ -82,7 +82,8 @@ model User {
   sessions      Session[]
   attempts      Attempt[]
   quizzes       Quiz[]
-  comments      Comment[]
+  forumThreads  ForumThread[]            @relation("ForumThreadAuthor")
+  forumReplies  ForumReply[]             @relation("ForumReplyAuthor")
   reports           AnswerReport[]           @relation("ReportAuthor")
   resolved          AnswerReport[]           @relation("ReportResolver")
   questions         Question[]               @relation("QuestionAuthor")
@@ -188,7 +189,7 @@ model Question {
   geminiAnswer  GeminiAnswer?
   geminiAnswerCandidate GeminiAnswerCandidate?
   attempts      Attempt[]
-  comments        Comment[]
+  forumThread     ForumThread?
   reports         AnswerReport[]
   bookmarks       Bookmark[]
   ragRuns         RagRun[]
@@ -401,18 +402,40 @@ model Quiz {
   attempts    Attempt[]
 }
 
-model Comment {
-  id         Int      @id @default(autoincrement())
-  questionId Int
-  userId     String
-  body       String   @db.Text
-  createdAt  DateTime @default(now())
-  editedAt   DateTime?
+/// A discussion thread. Two flavours sharing one table:
+///  - Free topic: `title` + `body` + `authorId` set, `questionId` null.
+///  - Question discussion: `questionId` set (title is rendered live from the question stem),
+///    `title`/`body`/`authorId` null. This is the single source of truth for a question's
+///    "תגובות קהילה" — replies appear both on the question page and in the forum.
+model ForumThread {
+  id          String       @id @default(cuid())
+  title       String?
+  body        String?      @db.Text
+  authorId    String?
+  questionId  Int?         @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  lastReplyAt DateTime     @default(now())
 
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  author    User?       @relation("ForumThreadAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  question  Question?   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  replies   ForumReply[]
 
-  @@index([questionId, createdAt])
+  @@index([lastReplyAt])
+}
+
+model ForumReply {
+  id        String      @id @default(cuid())
+  threadId  String
+  authorId  String
+  body      String      @db.Text
+  createdAt DateTime    @default(now())
+  editedAt  DateTime?
+
+  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author    User        @relation("ForumReplyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
 }
 
 model AnswerReport {

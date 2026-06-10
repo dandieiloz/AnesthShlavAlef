@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, User, BookOpen, Settings, Bookmark, CalendarClock, History } from "lucide-react";
+import { LogOut, User, BookOpen, Settings, Bookmark, CalendarClock, History, MessagesSquare } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +40,7 @@ interface SiteHeaderClientProps {
     dashboard: string;
     schedule: string;
     about: string;
+    forum: string;
     admin: string;
     profile: string;
     signIn: string;
@@ -62,6 +63,7 @@ function buildNavLinks(nav: SiteHeaderClientProps["nav"]) {
     { href: "/history",   label: nav.history,    icon: History },
     { href: "/bookmarks", label: nav.bookmarks,  icon: Bookmark },
     { href: "/schedule",  label: nav.schedule,   icon: CalendarClock },
+    { href: "/forum",     label: nav.forum,      icon: MessagesSquare },
     { href: "/about",     label: nav.about,      icon: Info },
   ];
 }

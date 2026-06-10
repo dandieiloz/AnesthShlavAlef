@@ -16,12 +16,12 @@ type CommentUser = {
 };
 
 export type CommentData = {
-  id: number;
+  id: string;
   body: string;
-  userId: string;
+  authorId: string;
   createdAt: Date;
   editedAt: Date | null;
-  user: CommentUser;
+  author: CommentUser;
 };
 
 type Props = {
@@ -36,8 +36,8 @@ export function CommentItem({ comment: c, meId, meRole, locale }: Props) {
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const canEdit = c.userId === meId || meRole === "ADMIN";
-  const canDelete = meRole === "ADMIN";
+  const canEdit = c.authorId === meId || meRole === "ADMIN";
+  const canDelete = c.authorId === meId || meRole === "ADMIN";
 
   function handleEditSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,14 +52,14 @@ export function CommentItem({ comment: c, meId, meRole, locale }: Props) {
     <Card>
       <CardContent className="p-3 space-y-1">
         <div className="flex items-center gap-2">
-          {c.user.image ? (
+          {c.author.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.user.image} alt="" className="h-5 w-5 rounded-full object-cover" />
+            <img src={c.author.image} alt="" className="h-5 w-5 rounded-full object-cover" />
           ) : null}
           <div className="flex flex-col">
-            <span className="text-xs font-medium">{c.user.name}</span>
-            {c.user.hospitalName && (
-              <span className="text-[10px] text-muted-foreground leading-tight">{c.user.hospitalName}</span>
+            <span className="text-xs font-medium">{c.author.name}</span>
+            {c.author.hospitalName && (
+              <span className="text-[10px] text-muted-foreground leading-tight">{c.author.hospitalName}</span>
             )}
           </div>
           <span className="text-xs text-muted-foreground ms-auto">

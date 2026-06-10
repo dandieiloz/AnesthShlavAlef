@@ -9,6 +9,7 @@ import { ProfileSchema } from "@/app/onboarding/schema";
 import { getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere, assertCanAccessQuestion, hasUsableAnswerWhere } from "@/lib/plan";
+import { addQuestionReply, editReply, deleteReply } from "@/lib/forum";
 import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
 import { loadQuizBatch, type QuizBatch, type QuestionPayload } from "@/app/quiz/[id]/quiz-session";
 import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
@@ -442,14 +443,14 @@ export async function postCommentAction(formData: FormData) {
     questionId: formData.get("questionId"),
     body: formData.get("body"),
   });
-  await db.comment.create({
-    data: { userId: me.id, questionId: data.questionId, body: data.body },
-  });
+  await addQuestionReply(data.questionId, me.id, data.body);
   revalidatePath("/quiz/[id]/review", "page");
+  revalidatePath("/history/[id]", "page");
+  revalidatePath("/forum");
 }
 
 const EditCommentSchema = z.object({
-  commentId: z.coerce.number(),
+  commentId: z.string().min(1),
   body: z.string().min(1).max(2000),
 });
 
@@ -459,27 +460,21 @@ export async function editCommentAction(formData: FormData) {
     commentId: formData.get("commentId"),
     body: formData.get("body"),
   });
-  const comment = await db.comment.findUnique({
-    where: { id: data.commentId },
-    select: { userId: true },
-  });
-  if (!comment) return;
-  if (comment.userId !== me.id && me.role !== "ADMIN") return;
-  await db.comment.update({
-    where: { id: data.commentId },
-    data: { body: data.body, editedAt: new Date() },
-  });
+  await editReply(data.commentId, me.id, me.role, data.body);
   revalidatePath("/quiz/[id]/review", "page");
+  revalidatePath("/history/[id]", "page");
+  revalidatePath("/forum");
 }
 
-const DeleteCommentSchema = z.object({ commentId: z.coerce.number() });
+const DeleteCommentSchema = z.object({ commentId: z.string().min(1) });
 
 export async function deleteCommentAction(formData: FormData) {
   const me = await requireUser();
-  if (me.role !== "ADMIN") return;
   const { commentId } = DeleteCommentSchema.parse({ commentId: formData.get("commentId") });
-  await db.comment.delete({ where: { id: commentId } });
+  await deleteReply(commentId, me.id, me.role);
   revalidatePath("/quiz/[id]/review", "page");
+  revalidatePath("/history/[id]", "page");
+  revalidatePath("/forum");
 }
 
 const ReportSchema = z.object({

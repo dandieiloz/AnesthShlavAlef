@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { analyzeSubmissionAction, importSubmissionAction, rejectSubmissionAction } from "./actions";
 import type { StandardizedQuestion } from "@/lib/submission-analysis";
 import type { SubmissionStatus } from "@prisma/client";
+import { QUESTION_SOURCES } from "@/lib/hospitals";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export type SubmissionRow = {
   id: string;
@@ -43,6 +45,25 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
   const [importing, startImport] = useTransition();
   const [rejecting, startReject] = useTransition();
 
+  // Source override — mirrors the add-question wizard. Defaults to the submitter's
+  // institute/year and is applied to every imported question.
+  const [sourceInstitution, setSourceInstitution] = useState(submission.institute);
+  const [sourceYear, setSourceYear] = useState(submission.year != null ? String(submission.year) : "");
+  const [sourceSuffix, setSourceSuffix] = useState("");
+
+  // Ensure a freeform submitter institute still renders in the select options.
+  const sourceOptions = QUESTION_SOURCES.includes(submission.institute as (typeof QUESTION_SOURCES)[number])
+    ? QUESTION_SOURCES
+    : [submission.institute, ...QUESTION_SOURCES];
+
+  const builtSource = sourceInstitution
+    ? sourceYear
+      ? sourceSuffix.trim()
+        ? `${sourceInstitution} ${sourceYear} ${sourceSuffix.trim()}`
+        : `${sourceInstitution} ${sourceYear}`
+      : sourceInstitution
+    : "";
+
   const selectedCount = selected.filter(Boolean).length;
 
   function runAnalyze() {
@@ -69,7 +90,7 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
       return;
     }
     startImport(async () => {
-      const r = await importSubmissionAction(submission.id, indexes);
+      const r = await importSubmissionAction(submission.id, indexes, builtSource || null);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -155,6 +176,50 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
         <p className="text-sm text-muted-foreground">השליחה נדחתה.</p>
       ) : (
         <div className="space-y-3">
+          {/* Source — mirrors the add-question wizard; applied to every imported question */}
+          <section className="rounded border bg-muted/20 p-3">
+            <h3 className="text-sm font-semibold">מקור השאלות</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">ייושם על כל השאלות שייובאו למרכז התור</p>
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <div className="min-w-[16rem]">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">מוסד</label>
+                <SearchableSelect
+                  value={sourceInstitution}
+                  onChange={(v) => setSourceInstitution(v)}
+                  options={sourceOptions}
+                  clearable
+                  clearLabel="— ללא מוסד —"
+                  placeholder="— ללא מוסד —"
+                  searchPlaceholder="חיפוש מוסד..."
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">שנה</label>
+                <input
+                  type="number"
+                  min={1990}
+                  max={2030}
+                  value={sourceYear}
+                  onChange={(e) => setSourceYear(e.target.value)}
+                  className="w-24 rounded border bg-background p-1 text-sm text-foreground"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">קבוצה (אופציונלי)</label>
+                <input
+                  type="text"
+                  value={sourceSuffix}
+                  onChange={(e) => setSourceSuffix(e.target.value)}
+                  placeholder="לדוגמה: א, ב, מועד א"
+                  className="w-28 rounded border bg-background p-1 text-sm text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+              {builtSource && (
+                <span className="pb-1 text-xs text-muted-foreground">· מקור: {builtSource}</span>
+              )}
+            </div>
+          </section>
+
           {questions != null && (
             <>
               <div className="flex items-center justify-between">

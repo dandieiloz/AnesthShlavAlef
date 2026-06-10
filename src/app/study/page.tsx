@@ -8,6 +8,7 @@ import { getQuizProgressMany } from "@/lib/quiz-progress";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { StatsSection } from "./StatsSection";
+import { ForumPreview } from "@/app/forum/ForumPreview";
 import { QuizzesClient, type QuizRow } from "@/app/quizzes/QuizzesClient";
 import {
   PlusCircle,
@@ -99,8 +100,9 @@ export default async function StudyPage({
               </Button>
             </div>
             {quizRows.length > 0 && (
-              <QuizzesClient quizzes={quizRows} locale={locale} />
+              <QuizzesClient quizzes={quizRows} locale={locale} initialVisible={3} />
             )}
+            <ForumPreview locale={locale} />
           </div>
         </StatsSection>
       </section>

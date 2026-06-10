@@ -52,7 +52,11 @@ export async function analyzeSubmissionAction(id: string): Promise<AnalyzeResult
 
 // ─── Import selected standardized questions into the generation queue ────────
 
-export async function importSubmissionAction(id: string, selectedIndexes: number[]): Promise<ImportResult> {
+export async function importSubmissionAction(
+  id: string,
+  selectedIndexes: number[],
+  sourceOverride?: string | null,
+): Promise<ImportResult> {
   const me = await requireAdmin();
   const submission = await db.questionSubmission.findUnique({ where: { id } });
   if (!submission) return { ok: false, error: "השליחה לא נמצאה" };
@@ -64,8 +68,14 @@ export async function importSubmissionAction(id: string, selectedIndexes: number
   const chosen = analysis.filter((_, i) => selectedSet.has(i));
   if (chosen.length === 0) return { ok: false, error: "לא נבחרו שאלות לייבוא" };
 
-  // Source mirrors the wizard convention: "<institute> <year>".
-  const source = submission.year ? `${submission.institute} ${submission.year}` : submission.institute;
+  // Source mirrors the wizard convention: "<institute> <year>". An admin-provided
+  // override (built in the submissions UI just like the wizard) takes precedence.
+  const trimmedOverride = sourceOverride?.trim();
+  const source = trimmedOverride
+    ? trimmedOverride
+    : submission.year
+      ? `${submission.institute} ${submission.year}`
+      : submission.institute;
 
   // Placeholder chapter — the RAG pipeline overwrites chapterId/chapterIds from evidence.
   const defaultChapter = await db.chapter.findFirst({ orderBy: { number: "asc" } });

@@ -165,10 +165,10 @@ function QuizCard({
   );
 }
 
-export function QuizzesClient({ quizzes, locale }: { quizzes: QuizRow[]; locale: Locale }) {
+export function QuizzesClient({ quizzes, locale, initialVisible = 5 }: { quizzes: QuizRow[]; locale: Locale; initialVisible?: number }) {
   const t = getDictionary(locale).quizzes;
   const nowMs = useRelativeNow();
-  const DEFAULT_VISIBLE = 5;
+  const DEFAULT_VISIBLE = initialVisible;
   const [expanded, setExpanded] = useState(false);
   const expandLabel = locale === "he" ? "הצג עוד" : "Show more";
   const collapseLabel = locale === "he" ? "הצג פחות" : "Show less";

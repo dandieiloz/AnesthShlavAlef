@@ -78,9 +78,13 @@ export default async function QuizReviewPage({
     include: {
       chapter: { select: { number: true, title: true } },
       geminiAnswer: true,
-      comments: {
-        include: { user: { select: { name: true, image: true, hospitalName: true } } },
-        orderBy: { createdAt: "asc" },
+      forumThread: {
+        include: {
+          replies: {
+            include: { author: { select: { name: true, image: true, hospitalName: true } } },
+            orderBy: { createdAt: "asc" },
+          },
+        },
       },
     },
     orderBy: { id: "asc" },
@@ -263,6 +267,7 @@ export default async function QuizReviewPage({
             const displayIndex = showWrongOnly ? questions.indexOf(q) + 1 : i + 1;
             const qT = tQuestion.get(q.id)!;
             const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
+            const comments = q.forumThread?.replies ?? [];
             const communityTotal = communityTotalMap.get(q.id) ?? 0;
             const communityCorrect = communityCorrectMap.get(q.id) ?? 0;
             const communityPercent =
@@ -458,18 +463,18 @@ export default async function QuizReviewPage({
                     <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
                       <MessageSquare className="h-3.5 w-3.5 shrink-0" />
                       {dict.quiz.comments}
-                      {q.comments.length > 0 && (
+                      {comments.length > 0 && (
                         <span className="ms-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
-                          {q.comments.length}
+                          {comments.length}
                         </span>
                       )}
                     </summary>
                     <div className="mt-3 space-y-3">
-                      {q.comments.length === 0 ? (
+                      {comments.length === 0 ? (
                         <p className="text-xs text-muted-foreground">{dict.quiz.noComments}</p>
                       ) : (
                         <ul className="space-y-2">
-                          {q.comments.map((c) => (
+                          {comments.map((c) => (
                             <li key={c.id}>
                               <CommentItem comment={c} meId={me.id} meRole={me.role} locale={uiLocale} />
                             </li>

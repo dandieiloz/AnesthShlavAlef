@@ -77,9 +77,9 @@ export default async function AdminQuestionPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const comments = await db.comment.findMany({
-    where: { questionId: q.id },
-    include: { user: { select: { name: true, email: true, hospitalName: true } } },
+  const comments = await db.forumReply.findMany({
+    where: { thread: { questionId: q.id } },
+    include: { author: { select: { name: true, email: true, hospitalName: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -724,8 +724,8 @@ export default async function AdminQuestionPage({
             <li key={c.id} className="rounded border bg-background/60 p-2">
               <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span>
-                  {c.user?.name ?? c.user?.email ?? "לא ידוע"}
-                  {c.user?.hospitalName ? ` · ${c.user.hospitalName}` : ""}
+                  {c.author?.name ?? c.author?.email ?? "לא ידוע"}
+                  {c.author?.hospitalName ? ` · ${c.author.hospitalName}` : ""}
                   {" · "}
                   {c.createdAt.toLocaleString("he-IL")}
                   {c.editedAt ? " · נערך" : ""}
