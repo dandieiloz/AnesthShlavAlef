@@ -32,11 +32,13 @@ export async function StatsSection({
   userId,
   locale,
   searchParams,
+  isAdmin = false,
   children,
 }: {
   userId: string;
   locale: Locale;
   searchParams?: Record<string, string | string[] | undefined>;
+  isAdmin?: boolean;
   children?: ReactNode;
 }) {
   const dict = getDictionary(locale);
@@ -206,9 +208,9 @@ export async function StatsSection({
         <p className="mt-1 text-sm text-muted-foreground">סיכום הביצועים שלך עד כה.</p>
       </div>
 
-      {/* Stat cards + community hospital chart (same row) */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="grid gap-4 sm:grid-cols-2">
+      {/* Stat cards + community hospital chart (chart is admin-only for now) */}
+      <div className={isAdmin ? "grid gap-4 lg:grid-cols-2" : ""}>
+        <div className={`grid gap-4 sm:grid-cols-2 ${isAdmin ? "" : "lg:grid-cols-4"}`}>
           <StatCard label="סה״כ שאלות" value={total} icon={Target} />
           <StatCard
             label="אחוז הצלחה"
@@ -225,22 +227,24 @@ export async function StatsSection({
           />
         </div>
 
-        {/* Community: questions solved by hospital (last 24h) */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t.hospitalChartTitle}
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">{t.hospitalChartSubtitle}</p>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            {hospitalChartData.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t.hospitalChartEmpty}</p>
-            ) : (
-              <HospitalPieChart data={hospitalChartData} questionsLabel={t.hospitalChartQuestions} />
-            )}
-          </CardContent>
-        </Card>
+        {/* Community: questions solved by hospital (last 24h) — admin-only for now */}
+        {isAdmin && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t.hospitalChartTitle}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">{t.hospitalChartSubtitle}</p>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              {hospitalChartData.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">{t.hospitalChartEmpty}</p>
+              ) : (
+                <HospitalPieChart data={hospitalChartData} questionsLabel={t.hospitalChartQuestions} />
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {children}

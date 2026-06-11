@@ -80,7 +80,7 @@ export default async function StudyPage({
 
       {/* Stats + My quizzes */}
       <section>
-        <StatsSection userId={me.id} locale={locale} searchParams={sp}>
+        <StatsSection userId={me.id} locale={locale} searchParams={sp} isAdmin={me.role === "ADMIN"}>
           <div className="space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
