@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { InstallButton } from "@/components/InstallButton";
+import { Disclaimer } from "@/components/disclaimer";
 
 interface FooterProps {
-  t: { tagline: string; credits: string; contribute: string; install: string };
+  t: { tagline: string; credits: string; contribute: string; install: string; disclaimer: string };
 }
 
 export function SiteFooter({ t }: FooterProps) {
@@ -29,6 +30,7 @@ export function SiteFooter({ t }: FooterProps) {
         </div>
         <span>© {new Date().getFullYear()}</span>
       </div>
+      <Disclaimer text={t.disclaimer} className="mx-auto max-w-6xl px-4" />
       <div className="mx-auto max-w-6xl px-4 pb-4 text-[10px] text-muted-foreground/70">
         {process.env.NEXT_PUBLIC_APP_VERSION}
       </div>

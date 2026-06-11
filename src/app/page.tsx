@@ -8,6 +8,7 @@ import { signIn } from "@/lib/auth";
 import { BookOpen, BrainCircuit, CalendarClock, TrendingUp } from "lucide-react";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
+import { Disclaimer } from "@/components/disclaimer";
 
 const YOUTUBE_VIDEO_ID = "7coXfQWP2_c";
 
@@ -91,6 +92,7 @@ export default async function Home() {
           </Link>
           .
         </p>
+        <Disclaimer text={t.disclaimer} className="mt-2" />
       </section>
 
       {/* Feature cards */}

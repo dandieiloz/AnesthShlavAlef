@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { EditableSection } from "./AboutEditor";
-import { Pencil } from "lucide-react";
+import { Pencil, AlertTriangle } from "lucide-react";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslated } from "@/lib/translate";
@@ -58,6 +58,14 @@ export default async function AboutPage() {
       <div className="text-center space-y-2">
         <h1 className="font-display text-5xl font-bold text-foreground tracking-tight">{t.heroTitle}</h1>
         <p className="text-muted-foreground text-base">{t.heroSubtitle}</p>
+      </div>
+
+      {/* ── Disclaimer ───────────────────────────────────────── */}
+      <div className="flex items-start gap-3 rounded-2xl border-2 border-red-500/70 bg-red-50 px-5 py-4 shadow-sm dark:border-red-500/60 dark:bg-red-950/30">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+        <p className="text-sm font-semibold leading-relaxed text-red-700 dark:text-red-300">
+          {t.disclaimer}
+        </p>
       </div>
 
       {/* ── Dr. Gisela Pearl ─────────────────────────────────── */}
