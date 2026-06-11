@@ -328,6 +328,7 @@ export const DICTIONARIES = {
       hospitalChartOther: "אחר",
       hospitalChartNoHospital: "ללא בית חולים",
       hospitalChartQuestions: "שאלות",
+      hospitalSummaryEmpty: "עדיין לא נפתרו שאלות ב-24 השעות האחרונות — היו הראשון!",
     },
     bookmarks: {
       title: "שאלות שסומנו",
@@ -937,6 +938,7 @@ export const DICTIONARIES = {
       hospitalChartOther: "Other",
       hospitalChartNoHospital: "No hospital",
       hospitalChartQuestions: "questions",
+      hospitalSummaryEmpty: "No questions solved in the last 24 hours — be the first!",
     },
     bookmarks: {
       title: "Bookmarked questions",

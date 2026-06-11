@@ -58,8 +58,8 @@ export async function StatsSection({
       orderBy: { createdAt: "desc" },
     }),
     getActivityHeatmap(userId, 120),
-    db.$queryRaw<Array<{ hospitalName: string | null; solved: bigint }>>`
-      SELECT u."hospitalName" AS "hospitalName", COUNT(*) AS "solved"
+    db.$queryRaw<Array<{ hospitalName: string | null; solved: bigint; residents: bigint }>>`
+      SELECT u."hospitalName" AS "hospitalName", COUNT(*) AS "solved", COUNT(DISTINCT a."userId") AS "residents"
       FROM "Attempt" a
       JOIN "User" u ON u."id" = a."userId"
       WHERE a."createdAt" >= now() - interval '24 hours'
@@ -86,6 +86,13 @@ export async function StatsSection({
       .reduce((sum, d) => sum + d.value, 0);
     hospitalChartData = [...top, { name: t.hospitalChartOther, value: otherValue }];
   }
+
+  // Community summary (shown to regular users): totals across the last 24h.
+  const communitySolved = hospitalRows.reduce((sum, r) => sum + Number(r.solved), 0);
+  const communityResidents = hospitalRows.reduce((sum, r) => sum + Number(r.residents), 0);
+  const communityHospitals = hospitalRows.filter(
+    (r) => r.hospitalName !== null && Number(r.solved) > 0,
+  ).length;
 
   const total = attempts.length;
   const correct = attempts.filter((a) => a.isCorrect).length;
@@ -247,6 +254,28 @@ export async function StatsSection({
         )}
       </div>
 
+      {/* Community summary sentence (regular users) */}
+      {!isAdmin && (
+        <div className="rounded-xl bg-gradient-to-l from-primary/10 via-primary/5 to-transparent border border-primary/20 px-4 py-3">
+          {communitySolved === 0 ? (
+            <p className="text-sm text-muted-foreground text-center">{t.hospitalSummaryEmpty}</p>
+          ) : (
+            <p
+              className="text-sm sm:text-base font-medium text-center leading-relaxed"
+              dir={locale === "he" ? "rtl" : "ltr"}
+            >
+              {locale === "he" ? "היום עד כה נפתרו " : "Today so far, "}
+              <SummaryNum value={communitySolved} locale={locale} colorClass="text-primary" />
+              {locale === "he" ? " שאלות על ידי " : " questions have been solved by "}
+              <SummaryNum value={communityResidents} locale={locale} colorClass="text-success" />
+              {locale === "he" ? " מתמחים מ-" : " residents from "}
+              <SummaryNum value={communityHospitals} locale={locale} colorClass="text-orange-500" />
+              {locale === "he" ? " בתי חולים" : " hospitals"}
+            </p>
+          )}
+        </div>
+      )}
+
       {children}
 
       {/* Per-chapter table */}
@@ -319,6 +348,22 @@ export async function StatsSection({
         )}
       </div>
     </div>
+  );
+}
+
+function SummaryNum({
+  value,
+  locale,
+  colorClass,
+}: {
+  value: number;
+  locale: Locale;
+  colorClass: string;
+}) {
+  return (
+    <span className={`font-display text-lg font-bold ${colorClass}`}>
+      {value.toLocaleString(locale)}
+    </span>
   );
 }
 
