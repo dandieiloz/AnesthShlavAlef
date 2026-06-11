@@ -192,6 +192,9 @@ export async function deleteThreadAction(formData: FormData): Promise<void> {
   const threadId = str(formData.get("threadId"));
   await deleteThread(threadId, me.id, me.role);
   revalidatePath("/forum");
+  // A question thread's discussion also appears on the question pages.
+  revalidatePath("/quiz/[id]/review", "page");
+  revalidatePath("/history/[id]", "page");
   redirect("/forum");
 }
 

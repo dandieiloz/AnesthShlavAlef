@@ -333,7 +333,7 @@ function ThreadRow({
             <p className="text-xs text-muted-foreground">{t.noReplies}</p>
           )}
 
-          {!th.isQuestion && (th.authorId === meId || meRole === "ADMIN") && (
+          {(meRole === "ADMIN" || (!th.isQuestion && th.authorId === meId)) && (
             <div className="flex justify-end">
               <DeleteThreadButton
                 threadId={th.id}

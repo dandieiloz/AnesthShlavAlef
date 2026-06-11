@@ -73,9 +73,13 @@ export async function deleteThread(threadId: string, userId: string, role: Forum
     select: { authorId: true, questionId: true },
   });
   if (!thread) return null;
-  // Question-linked threads are not deletable (they belong to the question, not a user).
-  if (thread.questionId !== null) return null;
-  if (thread.authorId !== userId && role !== "ADMIN") return null;
+  // Question-linked threads (community discussion on a question) belong to the
+  // question rather than a user, so only admins may delete them.
+  if (thread.questionId !== null) {
+    if (role !== "ADMIN") return null;
+  } else if (thread.authorId !== userId && role !== "ADMIN") {
+    return null;
+  }
   await db.forumThread.delete({ where: { id: threadId } });
   return thread;
 }

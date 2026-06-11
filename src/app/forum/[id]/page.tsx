@@ -52,8 +52,9 @@ export default async function ForumThreadPage({
   if (!thread) notFound();
 
   const isQuestion = thread.questionId !== null;
-  const canDeleteThread =
-    !isQuestion && (thread.authorId === me.id || me.role === "ADMIN");
+  const canDeleteThread = isQuestion
+    ? me.role === "ADMIN"
+    : thread.authorId === me.id || me.role === "ADMIN";
 
   // For question threads, load the full question (respecting the user's plan gate)
   // so the answer options and explanation can be shown inline.
@@ -185,6 +186,15 @@ export default async function ForumThreadPage({
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={`/history/${thread.questionId}`}>{t.viewQuestion}</Link>
                 </Button>
+              )}
+              {canDeleteThread && (
+                <div className="flex justify-end">
+                  <DeleteThreadButton
+                    threadId={thread.id}
+                    label={t.deleteTopic}
+                    confirmText={t.deleteConfirm}
+                  />
+                </div>
               )}
             </>
           ) : (
