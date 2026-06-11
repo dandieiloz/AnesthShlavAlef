@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { usefulnessTone, TONE_ROW_CLASS, TONE_BADGE_CLASS, toneLabel } from "@/lib/usefulness";
 import { getActivityHeatmap, getCurrentStreak } from "@/lib/activity";
-import { Target, CheckCircle2, TrendingUp, BookOpen, Flame } from "lucide-react";
+import { Target, TrendingUp, BookOpen, Flame } from "lucide-react";
 import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
+import { HospitalPieChart, type HospitalSlice } from "./HospitalPieChart";
 import type { ReactNode } from "react";
 
 const CHAPTER_SORT_FIELDS = ["chapter", "title", "attempts", "correct", "accuracy", "usefulness"] as const;
@@ -48,14 +49,41 @@ export async function StatsSection({
   const chapterOrder: SortOrder =
     typeof searchParams?.chapterOrder === "string" && searchParams.chapterOrder === "desc" ? "desc" : "asc";
 
-  const [attempts, heatmapData] = await Promise.all([
+  const [attempts, heatmapData, hospitalRows] = await Promise.all([
     db.attempt.findMany({
       where: { userId },
       include: { question: { include: { chapter: true } } },
       orderBy: { createdAt: "desc" },
     }),
     getActivityHeatmap(userId, 120),
+    db.$queryRaw<Array<{ hospitalName: string | null; solved: bigint }>>`
+      SELECT u."hospitalName" AS "hospitalName", COUNT(*) AS "solved"
+      FROM "Attempt" a
+      JOIN "User" u ON u."id" = a."userId"
+      WHERE a."createdAt" >= now() - interval '24 hours'
+      GROUP BY u."hospitalName"
+    `,
   ]);
+
+  // Community pie chart: questions answered in the last 24h, grouped by hospital.
+  // Keep the top hospitals as their own slices and fold the rest into "Other".
+  const TOP_HOSPITALS = 8;
+  const hospitalCounts = hospitalRows
+    .map((r) => ({
+      name: r.hospitalName ?? t.hospitalChartNoHospital,
+      value: Number(r.solved),
+    }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  let hospitalChartData: HospitalSlice[] = hospitalCounts;
+  if (hospitalCounts.length > TOP_HOSPITALS) {
+    const top = hospitalCounts.slice(0, TOP_HOSPITALS);
+    const otherValue = hospitalCounts
+      .slice(TOP_HOSPITALS)
+      .reduce((sum, d) => sum + d.value, 0);
+    hospitalChartData = [...top, { name: t.hospitalChartOther, value: otherValue }];
+  }
 
   const total = attempts.length;
   const correct = attempts.filter((a) => a.isCorrect).length;
@@ -178,23 +206,41 @@ export async function StatsSection({
         <p className="mt-1 text-sm text-muted-foreground">סיכום הביצועים שלך עד כה.</p>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="סה״כ שאלות" value={total} icon={Target} />
-        <StatCard label="תשובות נכונות" value={correct} icon={CheckCircle2} colorClass="text-success" />
-        <StatCard
-          label="אחוז הצלחה"
-          value={`${accuracy}%`}
-          icon={TrendingUp}
-          colorClass={accuracy >= 70 ? "text-success" : accuracy >= 50 ? "text-warning" : "text-destructive"}
-        />
-        <StatCard label="פרקים תורגלו" value={chaptersAttempted} icon={BookOpen} />
-        <StatCard
-          label="רצף ימים"
-          value={`${streak} 🔥`}
-          icon={Flame}
-          colorClass={streak > 0 ? "text-orange-500" : "text-muted-foreground"}
-        />
+      {/* Stat cards + community hospital chart (same row) */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard label="סה״כ שאלות" value={total} icon={Target} />
+          <StatCard
+            label="אחוז הצלחה"
+            value={`${accuracy}%`}
+            icon={TrendingUp}
+            colorClass={accuracy >= 70 ? "text-success" : accuracy >= 50 ? "text-warning" : "text-destructive"}
+          />
+          <StatCard label="פרקים תורגלו" value={chaptersAttempted} icon={BookOpen} />
+          <StatCard
+            label="רצף ימים"
+            value={`${streak} 🔥`}
+            icon={Flame}
+            colorClass={streak > 0 ? "text-orange-500" : "text-muted-foreground"}
+          />
+        </div>
+
+        {/* Community: questions solved by hospital (last 24h) */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t.hospitalChartTitle}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">{t.hospitalChartSubtitle}</p>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            {hospitalChartData.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t.hospitalChartEmpty}</p>
+            ) : (
+              <HospitalPieChart data={hospitalChartData} questionsLabel={t.hospitalChartQuestions} />
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {children}

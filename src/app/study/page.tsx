@@ -62,17 +62,17 @@ export default async function StudyPage({
   const tQuizzes = getDictionary(locale).quizzes;
 
   return (
-    <div className="space-y-10 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Greeting */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <h1 className="font-display text-xl font-bold">
             {me.name ? t.greeting(me.name.split(" ")[0]) : t.greetingAnon}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t.tagline}</p>
+          <p className="text-sm text-muted-foreground">{t.tagline}</p>
         </div>
         {dbUser?.residencyYear && (
-          <Badge variant="secondary" className="text-sm px-3 py-1">
+          <Badge variant="secondary" className="text-xs px-2.5 py-0.5">
             {residencyLabel(dbUser.residencyYear, t)}
           </Badge>
         )}
