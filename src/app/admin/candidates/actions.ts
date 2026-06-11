@@ -45,6 +45,7 @@ export async function acceptCandidateAction(questionId: number): Promise<Candida
         confidence: candidate.confidence,
         escalated: candidate.escalated,
         insufficientEvidence: candidate.insufficientEvidence,
+        generationHint: candidate.generationHint,
       },
     });
     if (question.chapterAutoTagged && candidate.derivedChapterIds.length > 0) {

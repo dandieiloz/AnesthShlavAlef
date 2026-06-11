@@ -408,6 +408,9 @@ export async function AdminQuestionPanel({
               {q.geminiAnswer.sourceChapters.length > 0 && (
                 <span> · פרקים שנסרקו: {q.geminiAnswer.sourceChapters.join(", ")}</span>
               )}
+              {q.geminiAnswer.generationHint && (
+                <span className="mr-1 rounded bg-purple-100 dark:bg-purple-900/30 px-1 text-purple-800 dark:text-purple-300"> נוצר עם רמז</span>
+              )}
             </p>
             <div className="mt-3">
               <EditableGeminiAnswer
@@ -437,19 +440,30 @@ export async function AdminQuestionPanel({
               className="mt-2 space-y-2"
             >
               {!openJob && !pendingCandidate && (
-                <details className="rounded border bg-muted/30 px-3 py-2 text-sm">
+                <details
+                  open={!!q.geminiAnswer.generationHint}
+                  className="rounded border bg-muted/30 px-3 py-2 text-sm"
+                >
                   <summary className="cursor-pointer text-primary hover:underline">
-                    הוסף הערה / רמז למודל (אופציונלי)
+                    {q.geminiAnswer.generationHint
+                      ? "ערוך הערה / רמז למודל"
+                      : "הוסף הערה / רמז למודל (אופציונלי)"}
                   </summary>
                   <p className="mt-2 text-xs text-muted-foreground">
                     הסבר בקצרה למה ההסבר הקיים שגוי כדי לעזור למודל לחולל תשובה טובה יותר. לדוגמה:
                     &quot;התשובה הנכונה היא B כי...&quot;, &quot;המודל התעלם מהשפעת...&quot;, &quot;המקור הנכון נמצא בפרק X&quot;.
                     הראיות עדיין חייבות להגיע מקטעי המקור.
                   </p>
+                  {q.geminiAnswer.generationHint && (
+                    <p className="mt-2 text-xs text-purple-700 dark:text-purple-300">
+                      הרמז האחרון ששימש בחילול נטען מראש — ערוך או נקה אותו לפי הצורך.
+                    </p>
+                  )}
                   <textarea
                     name="hint"
                     rows={4}
                     maxLength={2000}
+                    defaultValue={q.geminiAnswer.generationHint ?? ""}
                     className="mt-2 w-full rounded border p-2 text-sm bg-background text-foreground"
                     placeholder="הערה למודל (עד 2000 תווים)..."
                   />

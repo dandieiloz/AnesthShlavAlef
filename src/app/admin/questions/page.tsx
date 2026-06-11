@@ -31,6 +31,7 @@ export default async function AdminQuestionsPage({
     confidence?: string;
     escalated?: string;
     insufficient?: string;
+    hint?: string;
     status?: string;
     sort?: string;
     order?: string;
@@ -85,6 +86,8 @@ export default async function AdminQuestionsPage({
   else if (sp.escalated === "no") answerIs.escalated = false;
   if (sp.insufficient === "yes") answerIs.insufficientEvidence = true;
   else if (sp.insufficient === "no") answerIs.insufficientEvidence = false;
+  if (sp.hint === "yes") answerIs.generationHint = { not: null };
+  else if (sp.hint === "no") answerIs.generationHint = null;
   const hasAnswerFilter = Object.keys(answerIs).length > 0;
 
   if (sp.hasExplanation === "no") {
@@ -151,6 +154,7 @@ export default async function AdminQuestionsPage({
             confidence: true,
             escalated: true,
             insufficientEvidence: true,
+            generationHint: true,
           },
         },
       },
@@ -238,6 +242,7 @@ export default async function AdminQuestionsPage({
       confidence: q.geminiAnswer?.confidence ?? null,
       escalated: q.geminiAnswer?.escalated ?? null,
       insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,
+      generationHint: q.geminiAnswer?.generationHint ?? null,
       translationCount: translationCountMap.get(q.id) ?? 0,
       attemptCount,
       correctCount,

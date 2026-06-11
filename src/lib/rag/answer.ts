@@ -348,6 +348,7 @@ export async function generateExplanationForQuestionV2(
       autoTagged: question.chapterAutoTagged,
       target: mode,
       jobId,
+      hint,
     });
     await db.ragRun.create({
       data: {
@@ -448,6 +449,7 @@ export async function generateExplanationForQuestionV2(
     escalated,
     target: mode,
     jobId,
+    hint,
   });
 
   // Best-effort cache write (a race here just keeps the earlier entry).
@@ -492,6 +494,7 @@ async function persistAnswer(opts: {
   escalated?: boolean;
   target?: "answer" | "candidate";
   jobId?: number;
+  hint?: string;
 }) {
   const { questionId, payload, autoTagged } = opts;
   const escalated = opts.escalated ?? false;
@@ -529,6 +532,7 @@ async function persistAnswer(opts: {
         confidence: structured.confidence,
         escalated,
         insufficientEvidence: structured.insufficientEvidence,
+        generationHint: opts.hint ?? null,
         derivedChapterIds: payload.derivedChapterIds,
         primaryChapterId: payload.primaryChapterId,
       },
@@ -560,6 +564,7 @@ async function persistAnswer(opts: {
       confidence: structured.confidence,
       escalated,
       insufficientEvidence: structured.insufficientEvidence,
+      generationHint: opts.hint ?? null,
     },
   });
 }

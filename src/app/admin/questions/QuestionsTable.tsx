@@ -23,6 +23,8 @@ export type QuestionRow = {
   confidence: number | null;
   escalated: boolean | null;
   insufficientEvidence: boolean | null;
+  /** Last admin hint (רמז) used to generate the answer, or null when none / no answer. */
+  generationHint: string | null;
   /** Number of EN translation fields already cached (question + answer combined) */
   translationCount: number;
   attemptCount: number;
@@ -478,6 +480,7 @@ export function QuestionsTable({
               <SortHeader field="confidence" label="ביטחון" align="center" />
               <SortHeader field="escalated" label="Escalated" align="center" />
               <SortHeader field="insufficientEvidence" label="ראיות חסרות" align="center" />
+              <th className="p-2 text-center text-muted-foreground whitespace-nowrap">רמז</th>
               <SortHeader field="translationCount" label="תרגום EN" align="center" />
               <SortHeader field="attemptCount" label="ניסיונות" align="center" />
               <SortHeader field="percentCorrect" label="% נכונות" align="center" />
@@ -577,6 +580,18 @@ export function QuestionsTable({
                     <span className="italic text-muted-foreground/50">—</span>
                   ) : q.insufficientEvidence ? (
                     <span className="text-xs rounded px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                      כן
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground/60">לא</span>
+                  )}
+                </td>
+                <td className="p-2 text-center">
+                  {q.generationHint ? (
+                    <span
+                      className="text-xs rounded px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300"
+                      title={q.generationHint}
+                    >
                       כן
                     </span>
                   ) : (

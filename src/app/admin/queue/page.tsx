@@ -161,7 +161,7 @@ export default async function QueuePage({
             source: true,
             chapter: { select: { number: true, title: true } },
             geminiAnswer: {
-              select: { confidence: true, escalated: true, insufficientEvidence: true },
+              select: { confidence: true, escalated: true, insufficientEvidence: true, generationHint: true },
             },
           },
           orderBy: [{ geminiAnswer: { confidence: "asc" } }, { id: "asc" }],
@@ -175,6 +175,7 @@ export default async function QueuePage({
           confidence: q.geminiAnswer?.confidence ?? null,
           escalated: q.geminiAnswer?.escalated ?? false,
           insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? false,
+          lastHint: q.geminiAnswer?.generationHint ?? null,
         }))
       : [];
 

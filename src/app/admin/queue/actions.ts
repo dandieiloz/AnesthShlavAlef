@@ -161,8 +161,21 @@ export async function enqueueRegenerationBatchAction(
   const toCreate = questionIds.filter((id) => !blocked.has(id));
 
   if (toCreate.length > 0) {
+    // Carry forward each question's last hint (no per-row textarea in bulk mode):
+    // "חילול מחדש עם הרמז האחרון, אלא אם צוין אחרת".
+    const prevAnswers = await db.geminiAnswer.findMany({
+      where: { questionId: { in: toCreate } },
+      select: { questionId: true, generationHint: true },
+    });
+    const hintByQuestion = new Map(
+      prevAnswers.map((a) => [a.questionId, sanitizeHint(a.generationHint)]),
+    );
     await db.answerGenerationJob.createMany({
-      data: toCreate.map((questionId) => ({ questionId, kind: "REGENERATE" as const })),
+      data: toCreate.map((questionId) => ({
+        questionId,
+        kind: "REGENERATE" as const,
+        regenerationHint: hintByQuestion.get(questionId) ?? null,
+      })),
     });
   }
   revalidatePath("/admin/queue");

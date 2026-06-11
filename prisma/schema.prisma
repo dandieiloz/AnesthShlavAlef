@@ -234,6 +234,9 @@ model GeminiAnswer {
   confidence         Float?
   escalated          Boolean  @default(false)
   insufficientEvidence Boolean @default(false)
+  // Last admin hint/context (רמז) supplied to the generator for this answer, if any.
+  // Null when the answer was generated without a hint. Overwritten on each regeneration.
+  generationHint     String?  @db.Text
   // Optional image an admin manually attaches to the explanation (Firebase Storage)
   explanationImageUrl  String?  // public URL for the attached explanation image
   explanationImagePath String?  // storage object path, used to delete/replace
@@ -262,6 +265,8 @@ model GeminiAnswerCandidate {
   confidence           Float?
   escalated            Boolean  @default(false)
   insufficientEvidence Boolean  @default(false)
+  // Last admin hint/context (רמז) supplied to the generator for this candidate, if any.
+  generationHint       String?  @db.Text
   // Proposed chapter retag (only applied to Question on accept, and only if chapterAutoTagged).
   derivedChapterIds    Int[]    @default([])
   primaryChapterId     Int?

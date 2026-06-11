@@ -47,6 +47,8 @@ export type LowQualityQuestion = UnansweredQuestion & {
   confidence: number | null;
   escalated: boolean;
   insufficientEvidence: boolean;
+  /** Last admin hint (רמז) used to generate the current answer, or null. */
+  lastHint: string | null;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -375,7 +377,7 @@ export function QueueClient({
 
   const openHintModal = useCallback((q: LowQualityQuestion) => {
     setHintModalQ(q);
-    setHintText("");
+    setHintText(q.lastHint ?? "");
   }, []);
 
   const closeHintModal = useCallback(() => {
@@ -920,6 +922,11 @@ export function QueueClient({
                 &quot;התשובה הנכונה היא B כי...&quot;, &quot;המודל התעלם מהשפעת...&quot;, &quot;המקור הנכון נמצא בפרק X&quot;.
                 הראיות עדיין חייבות להגיע מקטעי המקור.
               </p>
+              {hintModalQ.lastHint && (
+                <p className="text-xs text-purple-700 dark:text-purple-300 mb-2">
+                  הרמז האחרון ששימש בחילול נטען מראש — ערוך או נקה אותו לפי הצורך.
+                </p>
+              )}
               <textarea
                 value={hintText}
                 onChange={(e) => setHintText(e.target.value)}

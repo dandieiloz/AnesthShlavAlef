@@ -158,6 +158,20 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
         </select>
       </div>
 
+      {/* Generated with hint (רמז) */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">רמז</label>
+        <select
+          name="hint"
+          defaultValue={params.get("hint") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="yes">עם רמז</option>
+          <option value="no">ללא</option>
+        </select>
+      </div>
+
       {/* Status (active / disabled) */}
       <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1">מצב</label>
