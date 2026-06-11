@@ -160,55 +160,91 @@ export default async function AboutPage() {
         <div className="grid gap-6 sm:grid-cols-2">
 
           {/* Dr. Yoni */}
-          <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-sm">
-            <div className="space-y-0.5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 mb-2">
-                <span className="text-xs font-medium text-primary">{t.anesthesiologist}</span>
+          <div className="group rounded-2xl border bg-card shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+            {/* Photo header */}
+            <div className="relative h-52 bg-gradient-to-l from-primary/15 via-primary/5 to-transparent">
+              <div className="absolute -bottom-32 inset-x-0 flex justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-primary/30 blur-md" aria-hidden="true" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/team/yoni.png"
+                    alt={t.yoniName}
+                    className="relative h-64 w-64 rounded-full object-cover object-top ring-4 ring-card shadow-lg"
+                    loading="lazy"
+                  />
+                </div>
               </div>
-              <h3 className="font-display text-xl font-bold text-foreground">
-                {t.yoniName}
-              </h3>
-              <a
-                href="mailto:Yonatan@khalatnik.com"
-                className="text-sm text-primary hover:underline break-all"
-              >
-                Yonatan@khalatnik.com
-              </a>
             </div>
-            <div className="h-px bg-border" />
-            <EditableSection
-              contentKey="about_yoni"
-              value={translated.about_yoni}
-              isAdmin={isAdmin}
-              locale={locale}
-              t={t}
-            />
+
+            <div className="p-6 pt-36 space-y-4">
+              <div className="text-center space-y-1">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1">
+                  <span className="text-xs font-medium text-primary">{t.anesthesiologist}</span>
+                </div>
+                <h3 className="font-display text-xl font-bold text-foreground">
+                  {t.yoniName}
+                </h3>
+                <a
+                  href="mailto:Yonatan@khalatnik.com"
+                  className="block text-sm text-primary hover:underline break-all"
+                >
+                  Yonatan@khalatnik.com
+                </a>
+              </div>
+              <div className="h-px bg-border" />
+              <EditableSection
+                contentKey="about_yoni"
+                value={translated.about_yoni}
+                isAdmin={isAdmin}
+                locale={locale}
+                t={t}
+              />
+            </div>
           </div>
 
           {/* Dr. Daniel */}
-          <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-sm">
-            <div className="space-y-0.5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 mb-2">
-                <span className="text-xs font-medium text-primary">{t.anesthesiologist}</span>
+          <div className="group rounded-2xl border bg-card shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+            {/* Photo header */}
+            <div className="relative h-52 bg-gradient-to-l from-primary/15 via-primary/5 to-transparent">
+              <div className="absolute -bottom-32 inset-x-0 flex justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-primary/30 blur-md" aria-hidden="true" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/team/daniel.png"
+                    alt={t.danielName}
+                    className="relative h-64 w-64 rounded-full object-cover object-top ring-4 ring-card shadow-lg"
+                    loading="lazy"
+                  />
+                </div>
               </div>
-              <h3 className="font-display text-xl font-bold text-foreground">
-                {t.danielName}
-              </h3>
-              <a
-                href="mailto:dandieiloz@gmail.com"
-                className="text-sm text-primary hover:underline break-all"
-              >
-                dandieiloz@gmail.com
-              </a>
             </div>
-            <div className="h-px bg-border" />
-            <EditableSection
-              contentKey="about_daniel"
-              value={translated.about_daniel}
-              isAdmin={isAdmin}
-              locale={locale}
-              t={t}
-            />
+
+            <div className="p-6 pt-36 space-y-4">
+              <div className="text-center space-y-1">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1">
+                  <span className="text-xs font-medium text-primary">{t.anesthesiologist}</span>
+                </div>
+                <h3 className="font-display text-xl font-bold text-foreground">
+                  {t.danielName}
+                </h3>
+                <a
+                  href="mailto:dandieiloz@gmail.com"
+                  className="block text-sm text-primary hover:underline break-all"
+                >
+                  dandieiloz@gmail.com
+                </a>
+              </div>
+              <div className="h-px bg-border" />
+              <EditableSection
+                contentKey="about_daniel"
+                value={translated.about_daniel}
+                isAdmin={isAdmin}
+                locale={locale}
+                t={t}
+              />
+            </div>
           </div>
 
         </div>
