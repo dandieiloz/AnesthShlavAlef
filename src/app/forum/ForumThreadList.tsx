@@ -22,6 +22,7 @@ import type { Locale } from "@/lib/locale";
 import { CommentItem, type CommentData } from "@/components/CommentItem";
 import { ReplyForm } from "./ReplyForm";
 import { ForumQuestionView } from "./ForumQuestionView";
+import { DeleteThreadButton } from "./DeleteThreadButton";
 import {
   loadThreadRepliesAction,
   loadThreadQuestionAction,
@@ -34,6 +35,7 @@ export type ForumThreadListItem = {
   isNew: boolean;
   title: string;
   body: string | null;
+  authorId: string;
   authorName: string | null;
   authorImage: string | null;
   replyCount: number;
@@ -329,6 +331,16 @@ function ThreadRow({
             </ul>
           ) : (
             <p className="text-xs text-muted-foreground">{t.noReplies}</p>
+          )}
+
+          {!th.isQuestion && (th.authorId === meId || meRole === "ADMIN") && (
+            <div className="flex justify-end">
+              <DeleteThreadButton
+                threadId={th.id}
+                label={t.deleteTopic}
+                confirmText={t.deleteConfirm}
+              />
+            </div>
           )}
 
           <div className="flex items-start gap-2 pt-1">

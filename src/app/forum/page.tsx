@@ -64,6 +64,7 @@ export default async function ForumPage() {
         ? snippet(th.question?.stem ?? t.questionDiscussionTitle)
         : th.title ?? "",
       body: isQuestion ? null : th.body,
+      authorId: th.authorId,
       authorName: th.author?.name ?? null,
       authorImage: th.author?.image ?? null,
       replyCount: th._count.replies,
