@@ -35,7 +35,7 @@ export type ForumThreadListItem = {
   isNew: boolean;
   title: string;
   body: string | null;
-  authorId: string;
+  authorId: string | null;
   authorName: string | null;
   authorImage: string | null;
   replyCount: number;
