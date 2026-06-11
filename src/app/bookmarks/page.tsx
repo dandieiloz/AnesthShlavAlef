@@ -124,7 +124,7 @@ export default async function BookmarksPage() {
   );
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in text-right" dir="rtl">
       <div>
         <h1 className="font-display text-2xl font-bold flex items-center gap-2">
           <Bookmark className="h-6 w-6 text-amber-500" />
@@ -151,7 +151,7 @@ export default async function BookmarksPage() {
             {entries.map(({ question: q, isBookmarked, savedOn }, i) => {
               const qT = translated[i];
               const optionTexts = [qT.optionA, qT.optionB, qT.optionC, qT.optionD];
-              const correctAnswer = q.geminiAnswer?.correctAnswer;
+              const correctAnswer = q.geminiAnswer?.correctAnswer ?? q.correctAnswer;
               const qHighlights = highlightsByQ.get(q.id) ?? [];
               const searchText = [
                 qT.stem,
@@ -166,7 +166,7 @@ export default async function BookmarksPage() {
               return (
               <li key={q.id} data-search-text={searchText}>
                 <Card className="transition-all hover:shadow-sm">
-                  <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
+                  <CardContent className="p-4 space-y-3 text-right" dir="rtl">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -177,7 +177,7 @@ export default async function BookmarksPage() {
                             {qT.chapterTitle}
                           </span>
                         </div>
-                        <p dir="auto" className="text-sm font-medium leading-relaxed [unicode-bidi:plaintext]" data-search-highlight>
+                        <p dir="rtl" className="text-sm font-medium leading-relaxed text-right" data-search-highlight>
                           {qT.stem}
                         </p>
                       </div>
@@ -214,7 +214,7 @@ export default async function BookmarksPage() {
                         return (
                           <div key={k} className={rowClass}>
                             <span className={letterClass}>{letters[idx]}</span>
-                            <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]" data-search-highlight>
+                            <span dir="rtl" className="flex-1 leading-snug text-right" data-search-highlight>
                               {optionTexts[idx]}
                             </span>
                             {isCorrect && (
