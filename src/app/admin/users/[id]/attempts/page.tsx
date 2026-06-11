@@ -252,7 +252,7 @@ export default async function AdminUserAttemptsPage({
                       </td>
                       <td className="p-2">
                         <Link
-                          href={`/admin/questions/${a.question.id}`}
+                          href={`/history/${a.question.id}`}
                           className="hover:underline"
                         >
                           {truncate(a.question.stem, STEM_PREVIEW_CHARS)}

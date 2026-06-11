@@ -250,7 +250,7 @@ export async function saveWizardQuestionAction(formData: FormData) {
     data: { questionId: created.id, kind: "INITIAL", createdById: me.id },
   });
 
-  redirect(`/admin/questions/${created.id}`);
+  redirect(`/history/${created.id}`);
 }
 
 export type CreateSingleResult =
@@ -344,7 +344,7 @@ export async function updateQuestionImageAction(formData: FormData) {
       where: { id: questionId },
       data: { imageUrl: null, imagePath: null, imageAlt: null },
     });
-    redirect(`/admin/questions/${questionId}`);
+    redirect(`/history/${questionId}`);
   }
 
   const imageFile = formData.get("image");
@@ -368,7 +368,7 @@ export async function updateQuestionImageAction(formData: FormData) {
       data: { imageAlt },
     });
   }
-  redirect(`/admin/questions/${questionId}`);
+  redirect(`/history/${questionId}`);
 }
 
 export async function updateQuestionVideoAction(formData: FormData) {
@@ -379,12 +379,12 @@ export async function updateQuestionVideoAction(formData: FormData) {
 
   if (intent === "remove") {
     await db.question.update({ where: { id: questionId }, data: { videoUrl: null } });
-    redirect(`/admin/questions/${questionId}`);
+    redirect(`/history/${questionId}`);
   }
 
   const raw = String(formData.get("videoUrl") ?? "").trim();
   const videoUrl = raw ? validateVideoUrl(raw) : null;
   await db.question.update({ where: { id: questionId }, data: { videoUrl } });
-  redirect(`/admin/questions/${questionId}`);
+  redirect(`/history/${questionId}`);
 }
 

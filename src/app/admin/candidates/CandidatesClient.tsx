@@ -278,7 +278,7 @@ export function CandidatesClient({ rows }: { rows: CandidateRow[] }) {
               </button>
               <div className="flex shrink-0 gap-2">
                 <Link
-                  href={`/admin/questions/${r.questionId}`}
+                  href={`/history/${r.questionId}`}
                   className="rounded border px-3 py-1.5 text-sm hover:bg-muted"
                 >
                   פתח שאלה

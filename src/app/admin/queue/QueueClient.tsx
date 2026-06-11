@@ -439,7 +439,7 @@ export function QueueClient({
                   <tr key={q.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="px-3 py-2 max-w-xs">
                       <Link
-                        href={`/admin/questions/${q.id}`}
+                        href={`/history/${q.id}`}
                         className="text-primary hover:underline font-medium line-clamp-2"
                         title={q.stem}
                       >
@@ -502,7 +502,7 @@ export function QueueClient({
                     <tr key={q.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-3 py-2 max-w-xs">
                         <Link
-                          href={`/admin/questions/${q.id}`}
+                          href={`/history/${q.id}`}
                           className="text-primary hover:underline font-medium line-clamp-2"
                           title={q.stem}
                         >
@@ -775,7 +775,7 @@ export function QueueClient({
 
                   <td className="px-3 py-2 max-w-xs">
                     <Link
-                      href={`/admin/questions/${row.questionId}`}
+                      href={`/history/${row.questionId}`}
                       className="text-primary hover:underline font-medium line-clamp-2"
                       title={row.stem}
                     >
@@ -941,7 +941,7 @@ export function QueueClient({
                 ביטול
               </button>
               <Link
-                href={`/admin/questions/${hintModalQ.id}`}
+                href={`/history/${hintModalQ.id}`}
                 className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
               >
                 פתח דף שאלה

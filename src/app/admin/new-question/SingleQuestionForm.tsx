@@ -118,7 +118,7 @@ export function SingleQuestionForm() {
           </button>
           <button
             type="button"
-            onClick={() => router.push(`/admin/questions/${saved.id}`)}
+            onClick={() => router.push(`/history/${saved.id}`)}
             className="rounded border px-4 py-2 text-sm"
           >
             לא, עבור לשאלה שנשמרה

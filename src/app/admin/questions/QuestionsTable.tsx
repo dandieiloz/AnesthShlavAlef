@@ -502,7 +502,7 @@ export function QuestionsTable({
                 <td className="p-2 max-w-md">
                   <div className="flex items-start gap-2">
                     <Link
-                      href={`/admin/questions/${q.id}`}
+                      href={`/history/${q.id}`}
                       className={`text-primary hover:underline line-clamp-2 ${q.disabled ? "opacity-60" : ""}`}
                     >
                       {q.stem.slice(0, 120)}{q.stem.length > 120 ? "…" : ""}

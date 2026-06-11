@@ -61,7 +61,7 @@ export async function acceptCandidateAction(questionId: number): Promise<Candida
 
   revalidatePath("/admin/candidates");
   revalidatePath("/admin/queue");
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
   return { ok: true };
 }
 
@@ -70,7 +70,7 @@ export async function discardCandidateAction(questionId: number): Promise<Candid
   const deleted = await db.geminiAnswerCandidate.deleteMany({ where: { questionId } });
   if (deleted.count === 0) return { ok: false, error: "אין מועמד פעיל לשאלה זו" };
   revalidatePath("/admin/candidates");
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
   return { ok: true };
 }
 

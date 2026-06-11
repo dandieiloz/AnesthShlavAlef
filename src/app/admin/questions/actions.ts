@@ -36,14 +36,14 @@ export async function setQuestionDisabledAction(id: number, disabled: boolean) {
   await requireAdmin();
   await db.question.update({ where: { id }, data: { disabled } });
   revalidatePath("/admin/questions");
-  revalidatePath(`/admin/questions/${id}`);
+  revalidatePath(`/history/${id}`);
 }
 
 export async function setQuestionAdminApprovedAction(id: number, approved: boolean) {
   await requireAdmin();
   await db.question.update({ where: { id }, data: { adminApproved: approved } });
   revalidatePath("/admin/questions");
-  revalidatePath(`/admin/questions/${id}`);
+  revalidatePath(`/history/${id}`);
 }
 
 export async function setPublishConfidenceThresholdAction(value: number) {

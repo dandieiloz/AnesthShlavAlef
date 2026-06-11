@@ -118,8 +118,8 @@ export async function saveQuestionAction(formData: FormData) {
         });
       }
     }
-    revalidatePath(`/admin/questions/${data.id}`);
-    redirect(`/admin/questions/${data.id}`);
+    revalidatePath(`/history/${data.id}`);
+    redirect(`/history/${data.id}`);
   } else {
     const created = await db.question.create({
       data: {
@@ -141,7 +141,7 @@ export async function saveQuestionAction(formData: FormData) {
     });
     revalidatePath(`/admin/chapters/${chapter.number}/questions`);
     revalidatePath(`/admin/queue`);
-    redirect(`/admin/questions/${created.id}`);
+    redirect(`/history/${created.id}`);
   }
 }
 
@@ -156,7 +156,7 @@ export async function generateExplanationAction(questionId: number) {
       data: { questionId, kind: "INITIAL" },
     });
   }
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
 }
 
 export async function regenerateExplanationAction(questionId: number, hint?: string | null) {
@@ -171,7 +171,7 @@ export async function regenerateExplanationAction(questionId: number, hint?: str
       data: { questionId, kind: "REGENERATE", regenerationHint: trimmed },
     });
   }
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
 }
 
 export async function deleteQuestionAction(questionId: number) {
@@ -227,7 +227,7 @@ export async function updateQuestionChaptersAction(formData: FormData) {
       chapterAutoTagged: false,
     },
   });
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
 }
 
 /** Re-enable auto-tagging — the next RAG regeneration will overwrite the chapter assignment. */
@@ -237,7 +237,7 @@ export async function resetChapterAutoTagAction(questionId: number) {
     where: { id: questionId },
     data: { chapterAutoTagged: true },
   });
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
 }
 
 const EvidenceCitationSchema = z.object({
@@ -322,7 +322,7 @@ export async function saveGeminiAnswerFieldsAction(
     if (changed.length > 0) {
       await invalidateTranslations("GeminiAnswer", String(existing.id), changed);
     }
-    revalidatePath(`/admin/questions/${data.questionId}`);
+    revalidatePath(`/history/${data.questionId}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -343,7 +343,7 @@ export async function addAdminNoteAction(formData: FormData) {
   await db.questionAdminNote.create({
     data: { questionId: data.questionId, body: data.body, authorId: me.id },
   });
-  revalidatePath(`/admin/questions/${data.questionId}`);
+  revalidatePath(`/history/${data.questionId}`);
 }
 
 export async function deleteAdminNoteAction(formData: FormData) {
@@ -351,5 +351,5 @@ export async function deleteAdminNoteAction(formData: FormData) {
   const noteId = Number(formData.get("noteId"));
   if (!Number.isFinite(noteId)) throw new Error("Invalid noteId");
   const note = await db.questionAdminNote.delete({ where: { id: noteId } });
-  revalidatePath(`/admin/questions/${note.questionId}`);
+  revalidatePath(`/history/${note.questionId}`);
 }

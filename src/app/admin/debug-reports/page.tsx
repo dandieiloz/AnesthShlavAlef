@@ -124,7 +124,7 @@ export default async function DebugReportsPage({
                 <div>
                   <strong>שאלה:</strong>{" "}
                   <Link
-                    href={`/admin/questions/${r.questionId}`}
+                    href={`/history/${r.questionId}`}
                     className="text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     #{r.questionId}

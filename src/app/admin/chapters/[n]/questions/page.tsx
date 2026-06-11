@@ -32,7 +32,7 @@ export default async function ChapterQuestions({ params }: { params: Promise<{ n
         {questions.map((q) => (
           <li key={q.id} className="rounded border bg-card p-3">
             <div className="flex items-start justify-between gap-3">
-              <Link href={`/admin/questions/${q.id}`} className="flex-1 hover:underline">{q.stem.slice(0, 140)}</Link>
+              <Link href={`/history/${q.id}`} className="flex-1 hover:underline">{q.stem.slice(0, 140)}</Link>
               <div className="flex flex-col items-end gap-1">
                 {q.chapterId !== chapter.id && (
                   <span className="text-xs rounded bg-muted px-2 py-0.5 text-muted-foreground" title="פרק ראשי שונה">

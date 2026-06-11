@@ -111,7 +111,7 @@ export async function enqueueInitialJobAction(
     data: { questionId, kind: "INITIAL", regenerationHint: sanitizeHint(hint) },
   });
   revalidatePath("/admin/queue");
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
   return { ok: true, jobId: job.id };
 }
 
@@ -142,7 +142,7 @@ export async function enqueueRegenerationAction(
     data: { questionId, kind: "REGENERATE", regenerationHint: sanitizeHint(hint) },
   });
   revalidatePath("/admin/queue");
-  revalidatePath(`/admin/questions/${questionId}`);
+  revalidatePath(`/history/${questionId}`);
   return { ok: true, jobId: job.id };
 }
 

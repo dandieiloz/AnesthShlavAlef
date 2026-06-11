@@ -37,7 +37,7 @@ Admin → Chapter → New question (paste stem + 4 options) → "חולל הסב
 - `/dashboard` stats per chapter
 - `/admin` chapter list
 - `/admin/chapters/[n]/questions` question CRUD
-- `/admin/questions/[id]` edit + generate/regenerate explanation
+- `/history/[id]` question page (shared): users see the answer + explanation; admins additionally get edit + generate/regenerate explanation and management tools
 - `/admin/reports` open answer-correctness reports
 
 ## Costs (rough)

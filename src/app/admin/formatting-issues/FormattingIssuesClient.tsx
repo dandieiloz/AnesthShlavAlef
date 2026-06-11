@@ -137,7 +137,7 @@ export function FormattingIssuesClient() {
             <li key={key} className="rounded border bg-card p-4 text-card-foreground">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Link
-                  href={`/admin/questions/${r.questionId}`}
+                  href={`/history/${r.questionId}`}
                   className="rounded border px-2 py-0.5 font-mono hover:bg-muted"
                 >
                   #{r.questionId}
@@ -247,7 +247,7 @@ export function FormattingIssuesClient() {
                     )}
 
                     <Link
-                      href={`/admin/questions/${r.questionId}`}
+                      href={`/history/${r.questionId}`}
                       className="rounded border px-3 py-1 text-sm hover:bg-muted"
                     >
                       פתח שאלה

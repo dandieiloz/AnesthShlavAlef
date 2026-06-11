@@ -90,7 +90,7 @@ export default async function ReportsPage({ searchParams }: { searchParams?: Pro
                   />
                   <div className="flex flex-wrap gap-2">
                     <Link
-                      href={`/admin/questions/${r.questionId}`}
+                      href={`/history/${r.questionId}`}
                       className="rounded border px-3 py-1 text-sm hover:bg-muted"
                     >
                       פתח שאלה
@@ -132,7 +132,7 @@ export default async function ReportsPage({ searchParams }: { searchParams?: Pro
                     />
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/admin/questions/${r.questionId}`}
+                        href={`/history/${r.questionId}`}
                         className="rounded border px-3 py-1 text-sm hover:bg-muted"
                       >
                         פתח שאלה

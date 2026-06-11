@@ -128,7 +128,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
               <ul className="mt-2 space-y-1">
                 {saveResult.saved.map((q) => (
                   <li key={q.id}>
-                    <Link href={`/admin/questions/${q.id}`} className="text-sm text-primary hover:underline">
+                    <Link href={`/history/${q.id}`} className="text-sm text-primary hover:underline">
                       {q.stem.length > 70 ? q.stem.slice(0, 70) + "..." : q.stem}
                     </Link>
                   </li>
@@ -145,7 +145,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
                     <span className="text-sm text-muted-foreground">
                       {q.stem.length > 70 ? q.stem.slice(0, 70) + "..." : q.stem}
                     </span>
-                    <Link href={`/admin/questions/${q.existingId}`} className="text-xs text-primary hover:underline whitespace-nowrap">
+                    <Link href={`/history/${q.existingId}`} className="text-xs text-primary hover:underline whitespace-nowrap">
                       → צפייה בשאלה קיימת
                     </Link>
                   </li>
@@ -301,7 +301,7 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
                   <div className="flex items-center justify-between gap-2 rounded bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-300">
                     <span>⚠ שאלה זו כבר קיימת במאגר — לא תתווסף</span>
                     <div className="flex gap-3 shrink-0">
-                      <Link href={`/admin/questions/${entry.dupeId}`} target="_blank"
+                      <Link href={`/history/${entry.dupeId}`} target="_blank"
                         className="underline hover:text-amber-900">צפה בקיימת ↗</Link>
                       <button type="button"
                         onClick={() => updateBatch(entry.uid, { dupeForce: true })}

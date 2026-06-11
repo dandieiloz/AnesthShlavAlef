@@ -9,6 +9,7 @@ import { QuestionVideo } from "@/components/QuestionVideo";
 import { CommentItem } from "@/components/CommentItem";
 import { SubmitButton } from "@/components/SubmitButton";
 import { BookmarkButton } from "./BookmarkButton";
+import { AdminQuestionPanel } from "./AdminQuestionPanel";
 import { postCommentAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,11 +29,14 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
 
 export default async function HistoryQuestionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const me = await requireCompletedProfile();
   const { id } = await params;
+  const { error } = await searchParams;
   const questionId = Number(id);
   if (!Number.isFinite(questionId)) notFound();
 
@@ -302,6 +306,10 @@ export default async function HistoryQuestionPage({
           )}
         </CardContent>
       </Card>
+
+      {me.role === "ADMIN" && (
+        <AdminQuestionPanel questionId={questionId} error={error} />
+      )}
     </div>
   );
 }
