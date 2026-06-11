@@ -270,7 +270,7 @@ export async function StatsSection({
               <SummaryNum value={communityResidents} locale={locale} colorClass="text-success" />
               {locale === "he" ? " מתמחים מ-" : " residents from "}
               <SummaryNum value={communityHospitals} locale={locale} colorClass="text-orange-500" />
-              {locale === "he" ? " בתי חולים" : " hospitals"}
+              {locale === "he" ? " בתי חולים ב-24 השעות האחרונות" : " hospitals in the last 24 hours"}
             </p>
           )}
         </div>
