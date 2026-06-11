@@ -46,6 +46,7 @@ export default async function BookmarksPage() {
             imageUrl: true,
             imageAlt: true,
             videoUrl: true,
+            source: true,
             chapter: { select: { number: true, title: true } },
             geminiAnswer: true,
           },
@@ -93,6 +94,7 @@ export default async function BookmarksPage() {
           imageUrl: true,
           imageAlt: true,
           videoUrl: true,
+          source: true,
           chapter: { select: { number: true, title: true } },
           geminiAnswer: true,
         },
@@ -176,6 +178,9 @@ export default async function BookmarksPage() {
                           <span className="text-xs text-muted-foreground line-clamp-1" data-search-highlight>
                             {qT.chapterTitle}
                           </span>
+                          {q.source && (
+                            <span className="text-xs text-muted-foreground shrink-0">· {q.source}</span>
+                          )}
                         </div>
                         <p dir="rtl" className="text-sm font-medium leading-relaxed text-right" data-search-highlight>
                           {qT.stem}
