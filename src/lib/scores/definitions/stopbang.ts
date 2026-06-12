@@ -27,7 +27,14 @@ export const stopbang: AdditiveScore = {
     binary("pressure", bi("יתר לחץ דם מטופל (Pressure)", "Treated hypertension"), 1),
     binary("bmi", bi("BMI מעל 35 ק\"ג/מ\"ר", "BMI over 35 kg/m²"), 1),
     binary("age", bi("גיל מעל 50", "Age over 50"), 1),
-    binary("neck", bi("היקף צוואר מעל 40 ס\"מ", "Neck circumference over 40 cm"), 1),
+    binary(
+      "neck",
+      bi(
+        "היקף צוואר גדול (>43 ס\"מ בגברים / >41 ס\"מ בנשים)",
+        "Large neck circumference (>43 cm men / >41 cm women)",
+      ),
+      1,
+    ),
     binary("gender", bi("מין זכר", "Male sex"), 1),
   ],
   interpretation: [

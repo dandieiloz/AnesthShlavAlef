@@ -36,10 +36,10 @@ export const aldrete: AdditiveScore = {
     ),
     triple(
       "circulation",
-      bi("מחזור הדם (שינוי בלחץ הדם)", "Circulation (BP change)"),
-      bi("סטייה מעל 50 ממ\"כ מהבסיס", "More than 50 mmHg from baseline"),
-      bi("סטייה של 20–50 ממ\"כ", "20–50 mmHg from baseline"),
-      bi("סטייה פחות מ‑20 ממ\"כ", "Less than 20 mmHg from baseline"),
+      bi("מחזור הדם (סטיית לחץ הדם מהבסיס)", "Circulation (BP deviation from baseline)"),
+      bi("סטייה מעל 50% מהערך הטרום-הרדמתי", "More than 50% from pre-anesthetic level"),
+      bi("סטייה של 20%–50% מהבסיס", "20–50% from pre-anesthetic level"),
+      bi("סטייה עד 20% (±20%) מהבסיס", "Within 20% (±20%) of pre-anesthetic level"),
     ),
     triple(
       "consciousness",
