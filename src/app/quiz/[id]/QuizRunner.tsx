@@ -997,7 +997,7 @@ export function QuizRunner(props: Props) {
                     variant="outline"
                     size="lg"
                     onClick={handlePrev}
-                    className="gap-1.5"
+                    className="w-full gap-1.5 sm:w-auto"
                   >
                     <ArrowRight className="h-4 w-4 ltr:rotate-180" />
                     {t.previousQuestion}
@@ -1009,6 +1009,7 @@ export function QuizRunner(props: Props) {
                     variant="ghost"
                     size="lg"
                     onClick={handleSkip}
+                    className="w-full sm:w-auto"
                   >
                     {t.skipQuestion}
                   </Button>
@@ -1016,7 +1017,7 @@ export function QuizRunner(props: Props) {
                 let mainBtn: React.ReactNode;
                 if (displayRevealed) {
                   mainBtn = (
-                    <Button type="button" className="flex-1" size="lg" onClick={handleNext}>
+                    <Button type="button" className="w-full sm:flex-1" size="lg" onClick={handleNext}>
                       {t.nextQuestion}
                     </Button>
                   );
@@ -1024,7 +1025,7 @@ export function QuizRunner(props: Props) {
                   mainBtn = (
                     <Button
                       type="button"
-                      className="flex-1"
+                      className="w-full sm:flex-1"
                       size="lg"
                       onClick={() => requeueSkipped([pastEntry!.question])}
                     >
@@ -1038,7 +1039,7 @@ export function QuizRunner(props: Props) {
                   mainBtn = (
                     <Button
                       type="button"
-                      className="flex-1"
+                      className="w-full sm:flex-1"
                       size="lg"
                       onClick={() => {
                         if (viewingIndex < past.length - 1) {
@@ -1055,7 +1056,7 @@ export function QuizRunner(props: Props) {
                   mainBtn = (
                     <Button
                       type="button"
-                      className="flex-1"
+                      className="w-full sm:flex-1"
                       size="lg"
                       disabled={!chosen || submitting}
                       onClick={handleSubmit}
