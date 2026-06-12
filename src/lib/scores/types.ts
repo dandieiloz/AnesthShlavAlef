@@ -139,6 +139,26 @@ export interface ClassifyCategory {
   detail?: Bilingual;
 }
 
+/**
+ * Optional multi-parameter reference grid for a classify score (e.g. Miller
+ * tables 33.4 / 33.5). When present, the explanation renders this as a table —
+ * parameters as columns, one row per category — instead of the `·`-packed
+ * per-category detail text. Each row links to a category id for highlighting.
+ */
+export interface ScaleTableRow {
+  /** Matches a ClassifyCategory.id; that row is highlighted when active. */
+  categoryId: string;
+  /** Cell values, one per column in `ScaleTable.columns`. */
+  cells: Bilingual[];
+}
+
+export interface ScaleTable {
+  /** Column headers (the parameters), e.g. Vmax, Mean gradient, AVA. */
+  columns: Bilingual[];
+  /** Rows in display order; each maps to a category and its cell values. */
+  rows: ScaleTableRow[];
+}
+
 export interface ClassifyTrigger {
   label: Bilingual; // e.g. "Diabetes"
   finding: Bilingual; // e.g. "Known diabetes mellitus"
@@ -154,6 +174,8 @@ export interface ClassifyScore extends ScoreBase {
   kind: "classify";
   categories: ClassifyCategory[];
   adjust?: ClassifyAdjust;
+  /** Optional reference grid rendered as a table in the explanation. */
+  scaleTable?: ScaleTable;
 }
 
 // ---------------------------------------------------------------------------

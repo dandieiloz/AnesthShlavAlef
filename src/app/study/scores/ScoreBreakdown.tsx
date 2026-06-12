@@ -214,6 +214,54 @@ function ClassifyScale({
   t: ScoresDict;
 }) {
   const sorted = [...score.categories].sort((a, b) => a.order - b.order);
+  const activeCat = sorted.find((cat) => question.result.en.includes(cat.label.en));
+
+  if (score.scaleTable) {
+    const labelById = new Map(sorted.map((c) => [c.id, c.label]));
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-foreground">{t.fullScaleTitle}</p>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b text-muted-foreground">
+                <th className="px-2 py-1 text-start font-semibold" />
+                {score.scaleTable.columns.map((col, i) => (
+                  <th key={i} className="px-2 py-1 text-start font-semibold whitespace-nowrap">
+                    {col[locale]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {score.scaleTable.rows.map((row) => {
+                const isActive = activeCat?.id === row.categoryId;
+                return (
+                  <tr
+                    key={row.categoryId}
+                    className={cn(
+                      "border-b last:border-0",
+                      isActive ? "bg-success/10 font-medium text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    <td className="px-2 py-1 font-medium text-foreground whitespace-nowrap">
+                      {labelById.get(row.categoryId)?.[locale] ?? row.categoryId}
+                    </td>
+                    {row.cells.map((cell, i) => (
+                      <td key={i} className="px-2 py-1 whitespace-nowrap tabular-nums">
+                        {cell[locale]}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <p className="text-xs font-semibold text-foreground">{t.fullScaleTitle}</p>

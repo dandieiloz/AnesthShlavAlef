@@ -84,4 +84,13 @@ export const lvef: ClassifyScore = {
       detail: bi("הפרעה קשה: מתחת ל‑30% (בשני המינים)", "Severe dysfunction: below 30% (both sexes)"),
     },
   ],
+  scaleTable: {
+    columns: [bi("זכר", "Male"), bi("נקבה", "Female")],
+    rows: [
+      { categoryId: "normal", cells: [bi("52%–72%", "52%–72%"), bi("54%–74%", "54%–74%")] },
+      { categoryId: "mild", cells: [bi("41%–51%", "41%–51%"), bi("41%–53%", "41%–53%")] },
+      { categoryId: "moderate", cells: [bi("30%–40%", "30%–40%"), bi("30%–40%", "30%–40%")] },
+      { categoryId: "severe", cells: [bi("< 30%", "< 30%"), bi("< 30%", "< 30%")] },
+    ],
+  },
 };

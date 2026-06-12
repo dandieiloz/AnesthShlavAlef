@@ -72,4 +72,41 @@ export const aorticstenosis: ClassifyScore = {
       ),
     },
   ],
+  scaleTable: {
+    columns: [
+      bi("מהירות שיא (Vmax)", "Peak velocity (Vmax)"),
+      bi("מפל לחץ ממוצע", "Mean gradient"),
+      bi("שטח מסתם (AVA)", "Valve area (AVA)"),
+      bi("AVA מתוקנן", "Indexed AVA"),
+    ],
+    rows: [
+      {
+        categoryId: "mild",
+        cells: [
+          bi("2.6–2.9 מ'/ש'", "2.6–2.9 m/s"),
+          bi("< 20 ממ\"כ", "< 20 mmHg"),
+          bi("> 1.5 סמ\"ר", "> 1.5 cm²"),
+          bi("> 0.85 סמ\"ר/מ\"ר", "> 0.85 cm²/m²"),
+        ],
+      },
+      {
+        categoryId: "moderate",
+        cells: [
+          bi("3.0–4.0 מ'/ש'", "3.0–4.0 m/s"),
+          bi("20–40 ממ\"כ", "20–40 mmHg"),
+          bi("1.0–1.5 סמ\"ר", "1.0–1.5 cm²"),
+          bi("0.6–0.85 סמ\"ר/מ\"ר", "0.6–0.85 cm²/m²"),
+        ],
+      },
+      {
+        categoryId: "severe",
+        cells: [
+          bi("≥ 4.0 מ'/ש'", "≥ 4.0 m/s"),
+          bi("≥ 40 ממ\"כ", "≥ 40 mmHg"),
+          bi("< 1.0 סמ\"ר", "< 1.0 cm²"),
+          bi("< 0.6 סמ\"ר/מ\"ר", "< 0.6 cm²/m²"),
+        ],
+      },
+    ],
+  },
 };
