@@ -25,6 +25,7 @@ import { ApproveQuestionButton } from "./ApproveQuestionButton";
 import { EditableGeminiAnswer } from "./EditableGeminiAnswer";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
 import { updateQuestionImageAction, updateQuestionVideoAction } from "@/app/admin/new-question/actions";
@@ -233,12 +234,10 @@ export async function AdminQuestionPanel({
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה (אופציונלי)</label>
-                <input
-                  type="text"
+                <GroupCombobox
                   name="sourceGroup"
                   defaultValue={defGroup}
-                  placeholder="לדוגמה: א, ב, מועד א"
-                  className="w-32 rounded border p-1 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+                  className="w-44"
                 />
               </div>
             </div>

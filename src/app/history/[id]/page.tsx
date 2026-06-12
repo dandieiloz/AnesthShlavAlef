@@ -161,7 +161,7 @@ export default async function HistoryQuestionPage({
               return (
                 <div key={k} className={rowClass}>
                   <span className={letterClass}>{letters[idx]}</span>
-                  <span dir="auto" className="flex-1 leading-snug [unicode-bidi:plaintext]">
+                  <span dir="rtl" className="flex-1 leading-snug text-start">
                     {optionTexts[idx]}
                   </span>
                   {isCorrect && (

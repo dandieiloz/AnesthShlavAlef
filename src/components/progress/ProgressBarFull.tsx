@@ -83,7 +83,7 @@ export function ProgressBarFull({ progress, t }: ProgressBarFullProps) {
         </div>
 
         {/* Milestone strip */}
-        <ol className="grid grid-cols-5 gap-1.5">
+        <ol className="grid grid-cols-5 gap-1 sm:gap-1.5">
             {LEVELS.map((lvl, i) => {
               const LvlIcon = LEVEL_ICONS[lvl.key];
               const isCurrent = i === index;
@@ -93,7 +93,7 @@ export function ProgressBarFull({ progress, t }: ProgressBarFullProps) {
                 <li
                   key={lvl.key}
                   className={cn(
-                    "relative flex flex-col items-center gap-1 rounded-lg border p-1.5 text-center transition-colors",
+                    "relative flex flex-col items-center gap-1 rounded-lg border p-1 text-center transition-colors sm:p-1.5",
                     isCurrent
                       ? "border-transparent bg-gradient-to-br text-white shadow-md " + lvl.gradient
                       : isUnlocked

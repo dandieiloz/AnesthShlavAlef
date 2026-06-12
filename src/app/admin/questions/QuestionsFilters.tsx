@@ -3,6 +3,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 
 type Chapter = { number: number; title: string };
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
@@ -78,11 +79,11 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
       {/* Suffix / group */}
       <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה</label>
-        <input
+        <GroupCombobox
           name="suffix"
           defaultValue={params.get("suffix") ?? ""}
-          placeholder="א, ב..."
-          className="w-24 rounded border p-2 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+          placeholder="הכל"
+          className="w-40"
         />
       </div>
 

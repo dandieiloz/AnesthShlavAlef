@@ -13,6 +13,7 @@ import {
 import type { ParsedQuestion } from "@/lib/wizard";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 
 type Chapter = { number: number; title: string; ingested: boolean };
 
@@ -220,12 +221,10 @@ export function WizardClient({ chapters }: { chapters: Chapter[] }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה (אופציונלי)</label>
-            <input
-              type="text"
+            <GroupCombobox
               value={sourceSuffix}
-              onChange={(e) => setSourceSuffix(e.target.value)}
-              placeholder="לדוגמה: א, ב, מועד א"
-              className="w-28 rounded border p-1 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+              onChange={setSourceSuffix}
+              className="w-44"
             />
           </div>
           {sourceInstitution && sourceYear && (

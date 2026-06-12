@@ -165,7 +165,7 @@ export function HistoryTable({
         </div>
       )}
       <div className="overflow-x-auto rounded border bg-card">
-      <table className="w-full text-sm border-collapse table-fixed">
+      <table className="w-full min-w-[860px] text-sm border-collapse table-fixed">
         <colgroup>
           <col className="w-10" />
           <col />

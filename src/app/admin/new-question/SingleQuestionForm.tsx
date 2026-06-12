@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createSingleQuestionAction, parseQuestionAction } from "./actions";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 
 type FieldKey = "stem" | "optionA" | "optionB" | "optionC" | "optionD";
 
@@ -239,13 +240,11 @@ export function SingleQuestionForm() {
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה (אופציונלי)</label>
-            <input
+            <GroupCombobox
               name="sourceSuffix"
-              type="text"
-              placeholder="לדוגמה: א, ב, מועד א"
               value={sourceSuffix}
-              onChange={(e) => setSourceSuffix(e.target.value)}
-              className="w-32 rounded border p-1 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+              onChange={setSourceSuffix}
+              className="w-44"
             />
           </div>
         </div>

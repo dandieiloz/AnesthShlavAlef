@@ -349,8 +349,11 @@ export function AnswerExplanation({
         </div>
       )}
 
-      {/* ── Per-answer cards: correct + accepted first, then wrong answers in original order ── */}
-      <div className="space-y-2">
+      {/* ── Per-answer cards: correct + accepted first, then wrong answers in original order ──
+          Force RTL so the answers and the detailed explanation stay right-aligned even when the
+          content (or a sentence) starts with a Latin term. The textbook-evidence block below is
+          intentionally excluded and keeps the container direction. */}
+      <div className="answers-rtl space-y-2" dir="rtl">
         {[...options]
           .sort((a, b) => {
             const rank = (k: Choice) =>

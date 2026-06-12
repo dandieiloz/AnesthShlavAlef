@@ -123,6 +123,17 @@
     text-align: start;
   }
 
+  /* Inside the answer cards + detailed explanation, force RTL alignment even
+     when a sentence starts with a Latin term (e.g. "Butyrylcholinesterase …").
+     The textbook-evidence block lives outside `.answers-rtl`, so it keeps the
+     per-element bidi detection above. `pre` code blocks stay LTR (handled
+     separately below). */
+  .answers-rtl .answer-content :where(p, h2, h3, h4, li, blockquote, td, th) {
+    unicode-bidi: isolate;
+    direction: rtl;
+    text-align: right;
+  }
+
   /* Headings */
   .answer-content :where(h2) {
     font-family: var(--font-frank-ruhl), Georgia, serif;

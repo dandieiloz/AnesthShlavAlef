@@ -1065,7 +1065,7 @@ export function QuizRunner(props: Props) {
                   );
                 }
                 return (
-                  <div className="mt-1 flex gap-2">
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                     {prevBtn}
                     {mainBtn}
                     {skipBtn}

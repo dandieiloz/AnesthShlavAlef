@@ -8,6 +8,7 @@ import type { StandardizedQuestion } from "@/lib/submission-analysis";
 import type { SubmissionStatus } from "@prisma/client";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 
 export type SubmissionRow = {
   id: string;
@@ -206,12 +207,10 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">קבוצה (אופציונלי)</label>
-                <input
-                  type="text"
+                <GroupCombobox
                   value={sourceSuffix}
-                  onChange={(e) => setSourceSuffix(e.target.value)}
-                  placeholder="לדוגמה: א, ב, מועד א"
-                  className="w-28 rounded border bg-background p-1 text-sm text-foreground placeholder:text-muted-foreground"
+                  onChange={setSourceSuffix}
+                  className="w-44"
                 />
               </div>
               {builtSource && (

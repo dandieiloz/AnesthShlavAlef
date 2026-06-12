@@ -36,7 +36,9 @@ export function invalidateDemoAllowedSources() {}
  * ADMIN and PAID users get an empty fragment (no restriction).
  */
 export async function questionAccessWhere(user: PlanGatedUser) {
-  if (user.role === "ADMIN") return {};
+  // Disabled questions are excluded from all question pools/listings for
+  // everyone, admins included (admins bypass only the publish/source gates).
+  if (user.role === "ADMIN") return { disabled: false };
   // Non-admin users never see disabled questions.
   const baseGate: Record<string, unknown> = { disabled: false };
   // Publish gate: confidence >= configured threshold OR admin manually approved the answer.

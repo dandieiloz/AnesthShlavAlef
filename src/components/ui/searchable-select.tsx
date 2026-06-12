@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SearchableSelectOption = { value: string; label: string };
@@ -19,6 +19,10 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   clearable?: boolean;
   clearLabel?: string;
+  /** When true, allows committing the typed search query as a new value if it doesn't match an existing option. */
+  creatable?: boolean;
+  /** Builds the label for the "create new" row. Defaults to `הוסף "<query>"`. */
+  createLabel?: (query: string) => string;
   className?: string;
   buttonClassName?: string;
 }
@@ -41,6 +45,8 @@ export function SearchableSelect({
   emptyMessage = "אין תוצאות",
   clearable = false,
   clearLabel,
+  creatable = false,
+  createLabel,
   className,
   buttonClassName,
 }: SearchableSelectProps) {
@@ -69,6 +75,12 @@ export function SearchableSelect({
     if (!q) return normalized;
     return normalized.filter((o) => normalize(o.label).includes(q));
   }, [normalized, query]);
+
+  const trimmedQuery = query.trim();
+  const showCreate =
+    creatable &&
+    trimmedQuery.length > 0 &&
+    !normalized.some((o) => normalize(o.value) === normalize(trimmedQuery));
 
   React.useEffect(() => {
     if (open) {
@@ -107,6 +119,7 @@ export function SearchableSelect({
       e.preventDefault();
       const opt = filtered[activeIdx];
       if (opt) commit(opt.value);
+      else if (showCreate) commit(trimmedQuery);
     } else if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
@@ -121,7 +134,9 @@ export function SearchableSelect({
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIdx, open]);
 
-  const selected = normalized.find((o) => o.value === value);
+  const selected =
+    normalized.find((o) => o.value === value) ??
+    (value ? { value, label: value } : undefined);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -229,9 +244,11 @@ export function SearchableSelect({
               </button>
             )}
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-muted-foreground">
-                {emptyMessage}
-              </div>
+              showCreate ? null : (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  {emptyMessage}
+                </div>
+              )
             ) : (
               filtered.map((opt, i) => {
                 const isSelected = opt.value === value;
@@ -256,6 +273,22 @@ export function SearchableSelect({
                   </button>
                 );
               })
+            )}
+            {showCreate && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => commit(trimmedQuery)}
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-start text-sm text-primary",
+                  "hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {createLabel ? createLabel(trimmedQuery) : `הוסף "${trimmedQuery}"`}
+                </span>
+              </button>
             )}
           </div>
         </div>

@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction, batchSetDisabledAction } from "./actions";
 import { enqueueRegenerationBatchAction } from "../queue/actions";
 
@@ -310,12 +311,10 @@ export function QuestionsTable({
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה (אופציונלי)</label>
-              <input
-                type="text"
+              <GroupCombobox
                 value={suffix}
-                onChange={(e) => setSuffix(e.target.value)}
-                placeholder="לדוגמה: א, ב"
-                className="w-28 rounded border p-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+                onChange={setSuffix}
+                className="w-44"
               />
             </div>
             <button
