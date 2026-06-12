@@ -42,7 +42,7 @@ export default async function StudyPage({
     }),
   ]);
 
-  const progressMap = await getQuizProgressMany(allQuizzes);
+  const progressMap = await getQuizProgressMany(me, allQuizzes);
 
   const quizRows: QuizRow[] = allQuizzes.map((q) => {
     const p = progressMap.get(q.id)!;

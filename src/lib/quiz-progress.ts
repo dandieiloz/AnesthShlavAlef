@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { hasUsableAnswerWhere } from "@/lib/plan";
+import { hasUsableAnswerWhere, questionAccessWhere, type PlanGatedUser } from "@/lib/plan";
 import type { Quiz } from "@prisma/client";
 
 export interface QuizProgress {
@@ -11,15 +11,16 @@ export interface QuizProgress {
   lastActivityAt: Date | null;
 }
 
-/** Compute progress for a single quiz.  Counts only questions that have a
- *  geminiAnswer (same filter used by the quiz page). */
-export async function getQuizProgress(quiz: Quiz): Promise<QuizProgress> {
+/** Compute progress for a single quiz.  Counts only questions the user can
+ *  actually be served (same plan/publish gate the quiz page uses). */
+export async function getQuizProgress(user: PlanGatedUser, quiz: Quiz): Promise<QuizProgress> {
   const useFixedSet = quiz.questionIds.length > 0;
+  const planGate = await questionAccessWhere(user);
   const [total, answeredRows] = await Promise.all([
     useFixedSet
       ? Promise.resolve(quiz.questionIds.length)
       : db.question.count({
-          where: { chapterIds: { hasSome: quiz.chapterIds }, disabled: false, AND: [hasUsableAnswerWhere] },
+          where: { chapterIds: { hasSome: quiz.chapterIds }, AND: [planGate, hasUsableAnswerWhere] },
         }),
     db.attempt.findMany({
       where: { quizId: quiz.id },
@@ -44,25 +45,22 @@ export async function getQuizProgress(quiz: Quiz): Promise<QuizProgress> {
 
 /** Batch-fetch progress for many quizzes with 3 queries total (no N+1). */
 export async function getQuizProgressMany(
+  user: PlanGatedUser,
   quizzes: Quiz[]
 ): Promise<Map<number, QuizProgress>> {
   if (quizzes.length === 0) return new Map();
 
   const allChapterIds = [...new Set(quizzes.flatMap((q) => q.chapterIds))];
+  const planGate = await questionAccessWhere(user);
 
-  // Count eligible questions per chapter (a question may surface under multiple chapters via chapterIds[])
+  // Fetch every question the user could actually be served across all of these
+  // quizzes' chapters (same plan/publish gate the quiz page uses). We keep the
+  // per-question chapterIds so each quiz's total is a DISTINCT count — a
+  // question that lists several of the quiz's chapters must only count once.
   const eligibleQuestions = await db.question.findMany({
-    where: { chapterIds: { hasSome: allChapterIds }, disabled: false, AND: [hasUsableAnswerWhere] },
+    where: { chapterIds: { hasSome: allChapterIds }, AND: [planGate, hasUsableAnswerWhere] },
     select: { id: true, chapterIds: true },
   });
-  // For each chapter, count how many eligible questions list it in their chapterIds
-  const qPerChapter = new Map<number, number>();
-  for (const cid of allChapterIds) {
-    qPerChapter.set(
-      cid,
-      eligibleQuestions.filter((q) => q.chapterIds.includes(cid)).length,
-    );
-  }
 
   // All attempts for these quizzes
   const attempts = await db.attempt.findMany({
@@ -72,9 +70,16 @@ export async function getQuizProgressMany(
 
   const result = new Map<number, QuizProgress>();
   for (const quiz of quizzes) {
-    const total = quiz.questionIds.length > 0
-      ? quiz.questionIds.length
-      : quiz.chapterIds.reduce((sum, cid) => sum + (qPerChapter.get(cid) ?? 0), 0);
+    let total: number;
+    if (quiz.questionIds.length > 0) {
+      total = quiz.questionIds.length;
+    } else {
+      // Distinct count: how many eligible questions intersect this quiz's chapters.
+      const quizChapterSet = new Set(quiz.chapterIds);
+      total = eligibleQuestions.filter((q) =>
+        q.chapterIds.some((cid) => quizChapterSet.has(cid)),
+      ).length;
+    }
     const quizAttempts = attempts.filter((a) => a.quizId === quiz.id);
     const answered = quizAttempts.length;
     const correct = quizAttempts.filter((a) => a.isCorrect).length;
