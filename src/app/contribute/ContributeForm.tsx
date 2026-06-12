@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { GroupCombobox } from "@/components/GroupCombobox";
 import { cn } from "@/lib/utils";
 
 type Chapter = { number: number; title: string };
@@ -78,6 +79,10 @@ export function ContributeForm({ isLoggedIn, hospitals, chapters }: Props) {
         <div className="space-y-1.5">
           <Label htmlFor="year">שנה (לא חובה)</Label>
           <Input id="year" name="year" type="number" inputMode="numeric" min={1990} max={2100} placeholder="2026" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="suffix">קבוצה (לא חובה)</Label>
+          <GroupCombobox id="suffix" name="suffix" placeholder="— ללא קבוצה —" />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chapterHint">פרק / נושא (לא חובה)</Label>

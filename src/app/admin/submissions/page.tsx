@@ -53,6 +53,7 @@ export default async function AdminSubmissionsPage({
     id: s.id,
     institute: s.institute,
     year: s.year,
+    suffix: s.suffix,
     chapterHint: s.chapterHint,
     doctorName: s.doctorName,
     submitterLabel: s.submittedBy

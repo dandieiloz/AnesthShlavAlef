@@ -51,6 +51,7 @@ export async function submitContributionAction(formData: FormData): Promise<Subm
   if (!institute) return { ok: false, error: "יש לבחור או להזין מוסד" };
 
   const year = parseYear(formData.get("year"));
+  const suffix = clampMeta(formData.get("suffix"));
   const chapterHint = clampMeta(formData.get("chapterHint"));
   const doctorName = clampMeta(formData.get("doctorName"));
 
@@ -92,6 +93,7 @@ export async function submitContributionAction(formData: FormData): Promise<Subm
       fileName,
       institute,
       year,
+      suffix,
       chapterHint,
       doctorName,
       submittedById: userId,

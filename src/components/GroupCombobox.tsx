@@ -19,6 +19,7 @@ interface GroupComboboxProps {
   onChange?: (value: string) => void;
   /** Hidden input name for FormData submission. */
   name?: string;
+  id?: string;
   className?: string;
   buttonClassName?: string;
   placeholder?: string;
@@ -33,6 +34,7 @@ export function GroupCombobox({
   defaultValue,
   onChange,
   name,
+  id,
   className,
   buttonClassName,
   placeholder = "— ללא קבוצה —",
@@ -62,6 +64,7 @@ export function GroupCombobox({
       defaultValue={defaultValue}
       onChange={onChange}
       name={name}
+      id={id}
       options={options}
       creatable
       clearable

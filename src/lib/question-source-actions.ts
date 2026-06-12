@@ -8,11 +8,11 @@ const SOURCE_RE = /^(.+?)\s+(\d{4})(?:\s+(.+))?$/;
 
 /**
  * Returns the distinct, non-empty group ("קבוצה") suffixes used across existing
- * questions, sorted alphabetically. Admin-only; returns [] for everyone else.
+ * questions, sorted alphabetically. Available to any signed-in user.
  */
 export async function getQuestionGroupsAction(): Promise<string[]> {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") return [];
+  if (!session?.user?.id) return [];
 
   const rows = await db.question.findMany({
     where: { source: { not: null } },

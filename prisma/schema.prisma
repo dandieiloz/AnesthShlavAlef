@@ -584,6 +584,7 @@ model QuestionSubmission {
   // Submitter-provided metadata
   institute      String                     // required
   year           Int?
+  suffix         String?                    // optional exam group ("קבוצה"), e.g. "א", "מועד א"
   chapterHint    String?                    // free-text chapter / topic
   doctorName     String?
   // Submitter identity (submittedBy set only when authenticated)

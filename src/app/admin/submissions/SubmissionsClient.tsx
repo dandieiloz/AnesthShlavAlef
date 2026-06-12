@@ -14,6 +14,7 @@ export type SubmissionRow = {
   id: string;
   institute: string;
   year: number | null;
+  suffix: string | null;
   chapterHint: string | null;
   doctorName: string | null;
   submitterLabel: string;
@@ -50,7 +51,7 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
   // institute/year and is applied to every imported question.
   const [sourceInstitution, setSourceInstitution] = useState(submission.institute);
   const [sourceYear, setSourceYear] = useState(submission.year != null ? String(submission.year) : "");
-  const [sourceSuffix, setSourceSuffix] = useState("");
+  const [sourceSuffix, setSourceSuffix] = useState(submission.suffix ?? "");
 
   // Ensure a freeform submitter institute still renders in the select options.
   const sourceOptions = QUESTION_SOURCES.includes(submission.institute as (typeof QUESTION_SOURCES)[number])
