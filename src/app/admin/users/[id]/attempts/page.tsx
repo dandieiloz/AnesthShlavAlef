@@ -64,6 +64,7 @@ export default async function AdminUserAttemptsPage({
       image: true,
       role: true,
       plan: true,
+      scoreDrillSolved: true,
     },
   });
 
@@ -168,7 +169,11 @@ export default async function AdminUserAttemptsPage({
       </div>
 
       {/* Global stats (unaffected by filters) */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono">{totalAttempts + user.scoreDrillSolved}</div>
+          <div className="text-xs text-muted-foreground mt-1">סה״כ שאלות שנפתרו</div>
+        </div>
         <div className="rounded border bg-card p-3">
           <div className="text-2xl font-bold font-mono">{totalAttempts}</div>
           <div className="text-xs text-muted-foreground mt-1">סה״כ ניסיונות</div>
@@ -188,6 +193,12 @@ export default async function AdminUserAttemptsPage({
             {percentCorrect === null ? "—" : `${percentCorrect}%`}
           </div>
           <div className="text-xs text-muted-foreground mt-1">אחוז הצלחה</div>
+        </div>
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-400">
+            {user.scoreDrillSolved}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">תרגול ציונים</div>
         </div>
       </div>
 

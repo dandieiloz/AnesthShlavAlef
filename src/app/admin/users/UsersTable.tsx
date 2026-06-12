@@ -22,6 +22,7 @@ export type UserRow = {
   attemptCount: number;
   localPdfSet: boolean;
   successPercent: number | null;
+  scoreDrillSolved: number;
 };
 
 type SortField =
@@ -170,6 +171,7 @@ export function UsersTable({
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פרופיל</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">PDF</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">אחוז הצלחה</th>
+          <th className="p-2 text-center text-muted-foreground whitespace-nowrap">תרגול ציונים</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">היסטוריה</th>
           <th className="p-2 text-center text-muted-foreground whitespace-nowrap">פעולות</th>
         </tr>
@@ -307,14 +309,23 @@ export function UsersTable({
                 )}
               </td>
 
+              {/* Score-drill questions solved */}
+              <td className="p-2 text-center text-muted-foreground whitespace-nowrap">
+                {u.scoreDrillSolved > 0 ? (
+                  <span className="font-mono text-xs tabular-nums">{u.scoreDrillSolved}</span>
+                ) : (
+                  <span className="italic text-muted-foreground/50">—</span>
+                )}
+              </td>
+
               {/* History link */}
               <td className="p-2 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <span
                     className="font-mono text-xs text-muted-foreground tabular-nums min-w-[2ch] text-end"
-                    title="סה”כ ניסיונות"
+                    title="סה״כ שאלות שנפתרו (ניסיונות + תרגול ציונים)"
                   >
-                    {u.attemptCount}
+                    {u.attemptCount + u.scoreDrillSolved}
                   </span>
                   <Link
                     href={`/admin/users/${u.id}/attempts`}

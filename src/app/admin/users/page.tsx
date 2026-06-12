@@ -110,6 +110,7 @@ export default async function AdminUsersPage({
     residencyYear: true,
     createdAt: true,
     localPdfSetAt: true,
+    scoreDrillSolved: true,
   } as const;
 
   // When sorting by lastActive we need to compute max(Attempt.createdAt) per
@@ -127,6 +128,7 @@ export default async function AdminUsersPage({
     residencyYear: number | null;
     createdAt: Date;
     localPdfSetAt: Date | null;
+    scoreDrillSolved: number;
   }>;
   let lastActiveByUser: Map<string, Date>;
   let lastVisitByUser: Map<string, Date> = new Map();
@@ -212,13 +214,15 @@ export default async function AdminUsersPage({
     lastActiveByUser = new Map();
   }
 
-  const [filteredTotal, totalUsers, adminCount, demoCount, todayQuestionsDoneCount] = await Promise.all([
+  const [filteredTotal, totalUsers, adminCount, demoCount, todayQuestionsDoneCount, drillSolvedAgg] = await Promise.all([
     db.user.count({ where }),
     db.user.count(),
     db.user.count({ where: { role: "ADMIN" } }),
     db.user.count({ where: { plan: "DEMO" } }),
     db.attempt.count({ where: { createdAt: { gte: todayStart, lt: tomorrowStart } } }),
+    db.user.aggregate({ _sum: { scoreDrillSolved: true } }),
   ]);
+  const totalDrillSolved = drillSolvedAgg._sum.scoreDrillSolved ?? 0;
 
   // Fetch attempt counts (and last-active when not already computed) for the
   // visible users. One indexed groupBy on Attempt(userId) per stat.
@@ -284,6 +288,7 @@ export default async function AdminUsersPage({
     lastVisitAt: lastVisitByUser.get(u.id)?.toISOString() ?? null,
     attemptCount: attemptCountByUser.get(u.id) ?? 0,
     localPdfSet: u.localPdfSetAt !== null,
+    scoreDrillSolved: u.scoreDrillSolved,
     successPercent: (() => {
       const total = attemptCountByUser.get(u.id) ?? 0;
       if (total === 0) return null;
@@ -300,7 +305,7 @@ export default async function AdminUsersPage({
       <UserActivityChart />
 
       {/* Summary stat cards */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         <div className="rounded border bg-card p-3">
           <div className="text-2xl font-bold font-mono">{totalUsers}</div>
           <div className="text-xs text-muted-foreground mt-1">סה״כ משתמשים</div>
@@ -316,6 +321,10 @@ export default async function AdminUsersPage({
         <div className="rounded border bg-card p-3">
           <div className="text-2xl font-bold font-mono text-orange-600 dark:text-orange-400">{todayQuestionsDoneCount}</div>
           <div className="text-xs text-muted-foreground mt-1">שאלות שבוצעו היום (00:00-23:59)</div>
+        </div>
+        <div className="rounded border bg-card p-3">
+          <div className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-400">{totalDrillSolved}</div>
+          <div className="text-xs text-muted-foreground mt-1">תרגול ציונים (סה״כ)</div>
         </div>
       </div>
 

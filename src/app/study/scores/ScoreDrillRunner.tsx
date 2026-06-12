@@ -11,7 +11,7 @@ import type { Locale } from "@/lib/locale";
 import type { ConfidenceLevel, GeneratedQuestion, ScoreSystem } from "@/lib/scores/types";
 import { getScoreById, SCORE_CATEGORIES } from "@/lib/scores/registry";
 import { generateScoreQuestion } from "@/lib/scores/generate";
-import { rateScoreConfidenceAction } from "@/app/(user)/actions";
+import { rateScoreConfidenceAction, incrementScoreDrillSolvedAction } from "@/app/(user)/actions";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 
 type ScoresT = ReturnType<typeof getDictionary>["scores"];
@@ -110,6 +110,13 @@ export function ScoreDrillRunner({
     setConfidence((c) => ({ ...c, [scoreId]: level }));
     startTransition(() => {
       void rateScoreConfidenceAction({ scoreId, level });
+    });
+  }
+
+  function reveal() {
+    setRevealed(true);
+    startTransition(() => {
+      void incrementScoreDrillSolvedAction();
     });
   }
 
@@ -258,7 +265,7 @@ export function ScoreDrillRunner({
               type="button"
               className="w-full gap-2"
               disabled={selectedId === null}
-              onClick={() => setRevealed(true)}
+              onClick={reveal}
             >
               <Check className="h-4 w-4" />
               {t.check}

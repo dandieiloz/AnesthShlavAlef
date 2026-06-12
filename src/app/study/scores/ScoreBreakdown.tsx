@@ -1,7 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
+import { findBand } from "@/lib/scores/engine";
 import type { GeneratedQuestion, ScoreSystem } from "@/lib/scores/types";
+
+import { cn } from "@/lib/utils";
 
 /**
  * Reveals how a generated score question was computed: the result line, a
@@ -57,6 +60,8 @@ export function ScoreBreakdown({
         </p>
       )}
 
+      <FullExplanation question={question} score={score} locale={locale} t={t} />
+
       <div className="text-xs text-muted-foreground">
         <span className="font-medium">{t.millerLabel}: </span>
         <span>{t.millerChapter(miller.primary.chapter, miller.primary.title[locale])}</span>
@@ -68,6 +73,203 @@ export function ScoreBreakdown({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+type ScoresDict = ReturnType<typeof getDictionary>["scores"];
+
+/**
+ * The complete reference for the score, regardless of the specific generated
+ * question: a one-line description plus the full interpretation scale (bands /
+ * categories / code positions), highlighting the part that applied this time.
+ */
+function FullExplanation({
+  question,
+  score,
+  locale,
+  t,
+}: {
+  question: GeneratedQuestion;
+  score: ScoreSystem;
+  locale: Locale;
+  t: ScoresDict;
+}) {
+  return (
+    <div className="space-y-2 border-t pt-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {t.aboutTitle}
+      </p>
+      <p className="text-xs text-muted-foreground">{score.blurb[locale]}</p>
+
+      {score.kind === "additive" && (
+        <AdditiveScale
+          score={score}
+          total={question.total}
+          breakdown={question.breakdown}
+          locale={locale}
+          t={t}
+        />
+      )}
+      {score.kind === "classify" && (
+        <ClassifyScale score={score} question={question} locale={locale} t={t} />
+      )}
+      {score.kind === "decode" && <DecodeScale score={score} locale={locale} t={t} />}
+    </div>
+  );
+}
+
+function AdditiveScale({
+  score,
+  total,
+  breakdown,
+  locale,
+  t,
+}: {
+  score: Extract<ScoreSystem, { kind: "additive" }>;
+  total: number | undefined;
+  breakdown: GeneratedQuestion["breakdown"];
+  locale: Locale;
+  t: ScoresDict;
+}) {
+  const active = typeof total === "number" ? findBand(score.interpretation, total) : undefined;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-foreground">{t.rubricTitle}</p>
+        <ul className="space-y-1.5">
+          {score.components.map((comp) => {
+            const row = breakdown.find((r) => r.label.en === comp.label.en);
+            return (
+              <li key={comp.id} className="text-xs">
+                <span className="font-medium text-foreground">{comp.label[locale]}</span>
+                <ul className="mt-0.5 space-y-0.5 ps-3">
+                  {comp.options.map((o, i) => {
+                    const isActive =
+                      row != null && row.value.en === o.value.en && row.points === o.points;
+                    return (
+                      <li
+                        key={i}
+                        className={cn(
+                          "flex items-start justify-between gap-3 rounded px-1.5 py-0.5",
+                          isActive
+                            ? "bg-success/10 font-medium text-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        <span>{o.value[locale]}</span>
+                        <span className="shrink-0 tabular-nums">
+                          {o.points >= 0 ? `+${o.points}` : o.points} {t.pointsLabel}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-foreground">{t.fullScaleTitle}</p>
+        <ul className="space-y-1">
+          {score.interpretation.map((band, i) => {
+            const isActive = active != null && band.min === active.min && band.max === active.max;
+            return (
+              <li
+                key={i}
+                className={cn(
+                  "flex items-start justify-between gap-3 rounded-md px-2 py-1 text-xs",
+                  isActive ? "bg-success/10 font-medium text-foreground" : "text-muted-foreground",
+                )}
+              >
+                <span>
+                  {band.label[locale]}
+                  {band.detail && (
+                    <span className="text-muted-foreground"> — {band.detail[locale]}</span>
+                  )}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {band.min === band.max ? band.min : `${band.min}–${band.max}`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function ClassifyScale({
+  score,
+  question,
+  locale,
+  t,
+}: {
+  score: Extract<ScoreSystem, { kind: "classify" }>;
+  question: GeneratedQuestion;
+  locale: Locale;
+  t: ScoresDict;
+}) {
+  const sorted = [...score.categories].sort((a, b) => a.order - b.order);
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-foreground">{t.fullScaleTitle}</p>
+      <ul className="space-y-1">
+        {sorted.map((cat) => {
+          const isActive = question.result.en.includes(cat.label.en);
+          return (
+            <li
+              key={cat.id}
+              className={cn(
+                "rounded-md px-2 py-1 text-xs",
+                isActive ? "bg-success/10 font-medium text-foreground" : "text-muted-foreground",
+              )}
+            >
+              <span className="font-medium text-foreground">{cat.label[locale]}</span>
+              {cat.detail && (
+                <span className="text-muted-foreground"> — {cat.detail[locale]}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function DecodeScale({
+  score,
+  locale,
+  t,
+}: {
+  score: Extract<ScoreSystem, { kind: "decode" }>;
+  locale: Locale;
+  t: ScoresDict;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-foreground">{t.positionsTitle}</p>
+      <ul className="space-y-1.5">
+        {score.positions.map((pos) => (
+          <li key={pos.index} className="text-xs">
+            <span className="font-medium text-foreground">
+              {pos.index}. {pos.name[locale]}
+            </span>
+            <ul className="mt-0.5 space-y-0.5 ps-3 text-muted-foreground">
+              {pos.letters.map((letter) => (
+                <li key={letter.code}>
+                  <span className="font-mono font-semibold text-foreground">{letter.code}</span>
+                  {" — "}
+                  {letter.meaning[locale]}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

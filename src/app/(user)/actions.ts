@@ -84,6 +84,18 @@ export async function rateScoreConfidenceAction(input: {
   revalidatePath("/study");
 }
 
+/**
+ * Increments the current user's lifetime count of scoring-drill questions
+ * answered. This is a plain counter — no per-question outcome is stored.
+ */
+export async function incrementScoreDrillSolvedAction() {
+  const me = await requireUser();
+  await db.user.update({
+    where: { id: me.id },
+    data: { scoreDrillSolved: { increment: 1 } },
+  });
+}
+
 const QuizSchema = z.object({
   name: z.string().min(1).max(200),
   chapterIds: z.array(z.coerce.number()).min(1),
