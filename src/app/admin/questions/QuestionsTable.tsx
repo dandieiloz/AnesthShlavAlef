@@ -503,7 +503,7 @@ export function QuestionsTable({
                   />
                 </td>
                 <td className="p-2 text-muted-foreground font-mono">{q.id}</td>
-                <td className="p-2 max-w-md">
+                <td className="p-2 max-w-2xl">
                   <div className="flex items-start gap-2">
                     <Link
                       href={`/history/${q.id}`}
@@ -526,7 +526,7 @@ export function QuestionsTable({
                     ) : null}
                   </div>
                 </td>
-                <td className="p-2 text-muted-foreground whitespace-nowrap">
+                <td className="p-2 text-muted-foreground max-w-[8rem] truncate" title={q.source ?? undefined}>
                   {q.source ?? <span className="italic text-muted-foreground/50">—</span>}
                 </td>
                 <td className="p-2 text-center text-muted-foreground">{q.chapterNumber}</td>

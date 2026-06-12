@@ -81,6 +81,31 @@ export interface ScoreComponent {
    * and the finding is shown without the label prefix.
    */
   selfDescribing?: boolean;
+  /**
+   * Optional coupling hook: derive this component's chosen option from the RNG
+   * and the options already picked for earlier components (which must appear
+   * before it in `components`). Used e.g. for STOP-BANG, where the neck-
+   * circumference threshold depends on the patient's sex. The returned `points`
+   * must equal one of `options`' points so the total / breakdown stay valid.
+   */
+  derive?: (ctx: DeriveContext) => DerivedComponent;
+}
+
+/** Context passed to a component's `derive` hook during generation. */
+export interface DeriveContext {
+  rng: () => number;
+  /** Options already chosen for earlier components, keyed by component id. */
+  chosen: Record<string, ScoreOption>;
+}
+
+/** Result of a component's `derive` hook. */
+export interface DerivedComponent {
+  /** Must equal one of the component's option points. */
+  points: number;
+  /** Concrete finding text shown in the question, e.g. "44 cm" (no threshold hint). */
+  shown: Bilingual;
+  /** Value label for the breakdown + rubric; equal one option's value to highlight it. */
+  value: Bilingual;
 }
 
 export interface InterpretationBand {

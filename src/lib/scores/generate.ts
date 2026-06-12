@@ -18,6 +18,7 @@ import type {
   Finding,
   GeneratedQuestion,
   NumericSample,
+  ScoreOption,
   ScoreSystem,
 } from "./types";
 import { adjustCategory, findBand, totalRange } from "./engine";
@@ -96,10 +97,20 @@ export function generateScoreQuestion(
 function genAdditive(score: AdditiveScore, rng: RNG): GeneratedQuestion {
   const findings: Finding[] = [];
   const breakdown: BreakdownRow[] = [];
+  const chosen: Record<string, ScoreOption> = {};
   let total = 0;
 
   for (const comp of score.components) {
+    if (comp.derive) {
+      const d = comp.derive({ rng, chosen });
+      total += d.points;
+      chosen[comp.id] = { value: d.value, points: d.points };
+      findings.push({ label: comp.selfDescribing ? undefined : comp.label, text: d.shown });
+      breakdown.push({ label: comp.label, value: d.value, points: d.points });
+      continue;
+    }
     const opt = pick(rng, comp.options);
+    chosen[comp.id] = opt;
     total += opt.points;
 
     let shown: Bilingual = opt.value;
