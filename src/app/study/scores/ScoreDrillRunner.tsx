@@ -16,6 +16,16 @@ import { ScoreBreakdown } from "./ScoreBreakdown";
 
 type ScoresT = ReturnType<typeof getDictionary>["scores"];
 
+/** Snapshot persisted to sessionStorage so leaving the page and returning resumes the same exam. */
+type PersistedDrill = {
+  scoreId: string;
+  question: GeneratedQuestion;
+  step: number;
+  selectedId: string | null;
+  revealed: boolean;
+  finished: boolean;
+};
+
 const CONF_ACTIVE: Record<ConfidenceLevel, string> = {
   CONFIDENT: "border-success bg-success/15 text-success",
   OK: "border-warning bg-warning/15 text-warning",
@@ -99,12 +109,59 @@ export function ScoreDrillRunner({
   const [confidence, setConfidence] = useState<Record<string, ConfidenceLevel>>(initialConfidence);
   const [, startTransition] = useTransition();
 
-  // Generate the first question on the client only (avoids SSR/hydration
-  // mismatch from Math.random).
+  // Stable key for this exam configuration so a different selection/length
+  // starts fresh while re-opening the same URL resumes.
+  const storageKey = useMemo(
+    () => `score-drill:${[...scoreIds].sort().join(",")}:${count}`,
+    [scoreIds, count],
+  );
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore an in-progress drill (survives navigating away & back within the
+  // tab) or generate the first question. Client-only to avoid SSR/hydration
+  // mismatch from Math.random.
   useEffect(() => {
-    if (scores.length > 0) setCurrent(makeQuestion());
+    if (scores.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as PersistedDrill;
+        const score = getScoreById(saved.scoreId);
+        if (score && saved.question && saved.step < count) {
+          setCurrent({ score, question: saved.question });
+          setStep(saved.step);
+          setSelectedId(saved.selectedId);
+          setRevealed(saved.revealed);
+          setFinished(saved.finished);
+          setHydrated(true);
+          return;
+        }
+      }
+    } catch {
+      // Corrupt or unavailable storage — fall through to a fresh question.
+    }
+    setCurrent(makeQuestion());
+    setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist whenever the drill advances so a return trip resumes exactly here.
+  useEffect(() => {
+    if (!hydrated || !current) return;
+    try {
+      const payload: PersistedDrill = {
+        scoreId: current.score.id,
+        question: current.question,
+        step,
+        selectedId,
+        revealed,
+        finished,
+      };
+      sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch {
+      // Storage may be full or disabled; resuming is best-effort.
+    }
+  }, [hydrated, current, step, selectedId, revealed, finished, storageKey]);
 
   function rate(scoreId: string, level: ConfidenceLevel) {
     setConfidence((c) => ({ ...c, [scoreId]: level }));
