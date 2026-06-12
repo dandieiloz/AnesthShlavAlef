@@ -14,6 +14,8 @@ import { aldrete } from "./definitions/aldrete";
 import { stopbang } from "./definitions/stopbang";
 import { rcri } from "./definitions/rcri";
 import { cha2ds2vasc } from "./definitions/cha2ds2vasc";
+import { lvef } from "./definitions/lvef";
+import { aorticstenosis } from "./definitions/aorticstenosis";
 import { pacemaker } from "./definitions/pacemaker";
 // import { ariscat } from "./definitions/ariscat"; // disabled for now
 import { gcs } from "./definitions/gcs";
@@ -41,6 +43,8 @@ export const SCORE_SYSTEMS: ScoreSystem[] = [
   stopbang,
   rcri,
   cha2ds2vasc,
+  lvef,
+  aorticstenosis,
   gcs,
   hunthess,
   fisher,
