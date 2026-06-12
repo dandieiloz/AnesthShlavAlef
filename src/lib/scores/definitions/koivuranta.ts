@@ -20,8 +20,16 @@ export const koivuranta: AdditiveScore = {
     primary: { chapter: 76, title: bi("ההתאוששות (PACU)", "The Postanesthesia Care Unit") },
   },
   components: [
-    binary("female", bi("מין נקבה", "Female sex"), 1),
-    binary("nonsmoker", bi("לא מעשן/ת", "Non-smoker"), 1),
+    binary("female", bi("מין", "Sex"), 1, {
+      yes: bi("אישה", "Woman"),
+      no: bi("גבר", "Man"),
+      selfDescribing: true,
+    }),
+    binary("nonsmoker", bi("עישון", "Smoking"), 1, {
+      yes: bi("לא מעשן/ת", "Non-smoker"),
+      no: bi("מעשן/ת", "Smoker"),
+      selfDescribing: true,
+    }),
     binary("ponv", bi("היסטוריה של PONV", "History of PONV"), 1),
     binary("motion", bi("היסטוריה של מחלת תנועה", "History of motion sickness"), 1),
     binary("duration", bi("משך ניתוח מעל 60 דקות", "Surgery longer than 60 minutes"), 1),

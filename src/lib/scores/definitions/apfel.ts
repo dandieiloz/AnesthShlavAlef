@@ -20,8 +20,16 @@ export const apfel: AdditiveScore = {
     primary: { chapter: 76, title: bi("ההתאוששות (PACU)", "The Postanesthesia Care Unit") },
   },
   components: [
-    binary("female", bi("מין נקבה", "Female sex"), 1),
-    binary("nonsmoker", bi("לא מעשן/ת", "Non-smoker"), 1),
+    binary("female", bi("מין", "Sex"), 1, {
+      yes: bi("אישה", "Woman"),
+      no: bi("גבר", "Man"),
+      selfDescribing: true,
+    }),
+    binary("nonsmoker", bi("עישון", "Smoking"), 1, {
+      yes: bi("לא מעשן/ת", "Non-smoker"),
+      no: bi("מעשן/ת", "Smoker"),
+      selfDescribing: true,
+    }),
     binary(
       "history",
       bi("היסטוריה של PONV או מחלת תנועה", "History of PONV or motion sickness"),

@@ -108,7 +108,7 @@ function genAdditive(score: AdditiveScore, rng: RNG): GeneratedQuestion {
       const unit = opt.sample.unit;
       shown = unit ? bi(`${v} ${unit}`, `${v} ${unit}`) : biNum(v);
     }
-    findings.push({ label: comp.label, text: shown });
+    findings.push({ label: comp.selfDescribing ? undefined : comp.label, text: shown });
     breakdown.push({ label: comp.label, value: opt.value, points: opt.points });
   }
 

@@ -16,7 +16,7 @@ export function binary(
   id: string,
   label: Bilingual,
   points: number,
-  override?: { yes?: Bilingual; no?: Bilingual },
+  override?: { yes?: Bilingual; no?: Bilingual; selfDescribing?: boolean },
 ): ScoreComponent {
   return {
     id,
@@ -25,6 +25,7 @@ export function binary(
       { value: override?.no ?? bi("לא", "No"), points: 0 },
       { value: override?.yes ?? bi("כן", "Yes"), points },
     ],
+    ...(override?.selfDescribing ? { selfDescribing: true } : {}),
   };
 }
 

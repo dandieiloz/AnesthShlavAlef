@@ -76,6 +76,11 @@ export interface ScoreComponent {
   /** Component name, e.g. "Age", "Female sex". */
   label: Bilingual;
   options: ScoreOption[];
+  /**
+   * When true, the option value is a complete phrase (e.g. "Woman" / "Man")
+   * and the finding is shown without the label prefix.
+   */
+  selfDescribing?: boolean;
 }
 
 export interface InterpretationBand {
