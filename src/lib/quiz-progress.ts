@@ -18,7 +18,9 @@ export async function getQuizProgress(user: PlanGatedUser, quiz: Quiz): Promise<
   const planGate = await questionAccessWhere(user);
   const [total, answeredRows] = await Promise.all([
     useFixedSet
-      ? Promise.resolve(quiz.questionIds.length)
+      ? db.question.count({
+          where: { id: { in: quiz.questionIds }, AND: [planGate, hasUsableAnswerWhere] },
+        })
       : db.question.count({
           where: { chapterIds: { hasSome: quiz.chapterIds }, AND: [planGate, hasUsableAnswerWhere] },
         }),
@@ -57,10 +59,28 @@ export async function getQuizProgressMany(
   // quizzes' chapters (same plan/publish gate the quiz page uses). We keep the
   // per-question chapterIds so each quiz's total is a DISTINCT count — a
   // question that lists several of the quiz's chapters must only count once.
-  const eligibleQuestions = await db.question.findMany({
-    where: { chapterIds: { hasSome: allChapterIds }, AND: [planGate, hasUsableAnswerWhere] },
-    select: { id: true, chapterIds: true },
-  });
+  const eligibleQuestions = allChapterIds.length > 0
+    ? await db.question.findMany({
+        where: { chapterIds: { hasSome: allChapterIds }, AND: [planGate, hasUsableAnswerWhere] },
+        select: { id: true, chapterIds: true },
+      })
+    : [];
+
+  // Fixed-set quizzes pin specific question ids. Some of those may since have
+  // become unservable (disabled, lost a usable answer, or fell out of plan), so
+  // the total must count only the ids that still pass the gate — otherwise the
+  // card shows a larger total than the quiz can ever deliver.
+  const allFixedIds = [...new Set(quizzes.flatMap((q) => q.questionIds))];
+  const servableFixedIds = allFixedIds.length > 0
+    ? new Set(
+        (
+          await db.question.findMany({
+            where: { id: { in: allFixedIds }, AND: [planGate, hasUsableAnswerWhere] },
+            select: { id: true },
+          })
+        ).map((q) => q.id),
+      )
+    : new Set<number>();
 
   // All attempts for these quizzes
   const attempts = await db.attempt.findMany({
@@ -72,7 +92,7 @@ export async function getQuizProgressMany(
   for (const quiz of quizzes) {
     let total: number;
     if (quiz.questionIds.length > 0) {
-      total = quiz.questionIds.length;
+      total = quiz.questionIds.filter((id) => servableFixedIds.has(id)).length;
     } else {
       // Distinct count: how many eligible questions intersect this quiz's chapters.
       const quizChapterSet = new Set(quiz.chapterIds);

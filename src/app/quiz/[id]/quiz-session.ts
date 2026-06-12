@@ -295,7 +295,9 @@ export async function loadQuizSession(args: {
       orderBy: { createdAt: "asc" },
     }),
     useFixedSet
-      ? Promise.resolve(quiz.questionIds.length)
+      ? db.question.count({
+          where: { id: { in: quiz.questionIds }, AND: [planGate, hasUsableAnswerWhere] },
+        })
       : db.question.count({
           where: { chapterIds: { hasSome: quiz.chapterIds }, AND: [planGate, hasUsableAnswerWhere] },
         }),
