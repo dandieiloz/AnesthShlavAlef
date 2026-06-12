@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx scripts/ingest-chapter.ts",
-    "ingest:all": "tsx scripts/reingest-all.ts"
+    "ingest:all": "tsx scripts/reingest-all.ts",
+    "check:scores": "tsx scripts/check-scores.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",

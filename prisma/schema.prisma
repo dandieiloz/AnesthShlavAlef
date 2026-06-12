@@ -59,6 +59,12 @@ enum SubmissionStatus {
   REJECTED
 }
 
+enum ConfidenceLevel {
+  CONFIDENT
+  OK
+  WEAK
+}
+
 model User {
   id             String    @id @default(cuid())
   name           String?
@@ -99,6 +105,19 @@ model User {
   activityPings     ActivityPing[]
   submissions       QuestionSubmission[]     @relation("SubmissionAuthor")
   reviewedSubmissions QuestionSubmission[]   @relation("SubmissionReviewer")
+  scoreConfidence   ScoreConfidence[]
+}
+
+model ScoreConfidence {
+  id        String          @id @default(cuid())
+  userId    String
+  scoreId   String
+  level     ConfidenceLevel
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scoreId])
+  @@index([userId])
 }
 
 model Account {

@@ -10,6 +10,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere, hasUsableAnswerWhere } from "@/lib/plan";
 import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
+import type { ConfidenceLevel } from "@/lib/scores/types";
 
 export default async function NewQuizPage({
   searchParams,
@@ -25,11 +26,19 @@ export default async function NewQuizPage({
   const me = await requireCompletedProfile();
   const { chapter, empty, mode, inst, year } = await searchParams;
   const preselectedChapter = chapter ? Number(chapter) : null;
-  const initialMode: "chapters" | "exam" = mode === "exam" ? "exam" : "chapters";
+  const initialMode: "chapters" | "exam" | "scores" =
+    mode === "exam" ? "exam" : mode === "scores" ? "scores" : "chapters";
 
   const locale = await getLocale();
   const dict = getDictionary(locale);
   const t = dict.studyNew;
+
+  const scoreConfidence = await db.scoreConfidence.findMany({
+    where: { userId: me.id },
+    select: { scoreId: true, level: true },
+  });
+  const confidenceMap: Record<string, ConfidenceLevel> = {};
+  for (const sc of scoreConfidence) confidenceMap[sc.scoreId] = sc.level;
 
   const chapters = await db.chapter.findMany({
     orderBy: { number: "asc" },
@@ -191,6 +200,7 @@ export default async function NewQuizPage({
               initialMode={initialMode}
               initialInstitute={inst ?? null}
               initialYear={year ?? null}
+              confidence={confidenceMap}
             />
           </form>
         </CardContent>

@@ -9,6 +9,7 @@ import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { StatsSection } from "./StatsSection";
 import { ForumPreview } from "@/app/forum/ForumPreview";
+import { ScoreConfidenceOverview } from "./ScoreConfidenceOverview";
 import { QuizzesClient, type QuizRow } from "@/app/quizzes/QuizzesClient";
 import {
   PlusCircle,
@@ -102,6 +103,7 @@ export default async function StudyPage({
             {quizRows.length > 0 && (
               <QuizzesClient quizzes={quizRows} locale={locale} initialVisible={3} />
             )}
+            <ScoreConfidenceOverview userId={me.id} locale={locale} />
             <ForumPreview locale={locale} />
           </div>
         </StatsSection>

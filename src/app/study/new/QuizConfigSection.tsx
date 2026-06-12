@@ -9,13 +9,15 @@ import { ChapterPicker } from "./ChapterPicker";
 import { QuestionLimitPicker } from "./QuestionLimitPicker";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
+import type { ConfidenceLevel } from "@/lib/scores/types";
+import { ScorePicker } from "./ScorePicker";
 
 type StudyNewT = Dictionary["studyNew"];
 
 const MODE_STORAGE_KEY = "quizAnswerMode";
 const SETUP_MODE_STORAGE_KEY = "quizSetupMode";
 type AnswerMode = "immediate" | "full";
-type SetupMode = "chapters" | "exam";
+type SetupMode = "chapters" | "exam" | "scores";
 
 interface ChapterRow {
   id: number;
@@ -60,6 +62,7 @@ export function QuizConfigSection({
   initialMode = "chapters",
   initialInstitute = null,
   initialYear = null,
+  confidence = {},
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
@@ -68,9 +71,11 @@ export function QuizConfigSection({
   initialMode?: SetupMode;
   initialInstitute?: string | null;
   initialYear?: string | null;
+  confidence?: Record<string, ConfidenceLevel>;
 }) {
   const t = getDictionary(locale).studyNew;
   const tq = getDictionary(locale).quiz;
+  const tScores = getDictionary(locale).scores;
   const initialSelected = chapters.filter((c) => preselected.includes(c.id));
   const [selectedChapters, setSelectedChapters] = useState<ChapterRow[]>(initialSelected);
   const [nameTouched, setNameTouched] = useState(false);
@@ -138,7 +143,7 @@ export function QuizConfigSection({
         !initialInstitute &&
         !initialYear &&
         initialMode === "chapters" &&
-        (storedSetup === "chapters" || storedSetup === "exam")
+        (storedSetup === "chapters" || storedSetup === "exam" || storedSetup === "scores")
       ) {
         setSetupMode(storedSetup);
         setIncludeSeen(storedSetup === "exam");
@@ -232,9 +237,25 @@ export function QuizConfigSection({
           >
             {t.modeExam}
           </button>
+          <button
+            type="button"
+            onClick={() => changeSetupMode("scores")}
+            aria-pressed={setupMode === "scores"}
+            className={`rounded px-3 py-1.5 transition-colors ${
+              setupMode === "scores"
+                ? "bg-background font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tScores.modeScores}
+          </button>
         </div>
       </div>
 
+      {setupMode === "scores" ? (
+        <ScorePicker locale={locale} confidence={confidence} />
+      ) : (
+        <>
       <div className="space-y-1.5">
         <Label>{t.answerMode}</Label>
         <div
@@ -398,6 +419,8 @@ export function QuizConfigSection({
         <PlusCircle className="h-4 w-4" />
         {t.createQuiz}
       </Button>
+        </>
+      )}
     </>
   );
 }

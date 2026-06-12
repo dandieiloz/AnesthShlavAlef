@@ -1,0 +1,205 @@
+/**
+ * Type definitions for the clinical scoring-drill mode.
+ *
+ * Each score is encoded as declarative, bilingual data. Questions are generated
+ * at runtime from random patient parameters — there are no question rows in the
+ * database. The same pure-TS modules run on the client (the runner) and in the
+ * verification script (scripts/check-scores.ts).
+ *
+ * Per-score clinical content (names, labels, interpretation, Miller citation)
+ * lives in the definitions/ folder. Only generic UI chrome lives in i18n.ts.
+ */
+
+export type ContentLocale = "he" | "en";
+
+export interface Bilingual {
+  he: string;
+  en: string;
+}
+
+/** Self-rated confidence for a score. Mirrors the Prisma `ConfidenceLevel` enum. */
+export type ConfidenceLevel = "CONFIDENT" | "OK" | "WEAK";
+
+export type ScoreCategoryId =
+  | "ponvPacu"
+  | "sleepAirway"
+  | "cardiacPeriop"
+  | "pulmonary"
+  | "neuro"
+  | "renal"
+  | "hepatic"
+  | "obstetric";
+
+export interface ScoreCategory {
+  id: ScoreCategoryId;
+  label: Bilingual;
+  order: number;
+}
+
+/** A reference to a Miller's Anesthesia chapter, used for citations. */
+export interface MillerRef {
+  chapter: number;
+  title: Bilingual;
+}
+
+export interface MillerCitation {
+  primary: MillerRef;
+  also?: MillerRef[];
+}
+
+// ---------------------------------------------------------------------------
+// Additive scores (sum of component points)
+// ---------------------------------------------------------------------------
+
+/**
+ * When present on an option, the generator samples a concrete number in
+ * [min, max] and shows it in the findings (e.g. "Bilirubin: 2.4 mg/dL"),
+ * while the breakdown still shows the band label + points. The sample range
+ * must lie inside the band the option represents.
+ */
+export interface NumericSample {
+  min: number;
+  max: number;
+  decimals?: number; // default 0
+  unit?: string;
+}
+
+export interface ScoreOption {
+  /** Value label shown in findings + breakdown, e.g. "Yes", "51–80 years". */
+  value: Bilingual;
+  points: number;
+  sample?: NumericSample;
+}
+
+export interface ScoreComponent {
+  id: string;
+  /** Component name, e.g. "Age", "Female sex". */
+  label: Bilingual;
+  options: ScoreOption[];
+}
+
+export interface InterpretationBand {
+  /** Inclusive total range. */
+  min: number;
+  max: number;
+  label: Bilingual; // e.g. "Class A", "Low risk"
+  detail?: Bilingual; // e.g. "~10% PONV risk", "5–6 points"
+}
+
+export type AdditiveAsk = "total" | "band";
+
+export interface AdditiveScore extends ScoreBase {
+  kind: "additive";
+  components: ScoreComponent[];
+  interpretation: InterpretationBand[];
+  ask: AdditiveAsk[];
+}
+
+// ---------------------------------------------------------------------------
+// Classify scores (map a presentation to a category/grade/stage)
+// ---------------------------------------------------------------------------
+
+export interface ClassifyCategory {
+  id: string;
+  label: Bilingual; // e.g. "Grade II", "Injury"
+  /** Severity order; ascending = less severe → more severe. */
+  order: number;
+  /** Distinct clinical presentations; one is sampled as the vignette. */
+  presentations: Bilingual[];
+  detail?: Bilingual;
+}
+
+export interface ClassifyTrigger {
+  label: Bilingual; // e.g. "Diabetes"
+  finding: Bilingual; // e.g. "Known diabetes mellitus"
+}
+
+export interface ClassifyAdjust {
+  /** Each trigger, if present, advances one step toward the most-severe category. */
+  triggers: ClassifyTrigger[];
+  note: Bilingual; // the rule explanation, shown after answering
+}
+
+export interface ClassifyScore extends ScoreBase {
+  kind: "classify";
+  categories: ClassifyCategory[];
+  adjust?: ClassifyAdjust;
+}
+
+// ---------------------------------------------------------------------------
+// Decode scores (nomenclature, e.g. pacemaker NBG code)
+// ---------------------------------------------------------------------------
+
+export interface DecodeLetter {
+  code: string; // "O", "A", "V", "D", "T", "I", "R"
+  meaning: Bilingual;
+}
+
+export interface DecodePosition {
+  index: number; // 1-based position
+  name: Bilingual; // "Chamber Paced"
+  letters: DecodeLetter[];
+}
+
+export type DecodeAsk = "decodeMeaning" | "decodeCode";
+
+export interface DecodeScore extends ScoreBase {
+  kind: "decode";
+  positions: DecodePosition[];
+  /** Real-world example codes used as scaffolding for generation. */
+  sampleCodes: string[];
+  ask: DecodeAsk[];
+}
+
+// ---------------------------------------------------------------------------
+// Common base + union
+// ---------------------------------------------------------------------------
+
+export interface ScoreBase {
+  id: string;
+  abbrev: string; // "Apfel", "RCRI"
+  name: Bilingual; // full name
+  category: ScoreCategoryId;
+  blurb: Bilingual; // one-line description for the picker
+  miller: MillerCitation;
+}
+
+export type ScoreSystem = AdditiveScore | ClassifyScore | DecodeScore;
+
+// ---------------------------------------------------------------------------
+// Generated question
+// ---------------------------------------------------------------------------
+
+export type QuestionKind = AdditiveAsk | "classify" | DecodeAsk;
+
+export interface Finding {
+  label?: Bilingual; // e.g. "Age"
+  text: Bilingual; // e.g. "63 years" or a full sentence
+}
+
+export interface AnswerOption {
+  id: string;
+  label: Bilingual;
+  correct: boolean;
+}
+
+export interface BreakdownRow {
+  label: Bilingual;
+  value: Bilingual;
+  points?: number;
+}
+
+export interface GeneratedQuestion {
+  scoreId: string;
+  questionKind: QuestionKind;
+  stem: Bilingual;
+  findings: Finding[];
+  options: AnswerOption[];
+  breakdown: BreakdownRow[];
+  /** Total points for additive scores (for display). */
+  total?: number;
+  /** Result summary line, e.g. "Total 3 → Class A (5–6 points)". */
+  result: Bilingual;
+  /** Optional extra note (e.g. the adjust-rule explanation). */
+  note?: Bilingual;
+}

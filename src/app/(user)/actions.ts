@@ -11,6 +11,7 @@ import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere, assertCanAccessQuestion, hasUsableAnswerWhere } from "@/lib/plan";
 import { addQuestionReply, editReply, deleteReply } from "@/lib/forum";
 import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
+import { getScoreById } from "@/lib/scores/registry";
 import { loadQuizBatch, type QuizBatch, type QuestionPayload } from "@/app/quiz/[id]/quiz-session";
 import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 export async function updateProfileAction(formData: FormData) {
@@ -55,6 +56,32 @@ export async function setLocalPdfStateAction(hasPdf: boolean) {
     where: { id: me.id },
     data: { localPdfSetAt: hasPdf ? new Date() : null },
   });
+}
+
+const ConfidenceSchema = z.object({
+  scoreId: z.string().min(1).max(64),
+  level: z.enum(["CONFIDENT", "OK", "WEAK"]),
+});
+
+/**
+ * Upserts the current user's self-rated confidence for a clinical score.
+ * The scoring-drill mode does no objective logging — only the learner's own
+ * confidence rating is stored, so they can target weak scores later.
+ */
+export async function rateScoreConfidenceAction(input: {
+  scoreId: string;
+  level: "CONFIDENT" | "OK" | "WEAK";
+}) {
+  const me = await requireUser();
+  const { scoreId, level } = ConfidenceSchema.parse(input);
+  // Only accept registered scores; ignore arbitrary ids.
+  if (!getScoreById(scoreId)) return;
+  await db.scoreConfidence.upsert({
+    where: { userId_scoreId: { userId: me.id, scoreId } },
+    create: { userId: me.id, scoreId, level },
+    update: { level },
+  });
+  revalidatePath("/study");
 }
 
 const QuizSchema = z.object({
