@@ -18,6 +18,8 @@ export type QuestionRow = {
   disabled: boolean;
   /** Primary correct answer (A/B/C/D), or null when not yet set. */
   correctAnswer: "A" | "B" | "C" | "D" | null;
+  /** Where the displayed answer comes from: Gemini-generated, admin-set, or none. */
+  correctAnswerSource: "gemini" | "admin" | null;
   /** Number of admin-marked additionally-accepted answers (excludes the primary). 0 = single-answer question. */
   acceptedAnswersCount: number;
   /** Confidence in [0,1] from the GeminiAnswer, or null when no answer exists. */
@@ -532,7 +534,10 @@ export function QuestionsTable({
                   {q.correctAnswer === null ? (
                     <span className="italic text-muted-foreground/50">—</span>
                   ) : (
-                    <span className="text-xs rounded px-2 py-0.5 font-mono font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300">
+                    <span
+                      className="text-xs rounded px-2 py-0.5 font-mono font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300"
+                      title={q.correctAnswerSource === "admin" ? "תשובה שהוגדרה ידנית על ידי מנהל" : "תשובה שנוצרה אוטומטית (Gemini)"}
+                    >
                       {q.correctAnswer}
                       {q.acceptedAnswersCount > 0 ? "+" : ""}
                     </span>

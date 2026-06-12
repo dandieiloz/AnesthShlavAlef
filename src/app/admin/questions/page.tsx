@@ -151,6 +151,7 @@ export default async function AdminQuestionsPage({
         geminiAnswer: {
           select: {
             id: true,
+            correctAnswer: true,
             confidence: true,
             escalated: true,
             insufficientEvidence: true,
@@ -237,7 +238,14 @@ export default async function AdminQuestionsPage({
       chapterNumber: q.chapter.number,
       hasExplanation: q.geminiAnswer !== null,
       disabled: q.disabled,
-      correctAnswer: q.correctAnswer,
+      // Effective answer learners actually see: Gemini's answer takes precedence,
+      // falling back to an admin-set official answer (mirrors grading logic elsewhere).
+      correctAnswer: q.geminiAnswer?.correctAnswer ?? q.correctAnswer,
+      correctAnswerSource: q.geminiAnswer?.correctAnswer
+        ? ("gemini" as const)
+        : q.correctAnswer
+          ? ("admin" as const)
+          : null,
       acceptedAnswersCount: q.acceptedAnswers.length,
       confidence: q.geminiAnswer?.confidence ?? null,
       escalated: q.geminiAnswer?.escalated ?? null,
