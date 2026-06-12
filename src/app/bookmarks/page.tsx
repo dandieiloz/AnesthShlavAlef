@@ -11,6 +11,7 @@ import { AnswerExplanation, type EvidenceCitationDisplay } from "@/components/An
 import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
 import { BookmarksSearch } from "@/components/BookmarksSearch";
+import { BookmarksSort, type BookmarksSortValue } from "@/components/BookmarksSort";
 import { Bookmark, BookmarkX, BookOpen, CheckCircle2 } from "lucide-react";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -19,12 +20,20 @@ import { questionAccessWhere } from "@/lib/plan";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
-export default async function BookmarksPage() {
+export default async function BookmarksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
   const me = await requireCompletedProfile();
   const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const dict = getDictionary(locale);
   const t = dict.bookmarks;
   const letters = contentLocale === "he" ? ["א", "ב", "ג", "ד"] : ["A", "B", "C", "D"];
+
+  const sortParam = (await searchParams).sort;
+  const sort: BookmarksSortValue =
+    sortParam === "oldest" || sortParam === "chapter" ? sortParam : "newest";
 
   const planGate = await questionAccessWhere(me);
 
@@ -115,8 +124,17 @@ export default async function BookmarksPage() {
     })),
   ];
 
-  // Sort by the order the user added each item (bookmark createdAt or earliest highlight).
-  entries.sort((a, b) => (a.savedOn?.getTime() ?? 0) - (b.savedOn?.getTime() ?? 0));
+  // Sort according to the user's choice. "savedOn" is the bookmark createdAt or
+  // the earliest highlight time, i.e. the order the user added each item.
+  entries.sort((a, b) => {
+    if (sort === "chapter") {
+      const byChapter = a.question.chapter.number - b.question.chapter.number;
+      if (byChapter !== 0) return byChapter;
+      return (a.savedOn?.getTime() ?? 0) - (b.savedOn?.getTime() ?? 0);
+    }
+    const diff = (a.savedOn?.getTime() ?? 0) - (b.savedOn?.getTime() ?? 0);
+    return sort === "oldest" ? diff : -diff;
+  });
 
   const translated = await Promise.all(
     entries.map(({ question }) =>
@@ -138,14 +156,28 @@ export default async function BookmarksPage() {
 
   return (
     <div className="space-y-6 animate-fade-in text-right" dir="rtl">
-      <div>
-        <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-          <Bookmark className="h-6 w-6 text-amber-500" />
-          {t.title}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t.subtitle(entries.length)}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold flex items-center gap-2">
+            <Bookmark className="h-6 w-6 text-amber-500" />
+            {t.title}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t.subtitle(entries.length)}
+          </p>
+        </div>
+        {entries.length > 0 && (
+          <BookmarksSort
+            value={sort}
+            rtl={locale === "he"}
+            labels={{
+              sortLabel: t.sortLabel,
+              newest: t.sortNewest,
+              oldest: t.sortOldest,
+              chapter: t.sortChapter,
+            }}
+          />
+        )}
       </div>
 
       <BookmarksSearch placeholder={t.searchPlaceholder} rtl={locale === "he"}>

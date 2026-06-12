@@ -349,6 +349,10 @@ export const DICTIONARIES = {
       openQuestion: "פתח שאלה",
       searchPlaceholder: "חיפוש בשאלות, בהדגשות ובהערות…",
       noMatches: "לא נמצאו תוצאות לחיפוש.",
+      sortLabel: "מיון",
+      sortNewest: "נוספו לאחרונה",
+      sortOldest: "נוספו ראשונים",
+      sortChapter: "לפי פרק",
     },
     studyNew: {
       backToStudy: "חזרה ללימוד",
@@ -1009,6 +1013,10 @@ export const DICTIONARIES = {
       openQuestion: "Open question",
       searchPlaceholder: "Search questions, highlights and notes…",
       noMatches: "No results match your search.",
+      sortLabel: "Sort",
+      sortNewest: "Recently added",
+      sortOldest: "Oldest first",
+      sortChapter: "By chapter",
     },
     studyNew: {
       backToStudy: "Back to study",
