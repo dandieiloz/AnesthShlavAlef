@@ -9,13 +9,13 @@ import type { ScoreCategory, ScoreSystem } from "./types";
 import { bi } from "./definitions/_helpers";
 
 import { apfel } from "./definitions/apfel";
-import { koivuranta } from "./definitions/koivuranta";
+// import { koivuranta } from "./definitions/koivuranta"; // disabled for now
 import { aldrete } from "./definitions/aldrete";
 import { stopbang } from "./definitions/stopbang";
 import { rcri } from "./definitions/rcri";
 import { cha2ds2vasc } from "./definitions/cha2ds2vasc";
 import { pacemaker } from "./definitions/pacemaker";
-import { ariscat } from "./definitions/ariscat";
+// import { ariscat } from "./definitions/ariscat"; // disabled for now
 import { gcs } from "./definitions/gcs";
 import { hunthess } from "./definitions/hunthess";
 import { fisher } from "./definitions/fisher";
@@ -37,12 +37,10 @@ export const SCORE_CATEGORIES: ScoreCategory[] = [
 
 export const SCORE_SYSTEMS: ScoreSystem[] = [
   apfel,
-  koivuranta,
   aldrete,
   stopbang,
   rcri,
   cha2ds2vasc,
-  ariscat,
   gcs,
   hunthess,
   fisher,
