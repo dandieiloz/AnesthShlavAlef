@@ -31,7 +31,7 @@ export default async function BookmarksPage() {
   const [bookmarks, allHighlights] = await Promise.all([
     db.bookmark.findMany({
       where: { userId: me.id, question: planGate },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
       include: {
         question: {
           select: {
@@ -65,15 +65,19 @@ export default async function BookmarksPage() {
         sentenceHash: true,
         sentenceText: true,
         note: true,
+        createdAt: true,
       },
     }),
   ]);
 
   const highlightsByQ = new Map<number, typeof allHighlights>();
+  const earliestHighlightByQ = new Map<number, Date>();
   for (const h of allHighlights) {
     const arr = highlightsByQ.get(h.questionId) ?? [];
     arr.push(h);
     highlightsByQ.set(h.questionId, arr);
+    const prev = earliestHighlightByQ.get(h.questionId);
+    if (!prev || h.createdAt < prev) earliestHighlightByQ.set(h.questionId, h.createdAt);
   }
 
   const bookmarkedIds = new Set(bookmarks.map((b) => b.question.id));
@@ -104,8 +108,15 @@ export default async function BookmarksPage() {
   type CardQuestion = (typeof bookmarks)[number]["question"];
   const entries: { question: CardQuestion; isBookmarked: boolean; savedOn: Date | null }[] = [
     ...bookmarks.map((b) => ({ question: b.question, isBookmarked: true, savedOn: b.createdAt })),
-    ...extraQuestions.map((question) => ({ question, isBookmarked: false, savedOn: null })),
+    ...extraQuestions.map((question) => ({
+      question,
+      isBookmarked: false,
+      savedOn: earliestHighlightByQ.get(question.id) ?? null,
+    })),
   ];
+
+  // Sort by the order the user added each item (bookmark createdAt or earliest highlight).
+  entries.sort((a, b) => (a.savedOn?.getTime() ?? 0) - (b.savedOn?.getTime() ?? 0));
 
   const translated = await Promise.all(
     entries.map(({ question }) =>
