@@ -17,6 +17,11 @@ const SORT_FIELDS = [
   "createdAt",
   "lastActive",
   "lastVisit",
+  "profile",
+  "pdf",
+  "success",
+  "drillSolved",
+  "attempts",
 ] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
@@ -191,6 +196,68 @@ export default async function AdminUsersPage({
     const byId = new Map(fetched.map((u) => [u.id, u]));
     users = pageIds.map((id) => byId.get(id)!).filter(Boolean);
     lastActiveByUser = new Map();
+  } else if (sort === "success") {
+    // Success % is computed (correct / total attempts) and not stored, so we
+    // must compute it for every matching user, sort in JS (nulls last), then
+    // slice — mirroring the lastActive branch.
+    const candidateIds = await db.user.findMany({ where, select: { id: true } });
+    const ids = candidateIds.map((u) => u.id);
+    const [attemptRows, correctRows] = ids.length
+      ? await Promise.all([
+          db.attempt.groupBy({ by: ["userId"], where: { userId: { in: ids } }, _count: { _all: true } }),
+          db.attempt.groupBy({
+            by: ["userId"],
+            where: { userId: { in: ids }, isCorrect: true },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], []];
+    const totalMap = new Map(attemptRows.map((r) => [r.userId, r._count._all]));
+    const correctMap = new Map(correctRows.map((r) => [r.userId, r._count._all]));
+    const pct = (id: string): number | null => {
+      const total = totalMap.get(id) ?? 0;
+      if (total === 0) return null;
+      return (correctMap.get(id) ?? 0) / total;
+    };
+    const sorted = [...ids].sort((a, b) => {
+      const pa = pct(a);
+      const pb = pct(b);
+      if (pa === null && pb === null) return 0;
+      if (pa === null) return 1; // nulls always last
+      if (pb === null) return -1;
+      return order === "asc" ? pa - pb : pb - pa;
+    });
+    const pageIds = sorted.slice(0, LIMIT);
+    const fetched = pageIds.length
+      ? await db.user.findMany({ where: { id: { in: pageIds } }, select: userSelect })
+      : [];
+    const byId = new Map(fetched.map((u) => [u.id, u]));
+    users = pageIds.map((id) => byId.get(id)!).filter(Boolean);
+    lastActiveByUser = new Map();
+  } else if (sort === "attempts") {
+    // History total = attempt count + score-drill counter. attemptCount is not
+    // stored on User, so compute for every matching user, sort, then slice.
+    const candidates = await db.user.findMany({
+      where,
+      select: { id: true, scoreDrillSolved: true },
+    });
+    const ids = candidates.map((c) => c.id);
+    const drillMap = new Map(candidates.map((c) => [c.id, c.scoreDrillSolved]));
+    const attemptRows = ids.length
+      ? await db.attempt.groupBy({ by: ["userId"], where: { userId: { in: ids } }, _count: { _all: true } })
+      : [];
+    const totalMap = new Map(attemptRows.map((r) => [r.userId, r._count._all]));
+    const metric = (id: string): number => (totalMap.get(id) ?? 0) + (drillMap.get(id) ?? 0);
+    const sorted = [...ids].sort((a, b) =>
+      order === "asc" ? metric(a) - metric(b) : metric(b) - metric(a),
+    );
+    const pageIds = sorted.slice(0, LIMIT);
+    const fetched = pageIds.length
+      ? await db.user.findMany({ where: { id: { in: pageIds } }, select: userSelect })
+      : [];
+    const byId = new Map(fetched.map((u) => [u.id, u]));
+    users = pageIds.map((id) => byId.get(id)!).filter(Boolean);
+    lastActiveByUser = new Map();
   } else {
     const orderBy =
       sort === "name"
@@ -203,7 +270,15 @@ export default async function AdminUsersPage({
               ? { hospitalName: order }
               : sort === "residencyYear"
                 ? { residencyYear: order }
-                : { createdAt: order };
+                : sort === "drillSolved"
+                  ? { scoreDrillSolved: order }
+                  : sort === "profile"
+                    ? // Group complete (residencyYear set) vs incomplete; toggle which group leads.
+                      { residencyYear: { sort: "asc", nulls: order === "asc" ? "first" : "last" } as const }
+                    : sort === "pdf"
+                      ? // Group configured (localPdfSetAt set) vs not; toggle which group leads.
+                        { localPdfSetAt: { sort: "desc", nulls: order === "asc" ? "first" : "last" } as const }
+                      : { createdAt: order };
 
     users = await db.user.findMany({
       where,
