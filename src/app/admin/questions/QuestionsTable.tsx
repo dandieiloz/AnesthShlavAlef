@@ -505,12 +505,23 @@ export function QuestionsTable({
                 <td className="p-2 text-muted-foreground font-mono">{q.id}</td>
                 <td className="p-2 max-w-2xl">
                   <div className="flex items-start gap-2">
-                    <Link
-                      href={`/history/${q.id}`}
-                      className={`text-primary hover:underline line-clamp-2 ${q.disabled ? "opacity-60" : ""}`}
-                    >
-                      {q.stem.slice(0, 120)}{q.stem.length > 120 ? "…" : ""}
-                    </Link>
+                    <div className="group relative min-w-0">
+                      <Link
+                        href={`/history/${q.id}`}
+                        className={`text-primary hover:underline line-clamp-2 ${q.disabled ? "opacity-60" : ""}`}
+                      >
+                        {q.stem.slice(0, 120)}{q.stem.length > 120 ? "…" : ""}
+                      </Link>
+                      {q.stem.length > 120 ? (
+                        <div
+                          role="tooltip"
+                          dir="rtl"
+                          className="pointer-events-none absolute right-0 top-full z-50 mt-1 hidden w-96 max-w-[min(90vw,28rem)] whitespace-pre-wrap break-words rounded-md border bg-popover p-3 text-start text-sm leading-relaxed text-popover-foreground shadow-lg group-hover:block"
+                        >
+                          {q.stem}
+                        </div>
+                      ) : null}
+                    </div>
                     {q.disabled ? (
                       <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         מושבתת
