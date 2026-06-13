@@ -53,7 +53,7 @@ export default async function AdminUsersPage({
 }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const sort: SortField = isSortField(sp.sort) ? sp.sort : "createdAt";
+  const sort: SortField = isSortField(sp.sort) ? sp.sort : "lastActive";
   const order: SortOrder = sp.order === "asc" ? "asc" : "desc";
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
