@@ -113,36 +113,26 @@ const QuizExamSchema = z.object({
   includeSeen: z.boolean().optional().default(false),
 });
 
-function fisherYatesSample<T>(arr: T[], n: number): T[] {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a.slice(0, Math.min(n, a.length));
-}
-
 /**
- * Sample question ids for a new quiz, prioritizing questions that no user has
- * ever attempted. Globally-untested questions are placed first (in random
- * order), then already-attempted ones fill the remainder (also random). The
- * result is sliced to `limit`, so when enough untested questions exist the quiz
- * is entirely fresh; otherwise it falls back to previously-seen questions.
+ * Sample question ids for a new quiz, prioritizing questions with the fewest
+ * total attempts across all users. Questions are ordered by their global
+ * attempt count ascending (so never-attempted questions come first, then
+ * least-attempted, and so on), with a random shuffle within each equal-count
+ * tier to keep variety. The result is sliced to `limit`, so the quiz fills up
+ * with the globally least-answered questions available in the pool.
  */
 async function samplePrioritizingUntested(poolIds: number[], limit: number): Promise<number[]> {
   if (poolIds.length === 0) return [];
-  const attempted = await db.attempt.findMany({
+  const grouped = await db.attempt.groupBy({
+    by: ["questionId"],
     where: { questionId: { in: poolIds } },
-    select: { questionId: true },
-    distinct: ["questionId"],
+    _count: { questionId: true },
   });
-  const attemptedSet = new Set(attempted.map((a) => a.questionId));
-  const untested = poolIds.filter((id) => !attemptedSet.has(id));
-  const tested = poolIds.filter((id) => attemptedSet.has(id));
-  return [
-    ...fisherYatesSample(untested, untested.length),
-    ...fisherYatesSample(tested, tested.length),
-  ].slice(0, Math.min(limit, poolIds.length));
+  const countById = new Map(grouped.map((g) => [g.questionId, g._count.questionId]));
+  const ranked = poolIds
+    .map((id) => ({ id, count: countById.get(id) ?? 0, r: Math.random() }))
+    .sort((a, b) => a.count - b.count || a.r - b.r);
+  return ranked.map((x) => x.id).slice(0, Math.min(limit, poolIds.length));
 }
 
 async function resolveUniqueName(userId: string, baseName: string): Promise<string> {
