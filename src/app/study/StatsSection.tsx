@@ -264,7 +264,7 @@ export async function StatsSection({
               className="text-sm sm:text-base font-medium text-center leading-relaxed"
               dir={locale === "he" ? "rtl" : "ltr"}
             >
-              {locale === "he" ? "היום עד כה נפתרו " : "Today so far, "}
+              {locale === "he" ? "היום נפתרו " : "Today so far, "}
               <SummaryNum value={communitySolved} locale={locale} colorClass="text-primary" />
               {locale === "he" ? " שאלות על ידי " : " questions have been solved by "}
               <SummaryNum value={communityResidents} locale={locale} colorClass="text-success" />
