@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { UsersTable, type UserRow } from "./UsersTable";
 import { UsersFilters } from "./UsersFilters";
 import { UserActivityChart } from "./UserActivityChart";
+import { BlockEmailPanel } from "./BlockEmailPanel";
 import { AdminNav } from "../AdminNav";
 import { AutoRefresh } from "./AutoRefresh";
 import { Suspense } from "react";
@@ -324,8 +325,7 @@ export default async function AdminUsersPage({
   const correctCountByUser = new Map<string, number>(
     correctStats.map((row) => [row.userId, row._count._all]),
   );
-  if (sort !== "lastActive") {
-    lastActiveByUser = new Map(
+  if (sort !== "lastActive") {    lastActiveByUser = new Map(
       attemptStats
         .filter((r): r is typeof r & { _max: { createdAt: Date } } => r._max.createdAt !== null)
         .map((r) => [r.userId, r._max.createdAt]),
@@ -348,6 +348,28 @@ export default async function AdminUsersPage({
     lastVisitByUser = new Map<string, Date>(visitRows.map((r) => [r.userId, r.max]));
   }
 
+  // Blocked-email lookup: a Set for the visible rows + the full blocklist for
+  // the standalone panel (includes emails that have no account yet).
+  const visibleEmails = users.map((u) => u.email.trim().toLowerCase());
+  const [visibleBlocked, allBlocked] = await Promise.all([
+    visibleEmails.length
+      ? db.blockedEmail.findMany({
+          where: { email: { in: visibleEmails } },
+          select: { email: true },
+        })
+      : Promise.resolve([]),
+    db.blockedEmail.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { email: true, reason: true, createdAt: true },
+    }),
+  ]);
+  const blockedEmailSet = new Set(visibleBlocked.map((b) => b.email));
+  const blockedList = allBlocked.map((b) => ({
+    email: b.email,
+    reason: b.reason,
+    createdAt: b.createdAt.toISOString(),
+  }));
+
   const rows: UserRow[] = users.map((u) => ({
     id: u.id,
     name: u.name,
@@ -369,6 +391,7 @@ export default async function AdminUsersPage({
       if (total === 0) return null;
       return Math.round(((correctCountByUser.get(u.id) ?? 0) / total) * 100);
     })(),
+    blocked: blockedEmailSet.has(u.email.trim().toLowerCase()),
   }));
 
   return (
@@ -406,6 +429,8 @@ export default async function AdminUsersPage({
       <Suspense>
         <UsersFilters />
       </Suspense>
+
+      <BlockEmailPanel blocked={blockedList} />
 
       <div className="text-sm text-muted-foreground">
         {filteredTotal > LIMIT

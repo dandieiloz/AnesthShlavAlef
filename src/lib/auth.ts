@@ -4,6 +4,18 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 
+/** Returns true if the given email is on the admin blocklist. */
+export async function isEmailBlocked(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+  const hit = await db.blockedEmail.findUnique({
+    where: { email: normalized },
+    select: { id: true },
+  });
+  return hit !== null;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(db),
   providers: [
@@ -14,6 +26,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   session: { strategy: "jwt" },
   callbacks: {
+    // Reject sign-in (and first-time sign-up) for blocked emails. The Prisma
+    // adapter only creates the user after signIn returns true.
+    async signIn({ user }) {
+      if (await isEmailBlocked(user.email)) return false;
+      return true;
+    },
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
@@ -49,6 +67,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 export async function requireUser() {
   const session = await auth();
   if (!session?.user?.id) redirect("/");
+  // Existing sessions are guarded out of the app once their email is blocked.
+  if (await isEmailBlocked(session.user.email)) redirect("/blocked");
   return session.user as {
     id: string;
     email?: string | null;

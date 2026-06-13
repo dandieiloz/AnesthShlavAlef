@@ -41,3 +41,28 @@ export async function deleteUserAction(userId: string) {
   ]);
   revalidatePath("/admin/users");
 }
+
+export async function blockEmailAction(email: string, reason?: string) {
+  const me = await requireAdmin();
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || !normalized.includes("@")) {
+    throw new Error("כתובת אימייל לא תקינה");
+  }
+  if (normalized === me.email?.trim().toLowerCase()) {
+    throw new Error("לא ניתן לחסום את עצמך");
+  }
+  const cleanReason = reason?.trim() || null;
+  await db.blockedEmail.upsert({
+    where: { email: normalized },
+    create: { email: normalized, reason: cleanReason, blockedById: me.id },
+    update: { reason: cleanReason, blockedById: me.id },
+  });
+  revalidatePath("/admin/users");
+}
+
+export async function unblockEmailAction(email: string) {
+  await requireAdmin();
+  const normalized = email.trim().toLowerCase();
+  await db.blockedEmail.deleteMany({ where: { email: normalized } });
+  revalidatePath("/admin/users");
+}

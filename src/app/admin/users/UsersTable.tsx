@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { setUserRoleAction, setUserPlanAction, deleteUserAction } from "./actions";
+import { setUserRoleAction, setUserPlanAction, deleteUserAction, blockEmailAction, unblockEmailAction } from "./actions";
 import { formatRelativeTime } from "@/lib/format-time";
 import { useRelativeNow } from "@/lib/use-relative-now";
 
@@ -23,6 +23,7 @@ export type UserRow = {
   localPdfSet: boolean;
   successPercent: number | null;
   scoreDrillSolved: number;
+  blocked: boolean;
 };
 
 type SortField =
@@ -116,6 +117,23 @@ export function UsersTable({
         await deleteUserAction(userId);
       } catch (err) {
         window.alert(err instanceof Error ? err.message : "מחיקת המשתמש נכשלה");
+      }
+      setPendingId(null);
+      router.refresh();
+    });
+  }
+
+  function toggleBlock(userId: string, email: string, currentlyBlocked: boolean) {
+    setPendingId(userId);
+    startTransition(async () => {
+      try {
+        if (currentlyBlocked) {
+          await unblockEmailAction(email);
+        } else {
+          await blockEmailAction(email);
+        }
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : "פעולת החסימה נכשלה");
       }
       setPendingId(null);
       router.refresh();
@@ -384,6 +402,18 @@ export function UsersTable({
                     className="rounded border border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 px-2 py-1 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isPending ? "..." : "מחק משתמש"}
+                  </button>
+                  <button
+                    onClick={() => toggleBlock(u.id, u.email, u.blocked)}
+                    disabled={isSelf || isPending}
+                    title={isSelf ? "לא ניתן לחסום את עצמך" : u.blocked ? "ביטול חסימת המשתמש" : "חסימת המשתמש"}
+                    className={`rounded border px-2 py-1 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      u.blocked
+                        ? "hover:bg-muted text-muted-foreground"
+                        : "border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    }`}
+                  >
+                    {isPending ? "..." : u.blocked ? "בטל חסימה" : "חסום"}
                   </button>
                 </div>
               </td>

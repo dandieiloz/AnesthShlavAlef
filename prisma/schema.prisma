@@ -107,6 +107,16 @@ model User {
   submissions       QuestionSubmission[]     @relation("SubmissionAuthor")
   reviewedSubmissions QuestionSubmission[]   @relation("SubmissionReviewer")
   scoreConfidence   ScoreConfidence[]
+  blockedEmails     BlockedEmail[]           @relation("BlockedEmailAuthor")
+}
+
+model BlockedEmail {
+  id          String   @id @default(cuid())
+  email       String   @unique // stored lowercased + trimmed
+  reason      String?  @db.Text
+  createdAt   DateTime @default(now())
+  blockedById String?
+  blockedBy   User?    @relation("BlockedEmailAuthor", fields: [blockedById], references: [id], onDelete: SetNull)
 }
 
 model ScoreConfidence {
