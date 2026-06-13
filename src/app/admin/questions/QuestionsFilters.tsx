@@ -173,6 +173,20 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
         </select>
       </div>
 
+      {/* Algorithm version */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">גרסת אלגוריתם</label>
+        <select
+          name="algoVersion"
+          defaultValue={params.get("algoVersion") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">הכל</option>
+          <option value="1">גרסה 1</option>
+          <option value="2">גרסה 2</option>
+        </select>
+      </div>
+
       {/* Status (active / disabled) */}
       <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1">מצב</label>

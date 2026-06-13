@@ -8,6 +8,11 @@ import { translateStemToEnglish } from "./translate";
 import { hashQuestion } from "./hash";
 import type { CachedAnswerPayload, EvidenceCitation, RetrievedChunk, StructuredAnswer } from "./types";
 
+// Generation-algorithm version produced by this (v2 RAG) pipeline. Persisted on
+// every new GeminiAnswer/GeminiAnswerCandidate so admins can later distinguish
+// legacy (v1) answers from current ones. Bump if the pipeline changes materially.
+export const CURRENT_ALGORITHM_VERSION = 2;
+
 // v2 system prompt: literal-evidence priority rules are HOISTED to the top
 // of the system instruction (before the role description) so the model
 // processes them first. Each rule is imperative ("RULE N: ...") and is
@@ -532,6 +537,7 @@ async function persistAnswer(opts: {
         confidence: structured.confidence,
         escalated,
         insufficientEvidence: structured.insufficientEvidence,
+        algorithmVersion: CURRENT_ALGORITHM_VERSION,
         generationHint: opts.hint ?? null,
         derivedChapterIds: payload.derivedChapterIds,
         primaryChapterId: payload.primaryChapterId,
@@ -564,6 +570,7 @@ async function persistAnswer(opts: {
       confidence: structured.confidence,
       escalated,
       insufficientEvidence: structured.insufficientEvidence,
+      algorithmVersion: CURRENT_ALGORITHM_VERSION,
       generationHint: opts.hint ?? null,
     },
   });

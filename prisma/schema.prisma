@@ -254,6 +254,10 @@ model GeminiAnswer {
   confidence         Float?
   escalated          Boolean  @default(false)
   insufficientEvidence Boolean @default(false)
+  // Generation-algorithm version used to produce this answer. 1 = legacy (no inline
+  // citation markers); 2 = current RAG pipeline with inline [N] citations. Set manually
+  // by admins or defaulted to the current pipeline version on new generations.
+  algorithmVersion   Int      @default(2)
   // Last admin hint/context (רמז) supplied to the generator for this answer, if any.
   // Null when the answer was generated without a hint. Overwritten on each regeneration.
   generationHint     String?  @db.Text
@@ -285,6 +289,8 @@ model GeminiAnswerCandidate {
   confidence           Float?
   escalated            Boolean  @default(false)
   insufficientEvidence Boolean  @default(false)
+  // Generation-algorithm version (see GeminiAnswer.algorithmVersion).
+  algorithmVersion     Int      @default(2)
   // Last admin hint/context (רמז) supplied to the generator for this candidate, if any.
   generationHint       String?  @db.Text
   // Proposed chapter retag (only applied to Question on accept, and only if chapterAutoTagged).

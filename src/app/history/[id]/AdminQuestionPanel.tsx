@@ -8,6 +8,7 @@ import {
   resetChapterAutoTagAction,
   addAdminNoteAction,
   deleteAdminNoteAction,
+  setAlgorithmVersionAction,
 } from "@/app/admin/actions";
 import {
   enqueueInitialJobAction,
@@ -411,6 +412,31 @@ export async function AdminQuestionPanel({
                 <span className="mr-1 rounded bg-purple-100 dark:bg-purple-900/30 px-1 text-purple-800 dark:text-purple-300"> נוצר עם רמז</span>
               )}
             </p>
+            <form
+              action={setAlgorithmVersionAction}
+              className="mt-2 flex flex-wrap items-center gap-2 text-xs"
+            >
+              <input type="hidden" name="questionId" value={q.id} />
+              <span className="font-medium text-muted-foreground">גרסת אלגוריתם:</span>
+              <span className="rounded bg-sky-100 px-1.5 py-0.5 font-semibold text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                v{q.geminiAnswer.algorithmVersion}
+              </span>
+              <select
+                name="algorithmVersion"
+                defaultValue={String(q.geminiAnswer.algorithmVersion)}
+                className="rounded border border-input bg-background px-1.5 py-0.5"
+                aria-label="גרסת אלגוריתם"
+              >
+                <option value="1">גרסה 1</option>
+                <option value="2">גרסה 2</option>
+              </select>
+              <button
+                type="submit"
+                className="rounded bg-slate-900 px-2 py-0.5 text-white dark:bg-slate-700"
+              >
+                עדכן
+              </button>
+            </form>
             <div className="mt-3">
               <EditableGeminiAnswer
                 questionId={q.id}

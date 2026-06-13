@@ -329,6 +329,28 @@ export async function saveGeminiAnswerFieldsAction(
   }
 }
 
+const AlgorithmVersionSchema = z.object({
+  questionId: z.coerce.number().int().positive(),
+  algorithmVersion: z.coerce.number().int().min(1).max(2),
+});
+
+/**
+ * Manually set the generation-algorithm version recorded on a question's live
+ * GeminiAnswer. Admin-only; used to correct/classify legacy answers.
+ */
+export async function setAlgorithmVersionAction(formData: FormData) {
+  await requireAdmin();
+  const data = AlgorithmVersionSchema.parse({
+    questionId: formData.get("questionId"),
+    algorithmVersion: formData.get("algorithmVersion"),
+  });
+  await db.geminiAnswer.update({
+    where: { questionId: data.questionId },
+    data: { algorithmVersion: data.algorithmVersion },
+  });
+  revalidatePath(`/history/${data.questionId}`);
+}
+
 const AdminNoteSchema = z.object({
   questionId: z.coerce.number().int().positive(),
   body: z.string().trim().min(1).max(4000),

@@ -45,6 +45,7 @@ export async function acceptCandidateAction(questionId: number): Promise<Candida
         confidence: candidate.confidence,
         escalated: candidate.escalated,
         insufficientEvidence: candidate.insufficientEvidence,
+        algorithmVersion: candidate.algorithmVersion,
         generationHint: candidate.generationHint,
       },
     });

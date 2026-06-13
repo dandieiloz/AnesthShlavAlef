@@ -29,6 +29,10 @@ export type QuestionRow = {
   insufficientEvidence: boolean | null;
   /** Last admin hint (רמז) used to generate the answer, or null when none / no answer. */
   generationHint: string | null;
+  /** Generation-algorithm version recorded on the answer (1 or 2), or null when no answer. */
+  algorithmVersion: number | null;
+  /** Generation model recorded on the answer (e.g. "gemini-2.5-pro"), or null when no answer. */
+  model: string | null;
   /** Number of EN translation fields already cached (question + answer combined) */
   translationCount: number;
   attemptCount: number;
@@ -36,7 +40,7 @@ export type QuestionRow = {
   percentCorrect: number | null;
 };
 
-type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "confidence" | "escalated" | "insufficientEvidence" | "translationCount" | "attemptCount" | "percentCorrect" | "createdAt";
+type SortField = "id" | "stem" | "source" | "chapter" | "hasExplanation" | "confidence" | "escalated" | "insufficientEvidence" | "algorithmVersion" | "translationCount" | "attemptCount" | "percentCorrect" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
@@ -53,6 +57,7 @@ const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
   confidence: "asc",
   escalated: "desc",
   insufficientEvidence: "desc",
+  algorithmVersion: "desc",
   translationCount: "desc",
   attemptCount: "desc",
   percentCorrect: "desc",
@@ -483,6 +488,7 @@ export function QuestionsTable({
               <SortHeader field="escalated" label="Escalated" align="center" />
               <SortHeader field="insufficientEvidence" label="ראיות חסרות" align="center" />
               <th className="p-2 text-center text-muted-foreground whitespace-nowrap">רמז</th>
+              <SortHeader field="algorithmVersion" label="אלגוריתם" align="center" />
               <SortHeader field="translationCount" label="תרגום EN" align="center" />
               <SortHeader field="attemptCount" label="ניסיונות" align="center" />
               <SortHeader field="percentCorrect" label="% נכונות" align="center" />
@@ -527,7 +533,7 @@ export function QuestionsTable({
                         תשובות מרובות
                       </span>
                     ) : null}
-                    {q.stem.length > 120 ? (
+                    {q.stem ? (
                       <div
                         role="tooltip"
                         dir="rtl"
@@ -625,6 +631,18 @@ export function QuestionsTable({
                     </span>
                   ) : (
                     <span className="text-xs text-muted-foreground/60">לא</span>
+                  )}
+                </td>
+                <td className="p-2 text-center">
+                  {q.algorithmVersion === null ? (
+                    <span className="italic text-muted-foreground/50">—</span>
+                  ) : (
+                    <span
+                      className="text-xs rounded px-2 py-0.5 font-mono bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300"
+                      title={q.model ?? undefined}
+                    >
+                      v{q.algorithmVersion}
+                    </span>
                   )}
                 </td>
                 <td className="p-2 text-center">

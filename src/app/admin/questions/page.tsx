@@ -9,7 +9,7 @@ import { AdminNav } from "../AdminNav";
 
 const PAGE_SIZE = 100;
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
-const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "confidence", "escalated", "insufficientEvidence", "translationCount", "attemptCount", "percentCorrect", "createdAt"] as const;
+const SORT_FIELDS = ["id", "stem", "source", "chapter", "hasExplanation", "confidence", "escalated", "insufficientEvidence", "algorithmVersion", "translationCount", "attemptCount", "percentCorrect", "createdAt"] as const;
 
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
@@ -32,6 +32,7 @@ export default async function AdminQuestionsPage({
     escalated?: string;
     insufficient?: string;
     hint?: string;
+    algoVersion?: string;
     status?: string;
     sort?: string;
     order?: string;
@@ -88,6 +89,8 @@ export default async function AdminQuestionsPage({
   else if (sp.insufficient === "no") answerIs.insufficientEvidence = false;
   if (sp.hint === "yes") answerIs.generationHint = { not: null };
   else if (sp.hint === "no") answerIs.generationHint = null;
+  if (sp.algoVersion === "1") answerIs.algorithmVersion = 1;
+  else if (sp.algoVersion === "2") answerIs.algorithmVersion = 2;
   const hasAnswerFilter = Object.keys(answerIs).length > 0;
 
   if (sp.hasExplanation === "no") {
@@ -131,7 +134,9 @@ export default async function AdminQuestionsPage({
                   ? [{ geminiAnswer: { escalated: order } }, { id: "desc" as const }]
                   : sort === "insufficientEvidence"
                     ? [{ geminiAnswer: { insufficientEvidence: order } }, { id: "desc" as const }]
-                    : /* translationCount, attemptCount, percentCorrect, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
+                    : sort === "algorithmVersion"
+                      ? [{ geminiAnswer: { algorithmVersion: order } }, { id: "desc" as const }]
+                      : /* translationCount, attemptCount, percentCorrect, createdAt, fallback */ [{ createdAt: order }, { id: "desc" as const }];
 
   const pageNum = Math.max(1, Number(sp.page) || 1);
   const skip = (pageNum - 1) * PAGE_SIZE;
@@ -155,6 +160,8 @@ export default async function AdminQuestionsPage({
             confidence: true,
             escalated: true,
             insufficientEvidence: true,
+            algorithmVersion: true,
+            model: true,
             generationHint: true,
           },
         },
@@ -251,6 +258,8 @@ export default async function AdminQuestionsPage({
       confidence: q.geminiAnswer?.confidence ?? null,
       escalated: q.geminiAnswer?.escalated ?? null,
       insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,
+      algorithmVersion: q.geminiAnswer?.algorithmVersion ?? null,
+      model: q.geminiAnswer?.model ?? null,
       generationHint: q.geminiAnswer?.generationHint ?? null,
       translationCount: translationCountMap.get(q.id) ?? 0,
       attemptCount,
