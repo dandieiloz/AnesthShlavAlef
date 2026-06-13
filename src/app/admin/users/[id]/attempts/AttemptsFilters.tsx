@@ -87,9 +87,9 @@ export function AttemptsFilters({
           defaultValue={params.get("sort") ?? ""}
           className="rounded border p-2 text-sm bg-background text-foreground"
         >
-          <option value="">לפי פרק</option>
-          <option value="newest">לפי זמן – חדש לישן</option>
+          <option value="">לפי זמן – חדש לישן</option>
           <option value="oldest">לפי זמן – ישן לחדש</option>
+          <option value="chapter">לפי פרק</option>
         </select>
       </div>
 

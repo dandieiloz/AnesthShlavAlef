@@ -80,7 +80,7 @@ export default async function AdminUserAttemptsPage({
     sp.correct === "yes" ? true : sp.correct === "no" ? false : null;
   const stemQuery = sp.q?.trim() ?? "";
   const sort: SortMode =
-    sp.sort === "newest" ? "newest" : sp.sort === "oldest" ? "oldest" : "chapter";
+    sp.sort === "chapter" ? "chapter" : sp.sort === "oldest" ? "oldest" : "newest";
 
   const questionFilter: Prisma.QuestionWhereInput = {};
   if (chapterNumber !== null) {
