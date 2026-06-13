@@ -9,6 +9,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
+import { getAnswerDistribution } from "@/lib/answer-distribution";
 import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import type { HighlightRecord } from "@/components/HighlightableMarkdown";
 
@@ -51,6 +52,7 @@ export type ForumQuestionView = {
   userChoice: "A" | "B" | "C" | "D" | undefined;
   highlights: HighlightRecord[];
   highlightT: ReturnType<typeof getDictionary>["highlights"];
+  answerDistribution: { A: number; B: number; C: number; D: number };
   answer: {
     explanation: string;
     evidenceCitations: EvidenceCitationDisplay[] | null;
@@ -102,6 +104,8 @@ export async function loadThreadQuestionAction(questionId: number): Promise<Foru
     }),
   ]);
 
+  const answerDistribution = await getAnswerDistribution(question.id);
+
   const letters = dict.review.labels[contentLocale] ?? ["A", "B", "C", "D"];
   const correctAnswer = question.geminiAnswer?.correctAnswer ?? question.correctAnswer;
 
@@ -122,6 +126,7 @@ export async function loadThreadQuestionAction(questionId: number): Promise<Foru
     userChoice: attempt?.chosen ?? undefined,
     highlights: highlights as HighlightRecord[],
     highlightT: dict.highlights,
+    answerDistribution,
     answer: question.geminiAnswer
       ? {
           explanation: question.geminiAnswer.explanation,

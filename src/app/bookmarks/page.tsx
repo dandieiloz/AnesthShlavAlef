@@ -17,6 +17,7 @@ import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
+import { getAnswerDistributions } from "@/lib/answer-distribution";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
@@ -153,6 +154,9 @@ export default async function BookmarksPage({
       ),
     ),
   );
+
+  // Per-option answer distribution (all attempts, all users) per question.
+  const distributionMap = await getAnswerDistributions(entries.map((e) => e.question.id));
 
   return (
     <div className="space-y-6 animate-fade-in text-right" dir="rtl">
@@ -303,6 +307,7 @@ export default async function BookmarksPage({
                               highlights={qHighlights}
                               highlightT={dict.highlights}
                               collapsibleSections={qHighlights.length > 0}
+                              answerDistribution={distributionMap.get(q.id) ?? null}
                             />
                           </div>
                         </details>

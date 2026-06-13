@@ -30,6 +30,7 @@ import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
+import { getAnswerDistributions } from "@/lib/answer-distribution";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
@@ -141,6 +142,9 @@ export default async function QuizReviewPage({
   const communityCorrectMap = new Map<number, number>(
     communityCorrectRows.map((r) => [r.questionId, r._count._all]),
   );
+
+  // Per-option answer distribution (all attempts, all users) per question.
+  const distributionMap = await getAnswerDistributions(reviewedIds);
 
   if (questions.length === 0) {
     return (
@@ -434,6 +438,7 @@ export default async function QuizReviewPage({
                             questionId={q.id}
                             highlights={highlightsByQ.get(q.id) ?? []}
                             highlightT={dict.highlights}
+                            answerDistribution={distributionMap.get(q.id) ?? null}
                           />
                         </div>
                       </details>

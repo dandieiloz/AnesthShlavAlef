@@ -14,6 +14,7 @@ import { OFFICIAL_EXAM_SOURCE } from "@/lib/hospitals";
 import { getScoreById } from "@/lib/scores/registry";
 import { loadQuizBatch, type QuizBatch, type QuestionPayload } from "@/app/quiz/[id]/quiz-session";
 import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
+import { getAnswerDistribution, type AnswerDistribution } from "@/lib/answer-distribution";
 export async function updateProfileAction(formData: FormData) {
   const me = await requireUser();
   const data = ProfileSchema.parse({
@@ -321,6 +322,20 @@ export async function recordAttemptAction(input: {
     });
   }
   return { ok: true, isCorrect };
+}
+
+/**
+ * Returns the per-option answer distribution (A/B/C/D attempt counts) for a
+ * single question. Called by the quiz runner after the answer is revealed so
+ * the histogram can include every attempt, including the user's own. Access is
+ * gated identically to the question itself.
+ */
+export async function getAnswerDistributionAction(
+  questionId: number,
+): Promise<AnswerDistribution> {
+  const me = await requireUser();
+  await assertCanAccessQuestion(me, questionId);
+  return getAnswerDistribution(questionId);
 }
 
 /**

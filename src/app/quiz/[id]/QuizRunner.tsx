@@ -40,9 +40,11 @@ import {
   toggleBookmarkValueAction,
   loadFullQuizProgressAction,
   loadQuestionAttemptAction,
+  getAnswerDistributionAction,
 } from "@/app/(user)/actions";
 import { getDictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
+import type { AnswerDistributionData } from "@/components/AnswerDistribution";
 import type { Choice, QuestionPayload } from "./quiz-session";
 
 const HEBREW_LETTERS = ["א", "ב", "ג", "ד"];
@@ -97,6 +99,12 @@ export function QuizRunner(props: Props) {
 
   const [chosen, setChosen] = useState<Choice | null>(null);
   const [revealed, setRevealed] = useState(false);
+  // Per-question answer distribution (A/B/C/D attempt counts), loaded lazily
+  // once a question's answer is revealed. Keyed by questionId so revisiting a
+  // past question reuses the cached tally instead of refetching.
+  const [distributions, setDistributions] = useState<Map<number, AnswerDistributionData>>(
+    () => new Map(),
+  );
   // Identity guard: the question id whose answer was just revealed via
   // submit. Live-question reveal is gated on this matching the current
   // question's id, so any stale `revealed=true` from a prior live question
@@ -263,6 +271,39 @@ export function QuizRunner(props: Props) {
   useEffect(() => {
     if (queue.length === 0 && hasMore) void refill();
   }, [queue.length, hasMore, refill]);
+
+  // The question whose answer is currently revealed (live immediate-mode submit
+  // or revisiting a past answered question). Mirrors the `showReveal` gate used
+  // in render, computed early so the loader effect keeps a stable hook order.
+  const pastEntryForReveal = viewingIndex !== -1 ? past[viewingIndex] : null;
+  const revealedQuestionForDist = pastEntryForReveal
+    ? mode === "immediate" && pastEntryForReveal.chosen !== null
+      ? pastEntryForReveal.question.id
+      : null
+    : mode === "immediate" &&
+        revealed &&
+        revealedQuestionId !== null &&
+        current?.id === revealedQuestionId
+      ? current.id
+      : null;
+
+  // Lazily load the per-option answer distribution once an answer is revealed.
+  // handleSubmit drops the cached entry after the attempt is recorded so this
+  // refetches with the user's own attempt included.
+  useEffect(() => {
+    if (revealedQuestionForDist === null) return;
+    if (distributions.has(revealedQuestionForDist)) return;
+    let cancelled = false;
+    const qid = revealedQuestionForDist;
+    getAnswerDistributionAction(qid)
+      .then((d) => {
+        if (!cancelled) setDistributions((prev) => new Map(prev).set(qid, d));
+      })
+      .catch((err) => console.error("[quiz] failed to load answer distribution", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [revealedQuestionForDist, distributions]);
 
   const totalForProgress = Math.max(props.totalQ, answered);
   const progressPct = totalForProgress > 0 ? Math.round((answered / totalForProgress) * 100) : 0;
@@ -504,6 +545,14 @@ export function QuizRunner(props: Props) {
           .finally(() => {
             submittingRef.current = false;
             setSubmitting(false);
+            // Drop any distribution snapshot fetched before the attempt was
+            // persisted so the loader effect refetches with this attempt included.
+            setDistributions((prev) => {
+              if (!prev.has(questionId)) return prev;
+              const next = new Map(prev);
+              next.delete(questionId);
+              return next;
+            });
           });
       });
     } else {
@@ -1144,6 +1193,7 @@ export function QuizRunner(props: Props) {
                     questionId={display.id}
                     highlights={display.highlights}
                     highlightT={dict.highlights}
+                    answerDistribution={distributions.get(display.id) ?? null}
                   />
 
                   <Separator className="opacity-50" />

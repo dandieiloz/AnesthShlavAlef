@@ -20,6 +20,7 @@ import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { assertCanAccessQuestion } from "@/lib/plan";
+import { getAnswerDistribution } from "@/lib/answer-distribution";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
@@ -54,7 +55,7 @@ export default async function HistoryQuestionPage({
   const t = dict.review;
   const letters = t.labels[contentLocale] ?? ["A", "B", "C", "D"];
 
-  const [question, attempts, highlightRows, latestUserReport, comments, bookmark] = await Promise.all([
+  const [question, attempts, highlightRows, latestUserReport, comments, bookmark, answerDistribution] = await Promise.all([
     db.question.findUnique({
       where: { id: questionId },
       include: {
@@ -85,6 +86,7 @@ export default async function HistoryQuestionPage({
       where: { userId_questionId: { userId: me.id, questionId } },
       select: { id: true },
     }),
+    getAnswerDistribution(questionId),
   ]);
 
   if (!question) notFound();
@@ -199,6 +201,7 @@ export default async function HistoryQuestionPage({
                 questionId={question.id}
                 highlights={highlightRows}
                 highlightT={dict.highlights}
+                answerDistribution={answerDistribution}
               />
             </>
           ) : (

@@ -5,6 +5,7 @@ import { MathMarkdown } from "@/components/MathMarkdown";
 import { HighlightableMarkdown, type HighlightRecord } from "@/components/HighlightableMarkdown";
 import { CitationPageLink } from "@/components/CitationPageLink";
 import { QuestionImage } from "@/components/QuestionImage";
+import { AnswerDistribution, type AnswerDistributionData } from "@/components/AnswerDistribution";
 import { BookMarked, XCircle, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,12 @@ type Props = {
   userChoice?: Choice;
   options: { key: Choice; text: string }[];
   insufficientEvidence?: boolean;
+  /**
+   * Per-attempt tally of how many users picked each option (A/B/C/D). When
+   * provided with at least one attempt, a distribution histogram is rendered
+   * after the textbook evidence. Shown to both users and admins.
+   */
+  answerDistribution?: AnswerDistributionData | null;
   /** Optional image an admin manually attached to the explanation; shown in the correct-answer card. */
   explanationImageUrl?: string | null;
   explanationImageAlt?: string | null;
@@ -190,6 +197,7 @@ export function AnswerExplanation({
   userChoice,
   options,
   insufficientEvidence,
+  answerDistribution,
   explanationImageUrl,
   explanationImageAlt,
   locale = "he",
@@ -587,6 +595,18 @@ export function AnswerExplanation({
           </div>
           )}
         </div>
+      )}
+
+      {/* ── How everyone answered (per-option distribution) ───── */}
+      {answerDistribution && (
+        <AnswerDistribution
+          distribution={answerDistribution}
+          options={options}
+          correctAnswer={correctAnswer}
+          acceptedAnswers={acceptedAnswers}
+          userChoice={userChoice}
+          locale={locale}
+        />
       )}
 
       {/* Inline hovercard rendered when the user mouses over a [N] citation marker. */}

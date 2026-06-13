@@ -7,6 +7,7 @@ import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere } from "@/lib/plan";
+import { getAnswerDistribution } from "@/lib/answer-distribution";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ export default async function ForumThreadPage({
     qT: NonNullable<Awaited<ReturnType<typeof loadThreadQuestion>>["qT"]>;
     userChoice: Awaited<ReturnType<typeof loadThreadQuestion>>["userChoice"];
     highlightRows: Awaited<ReturnType<typeof loadThreadQuestion>>["highlightRows"];
+    answerDistribution: Awaited<ReturnType<typeof loadThreadQuestion>>["answerDistribution"];
   } | null = null;
 
   if (thread.questionId !== null) {
@@ -73,6 +75,7 @@ export default async function ForumThreadPage({
         qT: loaded.qT!,
         userChoice: loaded.userChoice,
         highlightRows: loaded.highlightRows,
+        answerDistribution: loaded.answerDistribution,
       };
     }
   }
@@ -173,6 +176,7 @@ export default async function ForumThreadPage({
                           questionId={questionView.question.id}
                           highlights={questionView.highlightRows}
                           highlightT={dict.highlights}
+                          answerDistribution={questionView.answerDistribution}
                         />
                       </div>
                     </details>
@@ -266,10 +270,10 @@ async function loadThreadQuestion(
   });
 
   if (!question) {
-    return { question: null, qT: null, userChoice: undefined, highlightRows: [] as Awaited<ReturnType<typeof db.sentenceHighlight.findMany>> };
+    return { question: null, qT: null, userChoice: undefined, highlightRows: [] as Awaited<ReturnType<typeof db.sentenceHighlight.findMany>>, answerDistribution: null };
   }
 
-  const [qT, attempt, highlightRows] = await Promise.all([
+  const [qT, attempt, highlightRows, answerDistribution] = await Promise.all([
     getTranslatedFields(
       "Question",
       String(question.id),
@@ -292,7 +296,8 @@ async function loadThreadQuestion(
       where: { userId: me.id, locale: contentLocale, questionId: question.id },
       select: { id: true, questionId: true, section: true, sentenceIndex: true, colorId: true, sentenceHash: true, note: true },
     }),
+    getAnswerDistribution(question.id),
   ]);
 
-  return { question, qT, userChoice: attempt?.chosen ?? undefined, highlightRows };
+  return { question, qT, userChoice: attempt?.chosen ?? undefined, highlightRows, answerDistribution };
 }

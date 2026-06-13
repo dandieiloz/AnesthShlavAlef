@@ -67,6 +67,7 @@ export function ForumQuestionView({ data }: { data: Data }) {
             questionId={data.questionId}
             highlights={data.highlights}
             highlightT={data.highlightT}
+            answerDistribution={data.answerDistribution}
           />
         </>
       ) : (
