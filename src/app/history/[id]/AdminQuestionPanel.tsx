@@ -395,7 +395,7 @@ export async function AdminQuestionPanel({
         {q.geminiAnswer ? (
           <>
             <p className="text-xs text-muted-foreground mt-1">
-              נוצר {q.geminiAnswer.generatedAt.toLocaleString("he-IL")} · מודל: {q.geminiAnswer.model} · תשובה: {q.geminiAnswer.correctAnswer}
+              נוצר {q.geminiAnswer.generatedAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })} · מודל: {q.geminiAnswer.model} · תשובה: {q.geminiAnswer.correctAnswer}
               {typeof q.geminiAnswer.confidence === "number" && (
                 <span> · ביטחון: {(q.geminiAnswer.confidence * 100).toFixed(0)}%</span>
               )}
@@ -519,7 +519,7 @@ export async function AdminQuestionPanel({
                   חילול חדש ממתין לאישור
                 </div>
                 <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                  נוצר {new Date(pendingCandidate.generatedAt).toLocaleString("he-IL")} · תשובה
+                  נוצר {new Date(pendingCandidate.generatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })} · תשובה
                   מוצעת: {pendingCandidate.correctAnswer}
                   {pendingCandidate.confidence !== null
                     ? ` (${Math.round(pendingCandidate.confidence * 100)}%)`
@@ -659,7 +659,7 @@ export async function AdminQuestionPanel({
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     <span className={`rounded px-2 py-0.5 ${statusClass}`}>{statusLabel}</span>
                     <span>
-                      דווח על ידי {r.user.name ?? r.user.email} · {r.createdAt.toLocaleString("he-IL")}
+                      דווח על ידי {r.user.name ?? r.user.email} · {r.createdAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
                     </span>
                     {r.status !== "OPEN" && r.resolver && (
                       <span>· נסגר על ידי {r.resolver.name ?? r.resolver.email}</span>
@@ -704,7 +704,7 @@ export async function AdminQuestionPanel({
                       {r.adminResponse && (
                         <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-sm dark:border-emerald-700 dark:bg-emerald-950/40">
                           <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                            תגובת הצוות {r.adminResponseAt && `(${r.adminResponseAt.toLocaleString("he-IL")})`}
+                            תגובת הצוות {r.adminResponseAt && `(${r.adminResponseAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })})`}
                           </div>
                           <p className="whitespace-pre-wrap text-emerald-900 dark:text-emerald-100" dir="rtl">{r.adminResponse}</p>
                         </div>
@@ -765,7 +765,7 @@ export async function AdminQuestionPanel({
                   {c.author?.name ?? c.author?.email ?? "לא ידוע"}
                   {c.author?.hospitalName ? ` · ${c.author.hospitalName}` : ""}
                   {" · "}
-                  {c.createdAt.toLocaleString("he-IL")}
+                  {c.createdAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
                   {c.editedAt ? " · נערך" : ""}
                 </span>
                 <form action={deleteCommentAction}>
@@ -805,7 +805,7 @@ export async function AdminQuestionPanel({
               <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span>
                   {n.author?.name ?? n.author?.email ?? "לא ידוע"} ·{" "}
-                  {n.createdAt.toLocaleString("he-IL")}
+                  {n.createdAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
                 </span>
                 <form action={deleteAdminNoteAction}>
                   <input type="hidden" name="noteId" value={n.id} />

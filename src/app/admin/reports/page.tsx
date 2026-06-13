@@ -66,7 +66,7 @@ export default async function ReportsPage({ searchParams }: { searchParams?: Pro
               <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-2">
                 <span className={`rounded px-2 py-0.5 ${statusClass}`}>{statusLabel}</span>
                 <span>
-                  דווח על ידי {r.user.name ?? r.user.email} · {r.createdAt.toLocaleString("he-IL")} · פרק {r.question.chapter.number}
+                  דווח על ידי {r.user.name ?? r.user.email} · {r.createdAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })} · פרק {r.question.chapter.number}
                 </span>
                 {view === "closed" && r.resolver && (
                   <span>· נסגר על ידי {r.resolver.name ?? r.resolver.email}</span>
@@ -116,7 +116,7 @@ export default async function ReportsPage({ searchParams }: { searchParams?: Pro
                   {r.adminResponse && (
                     <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-sm dark:border-emerald-700 dark:bg-emerald-950/40">
                       <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                        תגובת הצוות {r.adminResponseAt && `(${r.adminResponseAt.toLocaleString("he-IL")})`}
+                        תגובת הצוות {r.adminResponseAt && `(${r.adminResponseAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })})`}
                       </div>
                       <p className="whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">{r.adminResponse}</p>
                     </div>

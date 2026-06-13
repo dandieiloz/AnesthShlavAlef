@@ -38,17 +38,20 @@ function formatBucket(iso: string, granularity: Granularity): string {
       minute: "2-digit",
       day: "2-digit",
       month: "2-digit",
+      timeZone: "Asia/Jerusalem",
     }).format(d);
   }
   if (granularity === "day") {
     return new Intl.DateTimeFormat("he-IL", {
       day: "2-digit",
       month: "2-digit",
+      timeZone: "Asia/Jerusalem",
     }).format(d);
   }
   return new Intl.DateTimeFormat("he-IL", {
     month: "2-digit",
     year: "numeric",
+    timeZone: "Asia/Jerusalem",
   }).format(d);
 }
 

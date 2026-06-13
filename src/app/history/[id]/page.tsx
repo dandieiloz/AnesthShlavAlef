@@ -26,6 +26,7 @@ const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Asia/Jerusalem",
 });
 
 export default async function HistoryQuestionPage({

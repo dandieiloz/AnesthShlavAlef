@@ -80,6 +80,19 @@ export function AttemptsFilters({
         </select>
       </div>
 
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">מיון</label>
+        <select
+          name="sort"
+          defaultValue={params.get("sort") ?? ""}
+          className="rounded border p-2 text-sm bg-background text-foreground"
+        >
+          <option value="">לפי פרק</option>
+          <option value="newest">לפי זמן – חדש לישן</option>
+          <option value="oldest">לפי זמן – ישן לחדש</option>
+        </select>
+      </div>
+
       <div className="flex gap-2">
         <button
           type="submit"

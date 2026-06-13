@@ -13,7 +13,10 @@ const STEM_PREVIEW_CHARS = 110;
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Asia/Jerusalem",
 });
+
+type SortMode = "chapter" | "newest" | "oldest";
 
 function formatRelative(date: Date): string {
   return formatRelativeTime(date, Date.now(), "he");
@@ -48,7 +51,7 @@ export default async function AdminUserAttemptsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ q?: string; chapter?: string; correct?: string }>;
+  searchParams: Promise<{ q?: string; chapter?: string; correct?: string; sort?: string }>;
 }) {
   await requireAdmin();
   const { id: userId } = await params;
@@ -76,6 +79,8 @@ export default async function AdminUserAttemptsPage({
   const correctFilter: boolean | null =
     sp.correct === "yes" ? true : sp.correct === "no" ? false : null;
   const stemQuery = sp.q?.trim() ?? "";
+  const sort: SortMode =
+    sp.sort === "newest" ? "newest" : sp.sort === "oldest" ? "oldest" : "chapter";
 
   const questionFilter: Prisma.QuestionWhereInput = {};
   if (chapterNumber !== null) {
@@ -103,7 +108,7 @@ export default async function AdminUserAttemptsPage({
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" },
         take: LIMIT,
       }),
       db.attempt.count({ where }),
@@ -225,7 +230,7 @@ export default async function AdminUserAttemptsPage({
             : `${filteredTotal} ניסיונות`}
       </div>
 
-      {groups.length === 0 ? null : (
+      {groups.length === 0 ? null : sort === "chapter" ? (
         <div className="space-y-4">
           {groups.map((group) => (
             <section key={group.chapterNumber} className="rounded border bg-card">
@@ -291,6 +296,63 @@ export default async function AdminUserAttemptsPage({
             </section>
           ))}
         </div>
+      ) : (
+        <section className="rounded border bg-card">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b bg-muted/40">
+                <th className="p-2 text-start text-muted-foreground whitespace-nowrap">
+                  תאריך
+                </th>
+                <th className="p-2 text-start text-muted-foreground whitespace-nowrap">
+                  פרק
+                </th>
+                <th className="p-2 text-start text-muted-foreground">שאלה</th>
+                <th className="p-2 text-center text-muted-foreground whitespace-nowrap">
+                  נבחר
+                </th>
+                <th className="p-2 text-center text-muted-foreground whitespace-nowrap">
+                  נכון
+                </th>
+                <th className="p-2 text-center text-muted-foreground whitespace-nowrap">
+                  תוצאה
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(attempts as AttemptRow[]).map((a) => (
+                <tr key={a.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                  <td className="p-2 text-muted-foreground whitespace-nowrap">
+                    {DATE_FORMATTER.format(a.createdAt)}
+                  </td>
+                  <td className="p-2 text-muted-foreground whitespace-nowrap">
+                    {a.question.chapter.number}
+                  </td>
+                  <td className="p-2">
+                    <Link href={`/history/${a.question.id}`} className="hover:underline">
+                      {truncate(a.question.stem, STEM_PREVIEW_CHARS)}
+                    </Link>
+                  </td>
+                  <td className="p-2 text-center font-mono">{a.chosen}</td>
+                  <td className="p-2 text-center font-mono text-muted-foreground">
+                    {a.question.correctAnswer ?? "—"}
+                  </td>
+                  <td className="p-2 text-center">
+                    {a.isCorrect ? (
+                      <span className="text-xs rounded px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
+                        ✓ נכון
+                      </span>
+                    ) : (
+                      <span className="text-xs rounded px-2 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300">
+                        ✗ שגוי
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       )}
     </div>
   );

@@ -29,6 +29,7 @@ const STEM_PREVIEW_CHARS = 140;
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Asia/Jerusalem",
 });
 
 const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {
