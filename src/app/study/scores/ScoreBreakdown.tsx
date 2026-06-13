@@ -171,33 +171,35 @@ function AdditiveScale({
         </ul>
       </div>
 
-      <div className="space-y-1">
-        <p className="text-xs font-semibold text-foreground">{t.fullScaleTitle}</p>
-        <ul className="space-y-1">
-          {score.interpretation.map((band, i) => {
-            const isActive = active != null && band.min === active.min && band.max === active.max;
-            return (
-              <li
-                key={i}
-                className={cn(
-                  "flex items-start justify-between gap-3 rounded-md px-2 py-1 text-xs",
-                  isActive ? "bg-success/10 font-medium text-foreground" : "text-muted-foreground",
-                )}
-              >
-                <span>
-                  {band.label[locale]}
-                  {band.detail && (
-                    <span className="text-muted-foreground"> — {band.detail[locale]}</span>
+      {score.interpretation.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-foreground">{t.fullScaleTitle}</p>
+          <ul className="space-y-1">
+            {score.interpretation.map((band, i) => {
+              const isActive = active != null && band.min === active.min && band.max === active.max;
+              return (
+                <li
+                  key={i}
+                  className={cn(
+                    "flex items-start justify-between gap-3 rounded-md px-2 py-1 text-xs",
+                    isActive ? "bg-success/10 font-medium text-foreground" : "text-muted-foreground",
                   )}
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {band.min === band.max ? band.min : `${band.min}–${band.max}`}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+                >
+                  <span>
+                    {band.label[locale]}
+                    {band.detail && (
+                      <span className="text-muted-foreground"> — {band.detail[locale]}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {band.min === band.max ? band.min : `${band.min}–${band.max}`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

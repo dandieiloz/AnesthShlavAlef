@@ -9,6 +9,52 @@ const NECK_OVER = bi(
 );
 const NECK_UNDER = bi("מתחת לסף לפי מין", "Below the sex-specific threshold");
 
+// BMI option values, shared between the rubric options and the derive hook.
+const BMI_OVER = bi("מעל 35 ק\"ג/מ\"ר", "Over 35 kg/m²");
+const BMI_UNDER = bi("עד 35 ק\"ג/מ\"ר", "Up to 35 kg/m²");
+
+// Age option values, shared between the rubric options and the derive hook.
+const AGE_OVER = bi("מעל 50", "Over 50");
+const AGE_UNDER = bi("עד 50", "Up to 50");
+
+/**
+ * BMI: a concrete value is shown (no threshold hint), and the point is awarded
+ * only when it exceeds 35 kg/m². The student must recall the cutoff.
+ */
+const bmi: ScoreComponent = {
+  id: "bmi",
+  label: bi("BMI", "BMI"),
+  options: [opt(BMI_OVER, 1), opt(BMI_UNDER, 0)],
+  derive: ({ rng }) => {
+    const value = Math.round((26 + rng() * 18) * 10) / 10; // 26.0–44.0 around the 35 cutoff
+    const over = value > 35;
+    return {
+      points: over ? 1 : 0,
+      shown: bi(`${value} ק"ג/מ"ר`, `${value} kg/m²`),
+      value: over ? BMI_OVER : BMI_UNDER,
+    };
+  },
+};
+
+/**
+ * Age: a concrete value is shown (no threshold hint), and the point is awarded
+ * only when it exceeds 50 years. The student must recall the cutoff.
+ */
+const age: ScoreComponent = {
+  id: "age",
+  label: bi("גיל", "Age"),
+  options: [opt(AGE_OVER, 1), opt(AGE_UNDER, 0)],
+  derive: ({ rng }) => {
+    const years = Math.round(38 + rng() * 36); // 38–74 around the 50 cutoff
+    const over = years > 50;
+    return {
+      points: over ? 1 : 0,
+      shown: bi(`${years} שנים`, `${years} years`),
+      value: over ? AGE_OVER : AGE_UNDER,
+    };
+  },
+};
+
 /**
  * Neck circumference: a concrete value is shown (no threshold hint), and the
  * point is awarded only if it exceeds the patient's sex-specific cutoff
@@ -56,8 +102,8 @@ export const stopbang: AdditiveScore = {
     binary("tired", bi("עייפות או ישנוניות ביום (Tired)", "Daytime tiredness"), 1),
     binary("observed", bi("הפסקות נשימה נצפות (Observed apnea)", "Observed apnea"), 1),
     binary("pressure", bi("יתר לחץ דם מטופל (Pressure)", "Treated hypertension"), 1),
-    binary("bmi", bi("BMI מעל 35 ק\"ג/מ\"ר", "BMI over 35 kg/m²"), 1),
-    binary("age", bi("גיל מעל 50", "Age over 50"), 1),
+    bmi,
+    age,
     // Sex is resolved before neck so the neck threshold can depend on it.
     binary("gender", bi("מין", "Sex"), 1, {
       yes: bi("זכר", "Male"),
@@ -66,10 +112,8 @@ export const stopbang: AdditiveScore = {
     }),
     neck,
   ],
-  interpretation: [
-    { min: 0, max: 2, label: bi("סיכון נמוך", "Low risk"), detail: bi("0–2 נקודות", "0–2 points") },
-    { min: 3, max: 4, label: bi("סיכון בינוני", "Intermediate risk"), detail: bi("3–4 נקודות", "3–4 points") },
-    { min: 5, max: 8, label: bi("סיכון גבוה", "High risk"), detail: bi("5–8 נקודות", "5–8 points") },
-  ],
-  ask: ["total", "band"],
+  // STOP-BANG severity bands vary across the literature (different cutoffs and
+  // labels), so we don't classify risk — the drill only asks for the total.
+  interpretation: [],
+  ask: ["total"],
 };

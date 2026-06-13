@@ -24,6 +24,7 @@ type PersistedDrill = {
   selectedId: string | null;
   revealed: boolean;
   finished: boolean;
+  updatedAt: number;
 };
 
 const CONF_ACTIVE: Record<ConfidenceLevel, string> = {
@@ -156,6 +157,7 @@ export function ScoreDrillRunner({
         selectedId,
         revealed,
         finished,
+        updatedAt: Date.now(),
       };
       sessionStorage.setItem(storageKey, JSON.stringify(payload));
     } catch {
