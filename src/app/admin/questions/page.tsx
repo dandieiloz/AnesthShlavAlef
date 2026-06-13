@@ -147,7 +147,7 @@ export default async function AdminQuestionsPage({
         correctAnswer: true,
         acceptedAnswers: true,
         createdAt: true,
-        chapter: { select: { number: true } },
+        chapter: { select: { number: true, title: true } },
         geminiAnswer: {
           select: {
             id: true,
@@ -236,6 +236,7 @@ export default async function AdminQuestionsPage({
       source: q.source,
       createdAt: q.createdAt.toISOString(),
       chapterNumber: q.chapter.number,
+      chapterTitle: q.chapter.title,
       hasExplanation: q.geminiAnswer !== null,
       disabled: q.disabled,
       // Effective answer learners actually see: Gemini's answer takes precedence,

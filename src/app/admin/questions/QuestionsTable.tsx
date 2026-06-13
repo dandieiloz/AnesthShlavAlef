@@ -14,6 +14,7 @@ export type QuestionRow = {
   source: string | null;
   createdAt: string;
   chapterNumber: number;
+  chapterTitle: string;
   hasExplanation: boolean;
   disabled: boolean;
   /** Primary correct answer (A/B/C/D), or null when not yet set. */
@@ -540,7 +541,20 @@ export function QuestionsTable({
                 <td className="p-2 text-muted-foreground max-w-[8rem] truncate" title={q.source ?? undefined}>
                   {q.source ?? <span className="italic text-muted-foreground/50">—</span>}
                 </td>
-                <td className="p-2 text-center text-muted-foreground">{q.chapterNumber}</td>
+                <td className="p-2 text-center text-muted-foreground">
+                  <div className="group relative inline-block">
+                    <span className="cursor-default">{q.chapterNumber}</span>
+                    {q.chapterTitle ? (
+                      <div
+                        role="tooltip"
+                        dir="rtl"
+                        className="pointer-events-none absolute right-1/2 top-full z-50 mt-1 hidden w-64 max-w-[min(90vw,16rem)] translate-x-1/2 whitespace-pre-wrap break-words rounded-md border bg-popover p-2.5 text-start text-sm leading-relaxed text-popover-foreground shadow-lg group-hover:block"
+                      >
+                        {q.chapterTitle}
+                      </div>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="p-2 text-center whitespace-nowrap">
                   {q.correctAnswer === null ? (
                     <span className="italic text-muted-foreground/50">—</span>
