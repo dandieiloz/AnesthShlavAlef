@@ -365,7 +365,7 @@ export default async function AdminQuestionsPage({
   // learners (excludes admin-approved and already-disabled questions, which the
   // gates never hide). publishThreshold / autoHideConfig / autoHiddenIds are
   // computed above for per-row gate flags.
-  const [publishFilteredCount, autoHideFilteredCount] = await Promise.all([
+  const [publishFilteredCount, autoHideFilteredCount, availableToUsersCount] = await Promise.all([
     db.question.count({
       where: {
         disabled: false,
@@ -378,12 +378,52 @@ export default async function AdminQuestionsPage({
           where: { disabled: false, adminApproved: false, id: { in: autoHiddenIds } },
         })
       : Promise.resolve(0),
+    // Questions actually visible to learners: not disabled AND pass the publish
+    // gate AND (admin-approved OR not auto-hidden). Mirrors the learner gate in
+    // lib/plan.ts.
+    db.question.count({
+      where: {
+        disabled: false,
+        AND: [
+          {
+            OR: [
+              { adminApproved: true },
+              { geminiAnswer: { is: { confidence: { gte: publishThreshold } } } },
+            ],
+          },
+          ...(autoHiddenIds.length
+            ? [{ OR: [{ adminApproved: true }, { id: { notIn: autoHiddenIds } }] }]
+            : []),
+        ],
+      },
+    }),
   ]);
 
   return (
     <div className="space-y-4">
       <AdminNav />
-      <h1 className="font-display text-2xl font-bold">ניהול שאלות</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-2xl font-bold">ניהול שאלות</h1>
+        <div
+          className="inline-flex items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-2 shadow-sm dark:border-emerald-900/50 dark:from-emerald-950/40 dark:to-teal-950/30"
+          title="שאלות הגלויות ללומדים לאחר סינון: לא מושבתות, מעל סף הביטחון, ולא מוסתרות אוטומטית"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </span>
+          <div className="leading-tight">
+            <div className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+              {availableToUsersCount.toLocaleString("he-IL")}
+            </div>
+            <div className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400/80">
+              זמינות ללומדים
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <PublishThresholdControl
