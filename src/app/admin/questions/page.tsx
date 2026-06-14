@@ -141,35 +141,105 @@ export default async function AdminQuestionsPage({
   const pageNum = Math.max(1, Number(sp.page) || 1);
   const skip = (pageNum - 1) * PAGE_SIZE;
 
-  const [questions, total, chapters] = await Promise.all([
-    db.question.findMany({
-      where,
+  const questionSelect = {
+    id: true,
+    stem: true,
+    source: true,
+    disabled: true,
+    correctAnswer: true,
+    acceptedAnswers: true,
+    createdAt: true,
+    chapter: { select: { number: true, title: true } },
+    geminiAnswer: {
       select: {
         id: true,
-        stem: true,
-        source: true,
-        disabled: true,
         correctAnswer: true,
-        acceptedAnswers: true,
-        createdAt: true,
-        chapter: { select: { number: true, title: true } },
-        geminiAnswer: {
-          select: {
-            id: true,
-            correctAnswer: true,
-            confidence: true,
-            escalated: true,
-            insufficientEvidence: true,
-            algorithmVersion: true,
-            model: true,
-            generationHint: true,
-          },
-        },
+        confidence: true,
+        escalated: true,
+        insufficientEvidence: true,
+        algorithmVersion: true,
+        model: true,
+        generationHint: true,
       },
-      orderBy,
-      take: PAGE_SIZE,
-      skip,
-    }),
+    },
+  } as const;
+
+  // attemptCount / percentCorrect are computed from Attempt aggregates and can't
+  // be ordered by Prisma. For these we must rank ALL matching questions globally
+  // (not just one DB-ordered page) before paginating — otherwise pagination would
+  // slice the createdAt-ordered set and only re-sort that local window.
+  const isAttemptSort = sort === "attemptCount" || sort === "percentCorrect";
+
+  const [questions, total, chapters] = await Promise.all([
+    (async () => {
+      if (!isAttemptSort) {
+        return db.question.findMany({
+          where,
+          select: questionSelect,
+          orderBy,
+          take: PAGE_SIZE,
+          skip,
+        });
+      }
+
+      // Global ranking path: fetch all matching ids, aggregate attempt stats for
+      // each, sort by the requested metric, then fetch full rows for the page.
+      const allMatching = await db.question.findMany({
+        where,
+        select: { id: true },
+      });
+      const allIds = allMatching.map((q) => q.id);
+
+      const [totalRows, correctRows] = allIds.length
+        ? await Promise.all([
+            db.attempt.groupBy({
+              by: ["questionId"],
+              where: { questionId: { in: allIds } },
+              _count: { _all: true },
+            }),
+            db.attempt.groupBy({
+              by: ["questionId"],
+              where: { questionId: { in: allIds }, isCorrect: true },
+              _count: { _all: true },
+            }),
+          ])
+        : [[], []];
+
+      const totalByQ = new Map<number, number>(
+        totalRows.map((r) => [r.questionId, r._count._all]),
+      );
+      const correctByQ = new Map<number, number>(
+        correctRows.map((r) => [r.questionId, r._count._all]),
+      );
+
+      const dir = order === "asc" ? 1 : -1;
+      const ranked = allIds
+        .map((id) => {
+          const attempts = totalByQ.get(id) ?? 0;
+          const correct = correctByQ.get(id) ?? 0;
+          const pct = attempts === 0 ? null : correct / attempts;
+          return { id, attempts, pct };
+        })
+        .sort((a, b) => {
+          if (sort === "attemptCount") {
+            return (a.attempts - b.attempts) * dir || b.id - a.id;
+          }
+          // null percentCorrect (no attempts) always sorts to the end
+          if (a.pct === null && b.pct === null) return b.id - a.id;
+          if (a.pct === null) return 1;
+          if (b.pct === null) return -1;
+          return (a.pct - b.pct) * dir || b.id - a.id;
+        });
+
+      const pageIds = ranked.slice(skip, skip + PAGE_SIZE).map((r) => r.id);
+      const pageRows = await db.question.findMany({
+        where: { id: { in: pageIds } },
+        select: questionSelect,
+      });
+      // Preserve the global ranking order (findMany ignores `in` ordering).
+      const byId = new Map(pageRows.map((q) => [q.id, q]));
+      return pageIds.map((id) => byId.get(id)!).filter(Boolean);
+    })(),
     db.question.count({ where }),
     db.chapter.findMany({
       select: { number: true, title: true },
@@ -234,7 +304,7 @@ export default async function AdminQuestionsPage({
     attemptCorrectRows.map((r) => [r.questionId, r._count._all]),
   );
 
-  let rows: QuestionRow[] = questions.map((q) => {
+  const rows: QuestionRow[] = questions.map((q) => {
     const attemptCount = attemptCountMap.get(q.id) ?? 0;
     const correctCount = correctCountMap.get(q.id) ?? 0;
     return {
@@ -268,23 +338,9 @@ export default async function AdminQuestionsPage({
     };
   });
 
-  // attemptCount / percentCorrect can't be ordered in the DB query — sort the
-  // current page in memory. Other sorts already came back ordered from Prisma.
-  if (sort === "attemptCount" || sort === "percentCorrect") {
-    const dir = order === "asc" ? 1 : -1;
-    rows = [...rows].sort((a, b) => {
-      if (sort === "attemptCount") {
-        return (a.attemptCount - b.attemptCount) * dir || (b.id - a.id);
-      }
-      // null percentCorrect (no attempts) sorts to the end regardless of direction
-      const av = a.percentCorrect;
-      const bv = b.percentCorrect;
-      if (av === null && bv === null) return b.id - a.id;
-      if (av === null) return 1;
-      if (bv === null) return -1;
-      return (av - bv) * dir || (b.id - a.id);
-    });
-  }
+  // attemptCount / percentCorrect ordering is handled globally before pagination
+  // (see the ranking path above), so the page rows already arrive in the correct
+  // order here. All other sorts came back ordered from Prisma.
 
   return (
     <div className="space-y-4">
