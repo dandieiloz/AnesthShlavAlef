@@ -6,6 +6,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { invalidateTranslations } from "@/lib/translate";
 import { uploadQuestionImage, deleteQuestionImage } from "@/lib/question-image";
+import { rescoreAttemptsForQuestion } from "@/lib/rescore-attempts";
 
 const QuestionSchema = z.object({
   id: z.coerce.number().optional(),
@@ -54,8 +55,7 @@ export async function saveQuestionAction(formData: FormData) {
   if (!chapter) throw new Error("Chapter not found");
 
   if (data.id) {
-    // Fetch existing values so we only invalidate translations for fields that actually changed,
-    // and so we can decide whether to re-score past attempts.
+    // Fetch existing values so we only invalidate translations for fields that actually changed.
     const existing = await db.question.findUnique({
       where: { id: data.id },
       select: {
@@ -64,9 +64,6 @@ export async function saveQuestionAction(formData: FormData) {
         optionB: true,
         optionC: true,
         optionD: true,
-        correctAnswer: true,
-        acceptedAnswers: true,
-        geminiAnswer: { select: { correctAnswer: true } },
       },
     });
     await db.question.update({
@@ -92,31 +89,10 @@ export async function saveQuestionAction(formData: FormData) {
       if (changed.length > 0) {
         await invalidateTranslations("Question", String(data.id), changed);
       }
-      // Retroactive re-score: if the accepted set OR the primary changed, fix
-      // existing Attempt rows so historical stats reflect the new ruling.
-      const prevPrimary = existing.geminiAnswer?.correctAnswer ?? existing.correctAnswer ?? null;
-      const newPrimary = existing.geminiAnswer?.correctAnswer ?? (data.correctAnswer ?? null);
-      const prevSet = new Set<string>([
-        ...(prevPrimary ? [prevPrimary] : []),
-        ...existing.acceptedAnswers,
-      ]);
-      const nextSet = new Set<string>([
-        ...(newPrimary ? [newPrimary] : []),
-        ...acceptedAnswers,
-      ]);
-      const setsEqual =
-        prevSet.size === nextSet.size && [...prevSet].every((c) => nextSet.has(c));
-      if (!setsEqual && newPrimary) {
-        const acceptedList = [...nextSet] as ("A" | "B" | "C" | "D")[];
-        await db.attempt.updateMany({
-          where: { questionId: data.id, chosen: { in: acceptedList } },
-          data: { isCorrect: true },
-        });
-        await db.attempt.updateMany({
-          where: { questionId: data.id, chosen: { notIn: acceptedList } },
-          data: { isCorrect: false },
-        });
-      }
+      // Retroactive re-score: recompute every past attempt's isCorrect against
+      // the question's current effective answer set so historical stats reflect
+      // the new ruling (idempotent — a no-op when nothing relevant changed).
+      await rescoreAttemptsForQuestion(data.id);
     }
     revalidatePath(`/history/${data.id}`);
     redirect(`/history/${data.id}`);

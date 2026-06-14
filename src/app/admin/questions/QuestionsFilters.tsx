@@ -1,9 +1,10 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GroupCombobox } from "@/components/GroupCombobox";
+import { YearCombobox } from "@/components/YearCombobox";
 
 type Chapter = { number: number; title: string };
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
@@ -12,6 +13,14 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
   const router = useRouter();
   const params = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Cascading source filters (מוסד → שנה → קבוצה). Controlled so that changing a
+  // parent narrows and resets its dependents. The "ללא מוסד" sentinel disables
+  // the year/group selectors since those questions have no year/group.
+  const [source, setSource] = useState(params.get("source") ?? "");
+  const [year, setYear] = useState(params.get("year") ?? "");
+  const [suffix, setSuffix] = useState(params.get("suffix") ?? "");
+  const sourceIsNull = source === NULL_SOURCE_FILTER;
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,6 +34,9 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
 
   function reset() {
     formRef.current?.reset();
+    setSource("");
+    setYear("");
+    setSuffix("");
     router.push("/admin/questions");
   }
 
@@ -50,7 +62,13 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
         <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
         <SearchableSelect
           name="source"
-          defaultValue={params.get("source") ?? ""}
+          value={source}
+          onChange={(v) => {
+            setSource(v);
+            // Changing the institution invalidates the narrowed year/group.
+            setYear("");
+            setSuffix("");
+          }}
           options={[
             { value: NULL_SOURCE_FILTER, label: "ללא מוסד" },
             ...QUESTION_SOURCES.map((s) => ({ value: s, label: s })),
@@ -65,14 +83,17 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
       {/* Year */}
       <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1">שנה</label>
-        <input
+        <YearCombobox
           name="year"
-          type="number"
-          min={1990}
-          max={2030}
-          defaultValue={params.get("year") ?? ""}
-          placeholder="כולל"
-          className="w-24 rounded border p-2 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+          value={year}
+          onChange={(v) => {
+            setYear(v);
+            // Changing the year invalidates the narrowed group.
+            setSuffix("");
+          }}
+          institution={sourceIsNull ? undefined : source}
+          placeholder="הכל"
+          className="w-28"
         />
       </div>
 
@@ -81,7 +102,10 @@ export function QuestionsFilters({ chapters }: { chapters: Chapter[] }) {
         <label className="block text-xs font-medium text-muted-foreground mb-1">קבוצה</label>
         <GroupCombobox
           name="suffix"
-          defaultValue={params.get("suffix") ?? ""}
+          value={suffix}
+          onChange={setSuffix}
+          institution={sourceIsNull ? undefined : source}
+          year={year}
           placeholder="הכל"
           className="w-40"
         />

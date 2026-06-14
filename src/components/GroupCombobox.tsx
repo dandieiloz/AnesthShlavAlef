@@ -3,6 +3,7 @@
 import * as React from "react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { getQuestionGroupsAction } from "@/lib/question-source-actions";
+import { loadSourceTuples } from "@/lib/source-tuples-client";
 
 /** Module-level cache so repeated mounts don't re-query the same admin session. */
 let groupsCache: Promise<string[]> | null = null;
@@ -23,6 +24,10 @@ interface GroupComboboxProps {
   className?: string;
   buttonClassName?: string;
   placeholder?: string;
+  /** When set, narrows the group options to those used with this institution. */
+  institution?: string;
+  /** When set, narrows the group options to those used with this year. */
+  year?: string;
 }
 
 /**
@@ -38,18 +43,40 @@ export function GroupCombobox({
   className,
   buttonClassName,
   placeholder = "— ללא קבוצה —",
+  institution,
+  year,
 }: GroupComboboxProps) {
   const [groups, setGroups] = React.useState<string[]>([]);
 
+  // When an institution or year is provided, derive groups from the parsed
+  // source tuples so the list cascades. Otherwise fall back to the flat list of
+  // all group values (used by the new-question wizard and contribute form).
+  const cascade = Boolean(institution?.trim() || year?.trim());
+
   React.useEffect(() => {
     let active = true;
-    loadGroups().then((g) => {
-      if (active) setGroups(g);
-    });
+    if (cascade) {
+      loadSourceTuples().then((tuples) => {
+        if (!active) return;
+        const inst = institution?.trim();
+        const yr = year?.trim();
+        const set = new Set<string>();
+        for (const t of tuples) {
+          if (inst && t.institution !== inst) continue;
+          if (yr && t.year !== yr) continue;
+          if (t.group) set.add(t.group);
+        }
+        setGroups([...set]);
+      });
+    } else {
+      loadGroups().then((g) => {
+        if (active) setGroups(g);
+      });
+    }
     return () => {
       active = false;
     };
-  }, []);
+  }, [cascade, institution, year]);
 
   const options = React.useMemo(() => {
     const set = new Set(groups);

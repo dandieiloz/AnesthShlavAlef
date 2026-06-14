@@ -5,6 +5,7 @@ import Link from "next/link";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GroupCombobox } from "@/components/GroupCombobox";
+import { YearCombobox } from "@/components/YearCombobox";
 import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction, batchSetDisabledAction } from "./actions";
 import { enqueueRegenerationBatchAction } from "../queue/actions";
 
@@ -298,7 +299,12 @@ export function QuestionsTable({
               <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
               <SearchableSelect
                 value={institution}
-                onChange={(v) => setInstitution(v)}
+                onChange={(v) => {
+                  setInstitution(v);
+                  // Changing the institution invalidates the narrowed year/group.
+                  setYear("");
+                  setSuffix("");
+                }}
                 options={QUESTION_SOURCES}
                 clearable
                 clearLabel="— ללא מוסד —"
@@ -308,13 +314,16 @@ export function QuestionsTable({
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">שנה</label>
-              <input
-                type="number"
-                min={1990}
-                max={2030}
+              <YearCombobox
                 value={year}
-                onChange={(e) => setYear(e.target.value)}
-                className="w-24 rounded border p-1.5 text-sm bg-background text-foreground"
+                onChange={(v) => {
+                  setYear(v);
+                  // Changing the year invalidates the narrowed group.
+                  setSuffix("");
+                }}
+                institution={institution}
+                placeholder="— שנה —"
+                className="w-28"
               />
             </div>
             <div>
@@ -322,6 +331,8 @@ export function QuestionsTable({
               <GroupCombobox
                 value={suffix}
                 onChange={setSuffix}
+                institution={institution}
+                year={year}
                 className="w-44"
               />
             </div>

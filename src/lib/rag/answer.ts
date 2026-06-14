@@ -6,6 +6,7 @@ import { retrieveCandidates } from "./retrieve";
 import { rerankWithFlashJudge, pickDiverseTopN } from "./rerank";
 import { translateStemToEnglish } from "./translate";
 import { hashQuestion } from "./hash";
+import { rescoreAttemptsForQuestion } from "@/lib/rescore-attempts";
 import type { CachedAnswerPayload, EvidenceCitation, RetrievedChunk, StructuredAnswer } from "./types";
 
 // Generation-algorithm version produced by this (v2 RAG) pipeline. Persisted on
@@ -556,7 +557,7 @@ async function persistAnswer(opts: {
     });
   }
 
-  return db.geminiAnswer.create({
+  const created = await db.geminiAnswer.create({
     data: {
       questionId,
       rawMarkdown: payload.rawMarkdown,
@@ -574,4 +575,8 @@ async function persistAnswer(opts: {
       generationHint: opts.hint ?? null,
     },
   });
+  // A fresh live answer may set a different correctAnswer than any prior one;
+  // keep past attempts' isCorrect in sync with the now-live answer.
+  await rescoreAttemptsForQuestion(questionId);
+  return created;
 }

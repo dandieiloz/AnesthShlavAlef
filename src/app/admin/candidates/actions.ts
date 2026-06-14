@@ -2,6 +2,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { invalidateTranslations } from "@/lib/translate";
+import { rescoreAttemptsForQuestion } from "@/lib/rescore-attempts";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 
@@ -59,6 +60,9 @@ export async function acceptCandidateAction(questionId: number): Promise<Candida
       });
     }
     await tx.geminiAnswerCandidate.delete({ where: { questionId } });
+    // The accepted candidate may carry a different correctAnswer than the
+    // answer it replaced; re-score past attempts so stats stay consistent.
+    await rescoreAttemptsForQuestion(questionId, tx);
   });
 
   revalidatePath("/admin/candidates");
