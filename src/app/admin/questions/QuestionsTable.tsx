@@ -18,6 +18,10 @@ export type QuestionRow = {
   chapterTitle: string;
   hasExplanation: boolean;
   disabled: boolean;
+  /** Hidden from learners by the publish-confidence gate (סף): no answer or confidence below threshold. Not disabled. */
+  belowThreshold: boolean;
+  /** Hidden from learners by the auto-hide performance rule (enough attempts, low correct ratio). Not disabled. */
+  autoHidden: boolean;
   /** Primary correct answer (A/B/C/D), or null when not yet set. */
   correctAnswer: "A" | "B" | "C" | "D" | null;
   /** Where the displayed answer comes from: Gemini-generated, admin-set, or none. */
@@ -510,7 +514,15 @@ export function QuestionsTable({
             {questions.map((q) => (
               <tr
                 key={q.id}
-                className={`border-b transition-colors ${selected.has(q.id) ? "bg-blue-50 dark:bg-blue-950/20" : "hover:bg-muted/30"}`}
+                className={`border-b transition-colors ${
+                  selected.has(q.id)
+                    ? "bg-blue-50 dark:bg-blue-950/20"
+                    : q.disabled
+                      ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
+                      : q.belowThreshold || q.autoHidden
+                        ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/30"
+                        : "hover:bg-muted/30"
+                }`}
               >
                 <td className="p-2 text-center">
                   <input
@@ -534,6 +546,22 @@ export function QuestionsTable({
                     {q.disabled ? (
                       <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         מושבתת
+                      </span>
+                    ) : null}
+                    {!q.disabled && q.belowThreshold ? (
+                      <span
+                        className="shrink-0 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 dark:bg-rose-900/40 dark:text-rose-200"
+                        title="מוסתרת מהלומדים — מתחת לסף הביטחון לפרסום"
+                      >
+                        מתחת לסף
+                      </span>
+                    ) : null}
+                    {!q.disabled && q.autoHidden ? (
+                      <span
+                        className="shrink-0 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 dark:bg-rose-900/40 dark:text-rose-200"
+                        title="מוסתרת אוטומטית — אחוז הצלחה נמוך"
+                      >
+                        הוסתרה אוטומטית
                       </span>
                     ) : null}
                     {q.acceptedAnswersCount > 0 ? (

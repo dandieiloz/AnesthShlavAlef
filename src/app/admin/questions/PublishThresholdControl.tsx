@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import { setPublishConfidenceThresholdAction } from "./actions";
 
-export function PublishThresholdControl({ initialThreshold }: { initialThreshold: number }) {
+export function PublishThresholdControl({ initialThreshold, filteredCount }: { initialThreshold: number; filteredCount: number }) {
   const [pct, setPct] = useState<string>(String(Math.round(initialThreshold * 100)));
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +58,9 @@ export function PublishThresholdControl({ initialThreshold }: { initialThreshold
           <span className="text-xs text-red-700 dark:text-red-400">{error}</span>
         )}
       </div>
+      <p className="text-xs text-muted-foreground mt-3">
+        מסנן כעת <strong>{filteredCount}</strong> שאלות מהמשתמשים
+      </p>
     </div>
   );
 }

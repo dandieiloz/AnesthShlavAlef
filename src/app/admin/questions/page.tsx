@@ -3,7 +3,9 @@ import { requireAdmin } from "@/lib/auth";
 import { QuestionsFilters } from "./QuestionsFilters";
 import { QuestionsTable, type QuestionRow } from "./QuestionsTable";
 import { PublishThresholdControl } from "./PublishThresholdControl";
+import { AutoHideThresholdControl } from "./AutoHideThresholdControl";
 import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
+import { getAutoHideConfig, getAutoHiddenQuestionIds } from "@/lib/auto-hide-threshold";
 import { Suspense } from "react";
 import { AdminNav } from "../AdminNav";
 
@@ -146,6 +148,7 @@ export default async function AdminQuestionsPage({
     stem: true,
     source: true,
     disabled: true,
+    adminApproved: true,
     correctAnswer: true,
     acceptedAnswers: true,
     createdAt: true,
@@ -304,9 +307,23 @@ export default async function AdminQuestionsPage({
     attemptCorrectRows.map((r) => [r.questionId, r._count._all]),
   );
 
+  // Learner-visibility gates (do NOT set `disabled`): a question is filtered out
+  // of the learner-facing pool when it is neither disabled nor admin-approved and
+  // either its answer confidence is below the publish threshold (סף) or it falls
+  // under the auto-hide performance rule.
+  const publishThreshold = await getPublishConfidenceThreshold();
+  const autoHideConfig = await getAutoHideConfig();
+  const autoHiddenIds = await getAutoHiddenQuestionIds(autoHideConfig);
+  const autoHiddenSet = new Set(autoHiddenIds);
+
   const rows: QuestionRow[] = questions.map((q) => {
     const attemptCount = attemptCountMap.get(q.id) ?? 0;
     const correctCount = correctCountMap.get(q.id) ?? 0;
+    const confidence = q.geminiAnswer?.confidence ?? null;
+    const exemptFromGates = q.disabled || q.adminApproved;
+    const belowThreshold =
+      !exemptFromGates && (confidence === null || confidence < publishThreshold);
+    const autoHidden = !exemptFromGates && autoHiddenSet.has(q.id);
     return {
       id: q.id,
       stem: q.stem,
@@ -325,7 +342,9 @@ export default async function AdminQuestionsPage({
           ? ("admin" as const)
           : null,
       acceptedAnswersCount: q.acceptedAnswers.length,
-      confidence: q.geminiAnswer?.confidence ?? null,
+      confidence,
+      belowThreshold,
+      autoHidden,
       escalated: q.geminiAnswer?.escalated ?? null,
       insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,
       algorithmVersion: q.geminiAnswer?.algorithmVersion ?? null,
@@ -342,12 +361,41 @@ export default async function AdminQuestionsPage({
   // (see the ranking path above), so the page rows already arrive in the correct
   // order here. All other sorts came back ordered from Prisma.
 
+  // Threshold controls: compute how many questions each gate currently hides from
+  // learners (excludes admin-approved and already-disabled questions, which the
+  // gates never hide). publishThreshold / autoHideConfig / autoHiddenIds are
+  // computed above for per-row gate flags.
+  const [publishFilteredCount, autoHideFilteredCount] = await Promise.all([
+    db.question.count({
+      where: {
+        disabled: false,
+        adminApproved: false,
+        NOT: { geminiAnswer: { is: { confidence: { gte: publishThreshold } } } },
+      },
+    }),
+    autoHiddenIds.length
+      ? db.question.count({
+          where: { disabled: false, adminApproved: false, id: { in: autoHiddenIds } },
+        })
+      : Promise.resolve(0),
+  ]);
+
   return (
     <div className="space-y-4">
       <AdminNav />
       <h1 className="font-display text-2xl font-bold">ניהול שאלות</h1>
 
-      <PublishThresholdControl initialThreshold={await getPublishConfidenceThreshold()} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <PublishThresholdControl
+          initialThreshold={publishThreshold}
+          filteredCount={publishFilteredCount}
+        />
+        <AutoHideThresholdControl
+          initialMinAttempts={autoHideConfig.minAttempts}
+          initialMaxCorrectPercent={autoHideConfig.maxCorrectPercent}
+          filteredCount={autoHideFilteredCount}
+        />
+      </div>
 
       <Suspense>
         <QuestionsFilters chapters={chapters} />

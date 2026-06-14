@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
+import { getAutoHideConfig, getAutoHiddenQuestionIds } from "@/lib/auto-hide-threshold";
 
 const NULL_SOURCE_SENTINEL = "__NULL__";
 
@@ -49,8 +50,15 @@ export async function questionAccessWhere(user: PlanGatedUser) {
       { geminiAnswer: { is: { confidence: { gte: threshold } } } },
     ],
   };
+  // Auto-hide gate: questions with enough attempts AND a low correct-answer ratio
+  // are hidden (likely a bad answer key), unless an admin manually approved them.
+  const hiddenIds = await getAutoHiddenQuestionIds();
+  const gates: Array<Record<string, unknown>> = [publishGate];
+  if (hiddenIds.length > 0) {
+    gates.push({ OR: [{ adminApproved: true }, { id: { notIn: hiddenIds } }] });
+  }
   if (user.plan === "PAID") {
-    return { ...baseGate, AND: [publishGate] };
+    return { ...baseGate, AND: gates };
   }
   const { sources, allowNullSource } = await getDemoAllowedSources();
   if (sources.length === 0 && !allowNullSource) {
@@ -60,7 +68,7 @@ export async function questionAccessWhere(user: PlanGatedUser) {
   if (sources.length > 0) or.push({ source: { in: sources } });
   if (allowNullSource) or.push({ source: null });
   const sourceGate = or.length === 1 ? or[0] : { OR: or };
-  return { ...baseGate, ...sourceGate, AND: [publishGate] };
+  return { ...baseGate, ...sourceGate, AND: gates };
 }
 
 /**
@@ -100,6 +108,17 @@ export async function assertCanAccessQuestion(user: PlanGatedUser, questionId: n
     const threshold = await getPublishConfidenceThreshold();
     const conf = q.geminiAnswer?.confidence ?? null;
     if (conf === null || conf < threshold) notFound();
+    // Auto-hide gate: enough attempts AND a low correct-answer ratio hides the question.
+    const autoHide = await getAutoHideConfig();
+    if (autoHide.minAttempts > 0) {
+      const [attempts, correct] = await Promise.all([
+        db.attempt.count({ where: { questionId } }),
+        db.attempt.count({ where: { questionId, isCorrect: true } }),
+      ]);
+      if (attempts >= autoHide.minAttempts && correct / attempts <= autoHide.maxCorrectPercent) {
+        notFound();
+      }
+    }
   }
   if (user.plan === "PAID") return;
   const { sources, allowNullSource } = await getDemoAllowedSources();

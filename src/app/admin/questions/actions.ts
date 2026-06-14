@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getTranslatedFields } from "@/lib/translate";
 import { setPublishConfidenceThreshold } from "@/lib/publish-threshold";
+import { setAutoHideConfig } from "@/lib/auto-hide-threshold";
 
 export async function batchUpdateSourceAction(ids: number[], source: string | null) {
   await requireAdmin();
@@ -51,6 +52,15 @@ export async function setPublishConfidenceThresholdAction(value: number) {
   const v = Number(value);
   if (!Number.isFinite(v)) throw new Error("Invalid threshold");
   await setPublishConfidenceThreshold(v);
+  revalidatePath("/admin/questions");
+}
+
+export async function setAutoHideThresholdAction(minAttempts: number, maxCorrectPercent: number) {
+  await requireAdmin();
+  const min = Number(minAttempts);
+  const pct = Number(maxCorrectPercent);
+  if (!Number.isFinite(min) || !Number.isFinite(pct)) throw new Error("Invalid threshold");
+  await setAutoHideConfig(min, pct);
   revalidatePath("/admin/questions");
 }
 
