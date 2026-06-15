@@ -93,6 +93,7 @@ export default async function AdminQuestionsPage({
   else if (sp.hint === "no") answerIs.generationHint = null;
   if (sp.algoVersion === "1") answerIs.algorithmVersion = 1;
   else if (sp.algoVersion === "2") answerIs.algorithmVersion = 2;
+  else if (sp.algoVersion === "3") answerIs.algorithmVersion = 3;
   const hasAnswerFilter = Object.keys(answerIs).length > 0;
 
   if (sp.hasExplanation === "no") {

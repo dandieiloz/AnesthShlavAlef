@@ -9,10 +9,13 @@ import { hashQuestion } from "./hash";
 import { rescoreAttemptsForQuestion } from "@/lib/rescore-attempts";
 import type { CachedAnswerPayload, EvidenceCitation, RetrievedChunk, StructuredAnswer } from "./types";
 
-// Generation-algorithm version produced by this (v2 RAG) pipeline. Persisted on
-// every new GeminiAnswer/GeminiAnswerCandidate so admins can later distinguish
-// legacy (v1) answers from current ones. Bump if the pipeline changes materially.
-export const CURRENT_ALGORITHM_VERSION = 2;
+// Generation-algorithm version produced by the RAG pipeline. Persisted on every
+// new GeminiAnswer/GeminiAnswerCandidate so admins can later distinguish answers
+// by pipeline generation. Bump if the pipeline changes materially.
+//   v1 = legacy (no inline [N] citations / non-pro model)
+//   v2 = RAG pipeline with inline citations (stem-only reranker)
+//   v3 = options-aware reranker (stem+options judge, wider window, multi-choice rubric)
+export const CURRENT_ALGORITHM_VERSION = 3;
 
 // v2 system prompt: literal-evidence priority rules are HOISTED to the top
 // of the system instruction (before the role description) so the model

@@ -307,7 +307,7 @@ export async function saveGeminiAnswerFieldsAction(
 
 const AlgorithmVersionSchema = z.object({
   questionId: z.coerce.number().int().positive(),
-  algorithmVersion: z.coerce.number().int().min(1).max(2),
+  algorithmVersion: z.coerce.number().int().min(1).max(3),
 });
 
 /**

@@ -429,6 +429,7 @@ export async function AdminQuestionPanel({
               >
                 <option value="1">גרסה 1</option>
                 <option value="2">גרסה 2</option>
+                <option value="3">גרסה 3</option>
               </select>
               <button
                 type="submit"
