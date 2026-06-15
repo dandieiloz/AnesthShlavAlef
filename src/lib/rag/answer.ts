@@ -377,6 +377,18 @@ export async function generateExplanationForQuestionV2(
     "א.", question.optionA, "ב.", question.optionB, "ג.", question.optionC, "ד.", question.optionD,
   ].join(" ");
   let englishQuery = question.stemEn ?? null;
+
+  // Question text shown to the reranker/judge: stem + every option, so the judge
+  // scores passages by how well they confirm OR refute each specific option
+  // (compound questions cover several drugs/entities). Judging the bare stem made
+  // every on-topic passage look equally relevant and buried the discriminating ones.
+  const rerankQuery = [
+    question.stem,
+    `א. ${question.optionA}`,
+    `ב. ${question.optionB}`,
+    `ג. ${question.optionC}`,
+    `ד. ${question.optionD}`,
+  ].join("\n");
   if (!englishQuery) {
     try {
       englishQuery = await translateStemToEnglish(question.stem);
@@ -400,7 +412,7 @@ export async function generateExplanationForQuestionV2(
   }
 
   // 4) Rerank into a wider pool, then enforce per-chapter diversity -------
-  const rerankedPool = await rerankWithFlashJudge(question.stem, candidates, RERANK_POOL);
+  const rerankedPool = await rerankWithFlashJudge(rerankQuery, candidates, RERANK_POOL);
   let finalChunks = pickDiverseTopN(rerankedPool, TOP_K_GEN, MAX_CHUNKS_PER_CHAPTER);
 
   // 5) Generate with Pro directly (no Flash pass-1) -----------------------
@@ -427,7 +439,7 @@ export async function generateExplanationForQuestionV2(
       perQueryK: PER_QUERY_K + 10,
     });
     const expandedPool = await rerankWithFlashJudge(
-      question.stem,
+      rerankQuery,
       expandedCandidates,
       RETRY_RERANK_POOL,
     );

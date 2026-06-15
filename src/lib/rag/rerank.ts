@@ -2,11 +2,18 @@ import { FLASH_MODEL, generateJson } from "@/lib/gemini";
 import { Type } from "@google/genai";
 import type { RetrievedChunk } from "./types";
 
+// How many characters of each candidate passage the judge sees. Kept generous so
+// a discriminating sentence (e.g. a drug's mechanism of action) buried mid-chunk
+// is not truncated away — the earlier 800-char window hid such evidence and made
+// the judge score on the chunk's opening topic sentence alone.
+const RERANK_SNIPPET_CHARS = 1200;
+
 const SYS = [
   "You are a relevance judge for a medical-board RAG system.",
   "Given a question and a set of candidate textbook passages, score how directly each passage helps answer the question on a 0..10 scale.",
   "10 = passage contains the answer or its definitive evidence. 0 = irrelevant.",
   "Be strict: only the most directly evidential passages should score >= 7.",
+  "The question is usually multiple-choice and lists several answer options/claims (often about different drugs or entities). Score a passage by how well it confirms OR refutes ANY single option — a passage that decides even one option is highly relevant even if it says nothing about the others. Prefer passages stating a specific mechanism, number, or fact named in an option over passages that only discuss the general topic.",
   "For outcome-type questions (e.g. 'what does X improve / reduce / prevent', 'which complication is most/least common'), passages that explicitly NAME the specific outcome from the question score higher than passages that merely discuss the same device/drug/topic in general.",
   "Passages that explicitly RULE OUT a candidate answer (e.g. 'there is no evidence X improves mortality', 'X is not associated with Y') are high-value evidence \u2014 score them >= 7 when they negate a plausible distractor.",
   "Score each passage independently. Return JSON only.",
@@ -51,7 +58,7 @@ export async function rerankWithFlashJudge(
   const passages = candidates
     .map(
       (c) =>
-        `[id=${c.id}] (Ch ${c.chapterNumber} \u2014 ${c.chapterTitle}${c.sectionPath ? ` > ${c.sectionPath}` : ""})\n${c.text.slice(0, 800)}`,
+        `[id=${c.id}] (Ch ${c.chapterNumber} \u2014 ${c.chapterTitle}${c.sectionPath ? ` > ${c.sectionPath}` : ""})\n${c.text.slice(0, RERANK_SNIPPET_CHARS)}`,
     )
     .join("\n\n---\n\n");
 
