@@ -47,6 +47,16 @@ export async function setQuestionAdminApprovedAction(id: number, approved: boole
   revalidatePath(`/history/${id}`);
 }
 
+export async function batchSetAdminApprovedAction(ids: number[], approved: boolean) {
+  await requireAdmin();
+  if (ids.length === 0) return;
+  await db.question.updateMany({
+    where: { id: { in: ids } },
+    data: { adminApproved: approved },
+  });
+  revalidatePath("/admin/questions");
+}
+
 export async function setPublishConfidenceThresholdAction(value: number) {
   await requireAdmin();
   const v = Number(value);

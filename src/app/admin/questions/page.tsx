@@ -345,6 +345,7 @@ export default async function AdminQuestionsPage({
       confidence,
       belowThreshold,
       autoHidden,
+      adminApproved: q.adminApproved,
       escalated: q.geminiAnswer?.escalated ?? null,
       insufficientEvidence: q.geminiAnswer?.insufficientEvidence ?? null,
       algorithmVersion: q.geminiAnswer?.algorithmVersion ?? null,

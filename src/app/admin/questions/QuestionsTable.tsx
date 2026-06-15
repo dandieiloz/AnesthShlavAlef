@@ -6,7 +6,7 @@ import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GroupCombobox } from "@/components/GroupCombobox";
 import { YearCombobox } from "@/components/YearCombobox";
-import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction, batchSetDisabledAction } from "./actions";
+import { batchUpdateSourceAction, batchDeleteQuestionsAction, batchTranslateMissingAction, batchSetDisabledAction, batchSetAdminApprovedAction, setQuestionAdminApprovedAction } from "./actions";
 import { enqueueRegenerationBatchAction } from "../queue/actions";
 
 export type QuestionRow = {
@@ -22,6 +22,8 @@ export type QuestionRow = {
   belowThreshold: boolean;
   /** Hidden from learners by the auto-hide performance rule (enough attempts, low correct ratio). Not disabled. */
   autoHidden: boolean;
+  /** Admin manually approved — overrides the publish/auto-hide gates so learners always see it. */
+  adminApproved: boolean;
   /** Primary correct answer (A/B/C/D), or null when not yet set. */
   correctAnswer: "A" | "B" | "C" | "D" | null;
   /** Where the displayed answer comes from: Gemini-generated, admin-set, or none. */
@@ -82,7 +84,7 @@ export function QuestionsTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [panel, setPanel] = useState<"source" | "delete" | "translate" | "disable" | "enable" | "regenerate" | null>(null);
+  const [panel, setPanel] = useState<"source" | "delete" | "translate" | "disable" | "enable" | "regenerate" | "approve" | "unapprove" | null>(null);
   const [translateDone, setTranslateDone] = useState<number | null>(null);
   const [regenDone, setRegenDone] = useState<{ enqueued: number; skipped: number } | null>(null);
 
@@ -162,6 +164,23 @@ export function QuestionsTable({
       await batchSetDisabledAction([...selected], disabled);
       setSelected(new Set());
       setPanel(null);
+      router.refresh();
+    });
+  }
+
+  function handleSetAdminApproved(approved: boolean) {
+    startTransition(async () => {
+      await batchSetAdminApprovedAction([...selected], approved);
+      setSelected(new Set());
+      setPanel(null);
+      router.refresh();
+    });
+  }
+
+  /** Per-row toggle of manual approval (override of the auto-hide / publish gates). */
+  function toggleRowApproved(id: number, approved: boolean) {
+    startTransition(async () => {
+      await setQuestionAdminApprovedAction(id, approved);
       router.refresh();
     });
   }
@@ -277,6 +296,20 @@ export function QuestionsTable({
             disabled={pending}
           >
             הפעל
+          </button>
+          <button
+            onClick={() => setPanel("approve")}
+            className="rounded bg-teal-600 px-3 py-1.5 text-sm text-white hover:bg-teal-700 disabled:opacity-50"
+            disabled={pending}
+          >
+            עקוף הסתרה (אשר)
+          </button>
+          <button
+            onClick={() => setPanel("unapprove")}
+            className="rounded bg-rose-600 px-3 py-1.5 text-sm text-white hover:bg-rose-700 disabled:opacity-50"
+            disabled={pending}
+          >
+            בטל עקיפה
           </button>
           <button
             onClick={() => setPanel("delete")}
@@ -454,6 +487,54 @@ export function QuestionsTable({
         </div>
       )}
 
+      {/* Approve (override hide) confirmation panel */}
+      {panel === "approve" && (
+        <div className="mb-3 rounded border border-teal-300 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4 space-y-3">
+          <p className="text-sm text-teal-800 dark:text-teal-300">
+            לאשר ידנית <strong>{selected.size}</strong> שאלות? הן יוצגו למשתמשים גם אם הוסתרו אוטומטית (אחוז הצלחה נמוך) או שהביטחון מתחת לסף.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSetAdminApproved(true)}
+              disabled={pending}
+              className="rounded bg-teal-600 px-4 py-1.5 text-sm text-white hover:bg-teal-700 disabled:opacity-50"
+            >
+              {pending ? "מאשר..." : "כן, אשר והצג"}
+            </button>
+            <button
+              onClick={() => setPanel(null)}
+              className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Unapprove (revert override) confirmation panel */}
+      {panel === "unapprove" && (
+        <div className="mb-3 rounded border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 p-4 space-y-3">
+          <p className="text-sm text-rose-800 dark:text-rose-300">
+            לבטל את האישור הידני עבור <strong>{selected.size}</strong> שאלות? הן יחזרו לכפיפות לכללי ההסתרה האוטומטית וסף הביטחון.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSetAdminApproved(false)}
+              disabled={pending}
+              className="rounded bg-rose-600 px-4 py-1.5 text-sm text-white hover:bg-rose-700 disabled:opacity-50"
+            >
+              {pending ? "מבטל..." : "כן, בטל עקיפה"}
+            </button>
+            <button
+              onClick={() => setPanel(null)}
+              className="rounded border px-4 py-1.5 text-sm hover:bg-muted"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Delete confirmation panel */}
       {panel === "delete" && (
         <div className="mb-3 rounded border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 space-y-3">
@@ -557,12 +638,26 @@ export function QuestionsTable({
                       </span>
                     ) : null}
                     {!q.disabled && q.autoHidden ? (
-                      <span
-                        className="shrink-0 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 dark:bg-rose-900/40 dark:text-rose-200"
-                        title="מוסתרת אוטומטית — אחוז הצלחה נמוך"
+                      <button
+                        type="button"
+                        onClick={() => toggleRowApproved(q.id, true)}
+                        disabled={pending}
+                        className="shrink-0 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 hover:bg-rose-200 disabled:opacity-50 dark:bg-rose-900/40 dark:text-rose-200 dark:hover:bg-rose-900/60"
+                        title="מוסתרת אוטומטית — אחוז הצלחה נמוך. לחץ כדי לעקוף ולהציג למשתמשים"
                       >
                         הוסתרה אוטומטית
-                      </span>
+                      </button>
+                    ) : null}
+                    {!q.disabled && q.adminApproved ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleRowApproved(q.id, false)}
+                        disabled={pending}
+                        className="shrink-0 rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 hover:bg-teal-200 disabled:opacity-50 dark:bg-teal-900/40 dark:text-teal-200 dark:hover:bg-teal-900/60"
+                        title="אושרה ידנית — מוצגת למשתמשים גם אם נכשלה בכללי ההסתרה. לחץ כדי לבטל את העקיפה"
+                      >
+                        אושרה ידנית
+                      </button>
                     ) : null}
                     {q.acceptedAnswersCount > 0 ? (
                       <span
