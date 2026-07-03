@@ -87,6 +87,8 @@ export function QuestionsTable({
   const [panel, setPanel] = useState<"source" | "delete" | "translate" | "disable" | "enable" | "regenerate" | "approve" | "unapprove" | null>(null);
   const [translateDone, setTranslateDone] = useState<number | null>(null);
   const [regenDone, setRegenDone] = useState<{ enqueued: number; skipped: number } | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Source edit form state
   const [institution, setInstitution] = useState("");
@@ -166,6 +168,39 @@ export function QuestionsTable({
       setPanel(null);
       router.refresh();
     });
+  }
+
+  /** Export the selected questions and their explanations to a Word (.docx) document. */
+  async function handleExportWord() {
+    setExportError(null);
+    setExporting(true);
+    try {
+      const res = await fetch("/api/admin/questions/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selected] }),
+      });
+      if (!res.ok) {
+        const msg = await res.json().catch(() => null);
+        throw new Error(msg?.error || `שגיאה ${res.status}`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] || "questions-export.docx";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "ייצוא נכשל");
+    } finally {
+      setExporting(false);
+    }
   }
 
   function handleSetAdminApproved(approved: boolean) {
@@ -312,6 +347,13 @@ export function QuestionsTable({
             בטל עקיפה
           </button>
           <button
+            onClick={handleExportWord}
+            className="rounded bg-slate-700 px-3 py-1.5 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+            disabled={pending || exporting}
+          >
+            {exporting ? "מייצא…" : "ייצא ל-Word"}
+          </button>
+          <button
             onClick={() => setPanel("delete")}
             className="rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-50"
             disabled={pending}
@@ -324,6 +366,9 @@ export function QuestionsTable({
           >
             בטל בחירה
           </button>
+          {exportError && (
+            <span className="text-xs text-red-600">⚠ {exportError}</span>
+          )}
         </div>
       )}
 
