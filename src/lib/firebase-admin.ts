@@ -9,10 +9,10 @@ function getApp(): App {
   const existing = getApps()[0];
   if (existing) return (cached = existing);
 
-  const bucket = process.env.FIREBASE_STORAGE_BUCKET;
-  if (!bucket) throw new Error("FIREBASE_STORAGE_BUCKET is not set");
+  const bucket = process.env.STORAGE_BUCKET;
+  if (!bucket) throw new Error("STORAGE_BUCKET is not set");
 
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const json = process.env.SERVICE_ACCOUNT_JSON;
   if (json) {
     const creds = JSON.parse(json) as { project_id: string; client_email: string; private_key: string };
     return (cached = initializeApp({

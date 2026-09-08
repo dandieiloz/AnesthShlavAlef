@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "generatedAt": "2026-06-03T09:35:31.691Z",
+  "sourcePdf": "Miller's Anesthesia 10 ed print layout.pdf",
+  "pdfPageCount": 3393,
+  "detectionCount": 2843,
+  "breakpoints": [
+    {
+      "fromPrinted": 2,
+      "offset": 143
+    },
+    {
+      "fromPrinted": 10,
+      "offset": 144
+    },
+    {
+      "fromPrinted": 48,
+      "offset": 150
+    },
+    {
+      "fromPrinted": 60,
+      "offset": 152
+    },
+    {
+      "fromPrinted": 77,
+      "offset": 154
+    },
+    {
+      "fromPrinted": 98,
+      "offset": 157
+    },
+    {
+      "fromPrinted": 114,
+      "offset": 159
+    },
+    {
+      "fromPrinted": 134,
+      "offset": 160
+    },
+    {
+      "fromPrinted": 152,
+      "offset": 167
+    },
+    {
+      "fromPrinted": 180,
+      "offset": 175
+    },
+    {
+      "fromPrinted": 225,
+      "offset": 185
+    },
+    {
+      "fromPrinted": 245,
+      "offset": 187
+    },
+    {
+      "fromPrinted": 273,
+      "offset": 191
+    },
+    {
+      "fromPrinted": 293,
+      "offset": 193
+    },
+    {
+      "fromPrinted": 329,
+      "offset": 201
+    },
+    {
+      "fromPrinted": 347,
+      "offset": 203
+    },
+    {
+      "fromPrinted": 372,
+      "offset": 205
+    },
+    {
+      "fromPrinted": 395,
+      "offset": 211
+    },
+    {
+      "fromPrinted": 426,
+      "offset": 217
+    },
+    {
+      "fromPrinted": 457,
+      "offset": 224
+    },
+    {
+      "fromPrinted": 512,
+      "offset": 229
+    },
+    {
+      "fromPrinted": 555,
+      "offset": 239
+    },
+    {
+      "fromPrinted": 623,
+      "offset": 253
+    },
+    {
+      "fromPrinted": 674,
+      "offset": 262
+    },
+    {
+      "fromPrinted": 742,
+      "offset": 275
+    },
+    {
+      "fromPrinted": 768,
+      "offset": 279
+    },
+    {
+      "fromPrinted": 808,
+      "offset": 284
+    },
+    {
+      "fromPrinted": 873,
+      "offset": 297
+    },
+    {
+      "fromPrinted": 930,
+      "offset": 304
+    },
+    {
+      "fromPrinted": 959,
+      "offset": 308
+    },
+    {
+      "fromPrinted": 994,
+      "offset": 318
+    },
+    {
+      "fromPrinted": 1043,
+      "offset": 328
+    },
+    {
+      "fromPrinted": 1049,
+      "offset": 329
+    },
+    {
+      "fromPrinted": 1055,
+      "offset": 331
+    },
+    {
+      "fromPrinted": 1067,
+      "offset": 333
+    },
+    {
+      "fromPrinted": 1085,
+      "offset": 342
+    },
+    {
+      "fromPrinted": 1099,
+      "offset": 343
+    },
+    {
+      "fromPrinted": 1133,
+      "offset": 348
+    },
+    {
+      "fromPrinted": 1153,
+      "offset": 352
+    },
+    {
+      "fromPrinted": 1195,
+      "offset": 363
+    },
+    {
+      "fromPrinted": 1209,
+      "offset": 367
+    },
+    {
+      "fromPrinted": 1227,
+      "offset": 371
+    },
+    {
+      "fromPrinted": 1267,
+      "offset": 378
+    },
+    {
+      "fromPrinted": 1305,
+      "offset": 388
+    },
+    {
+      "fromPrinted": 1331,
+      "offset": 391
+    },
+    {
+      "fromPrinted": 1374,
+      "offset": 397
+    },
+    {
+      "fromPrinted": 1398,
+      "offset": 400
+    },
+    {
+      "fromPrinted": 1432,
+      "offset": 406
+    },
+    {
+      "fromPrinted": 1458,
+      "offset": 411
+    },
+    {
+      "fromPrinted": 1476,
+      "offset": 415
+    },
+    {
+      "fromPrinted": 1505,
+      "offset": 424
+    },
+    {
+      "fromPrinted": 1577,
+      "offset": 432
+    },
+    {
+      "fromPrinted": 1683,
+      "offset": 446
+    },
+    {
+      "fromPrinted": 1696,
+      "offset": 448
+    },
+    {
+      "fromPrinted": 1740,
+      "offset": 453
+    },
+    {
+      "fromPrinted": 1784,
+      "offset": 462
+    },
+    {
+      "fromPrinted": 1804,
+      "offset": 466
+    },
+    {
+      "fromPrinted": 1833,
+      "offset": 472
+    },
+    {
+      "fromPrinted": 1871,
+      "offset": 480
+    },
+    {
+      "fromPrinted": 1884,
+      "offset": 482
+    },
+    {
+      "fromPrinted": 1921,
+      "offset": 490
+    },
+    {
+      "fromPrinted": 1952,
+      "offset": 499
+    },
+    {
+      "fromPrinted": 1984,
+      "offset": 506
+    },
+    {
+      "fromPrinted": 2000,
+      "offset": 511
+    },
+    {
+      "fromPrinted": 2044,
+      "offset": 520
+    },
+    {
+      "fromPrinted": 2057,
+      "offset": 521
+    },
+    {
+      "fromPrinted": 2085,
+      "offset": 523
+    },
+    {
+      "fromPrinted": 2103,
+      "offset": 527
+    },
+    {
+      "fromPrinted": 2130,
+      "offset": 531
+    },
+    {
+      "fromPrinted": 2149,
+      "offset": 537
+    },
+    {
+      "fromPrinted": 2185,
+      "offset": 549
+    },
+    {
+      "fromPrinted": 2211,
+      "offset": 552
+    },
+    {
+      "fromPrinted": 2234,
+      "offset": 559
+    },
+    {
+      "fromPrinted": 2266,
+      "offset": 565
+    },
+    {
+      "fromPrinted": 2300,
+      "offset": 572
+    },
+    {
+      "fromPrinted": 2354,
+      "offset": 581
+    },
+    {
+      "fromPrinted": 2411,
+      "offset": 589
+    },
+    {
+      "fromPrinted": 2484,
+      "offset": 601
+    },
+    {
+      "fromPrinted": 2512,
+      "offset": 606
+    },
+    {
+      "fromPrinted": 2538,
+      "offset": 612
+    },
+    {
+      "fromPrinted": 2552,
+      "offset": 615
+    },
+    {
+      "fromPrinted": 2570,
+      "offset": 621
+    },
+    {
+      "fromPrinted": 2596,
+      "offset": 629
+    },
+    {
+      "fromPrinted": 2616,
+      "offset": 631
+    },
+    {
+      "fromPrinted": 2652,
+      "offset": 634
+    },
+    {
+      "fromPrinted": 2681,
+      "offset": 640
+    },
+    {
+      "fromPrinted": 2703,
+      "offset": 645
+    },
+    {
+      "fromPrinted": 2709,
+      "offset": 646
+    },
+    {
+      "fromPrinted": 2727,
+      "offset": 651
+    }
+  ]
+}

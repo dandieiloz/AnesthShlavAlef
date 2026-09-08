@@ -1214,6 +1214,21 @@ export function QuizRunner(props: Props) {
                   reportResponseHeader: t.reportResponseHeader,
                 }}
               />
+
+              {/* Advance to the next question straight from the bottom of the
+                  reveal, so the user doesn't have to scroll back up. */}
+              <Separator className="opacity-50" />
+              <Button
+                type="button"
+                className="w-full"
+                size="lg"
+                onClick={() => {
+                  handleNext();
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                {t.nextQuestion}
+              </Button>
             </CardContent>
           </Card>
         )}
