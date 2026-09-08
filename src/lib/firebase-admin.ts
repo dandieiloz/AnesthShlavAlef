@@ -9,10 +9,11 @@ function getApp(): App {
   const existing = getApps()[0];
   if (existing) return (cached = existing);
 
-  const bucket = process.env.STORAGE_BUCKET;
-  if (!bucket) throw new Error("STORAGE_BUCKET is not set");
+  // Firebase Cloud Functions rejects env keys prefixed with FIREBASE_, so both names are supported.
+  const bucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.STORAGE_BUCKET;
+  if (!bucket) throw new Error("FIREBASE_STORAGE_BUCKET / STORAGE_BUCKET is not set");
 
-  const json = process.env.SERVICE_ACCOUNT_JSON;
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.SERVICE_ACCOUNT_JSON;
   if (json) {
     const creds = JSON.parse(json) as { project_id: string; client_email: string; private_key: string };
     return (cached = initializeApp({

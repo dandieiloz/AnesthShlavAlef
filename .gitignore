@@ -6,5 +6,6 @@ out
 *.log
 .DS_Store
 .vercel
+.firebase
 prisma/migrations/*/migration.sql.bak
 textbook/*.pdf
