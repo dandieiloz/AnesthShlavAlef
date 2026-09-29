@@ -134,7 +134,7 @@ export function SubmissionCard({ submission }: { submission: SubmissionRow }) {
             {submission.doctorName && <span className="text-muted-foreground">· {submission.doctorName}</span>}
           </div>
           <div className="text-xs text-muted-foreground">
-            {submission.submitterLabel} · {new Date(submission.createdAt).toLocaleDateString("he-IL")}
+            {submission.submitterLabel} · {new Date(submission.createdAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}
             {submission.fileName && <> · קובץ: {submission.fileName}</>}
           </div>
         </div>

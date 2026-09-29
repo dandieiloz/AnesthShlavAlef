@@ -44,7 +44,8 @@ export function RelativeTime({
   className?: string;
 }) {
   const d = typeof date === "string" ? new Date(date) : date;
-  const absolute = d.toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
+  const bcp47 = locale === "he" ? "he-IL" : "en-US";
+  const absolute = d.toLocaleDateString(bcp47, { timeZone: "Asia/Jerusalem" });
   const [label, setLabel] = useState(absolute);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function RelativeTime({
   }, [date, locale, justNow]);
 
   return (
-    <time dateTime={d.toISOString()} title={d.toLocaleString(locale === "he" ? "he-IL" : "en-US")} className={className}>
+    <time dateTime={d.toISOString()} title={d.toLocaleString(bcp47, { timeZone: "Asia/Jerusalem" })} className={className}>
       {label}
     </time>
   );

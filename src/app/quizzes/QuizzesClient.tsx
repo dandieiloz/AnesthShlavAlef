@@ -47,7 +47,9 @@ function relativeDate(
   // While SSR / pre-hydration, fall back to a stable absolute date to avoid
   // hydration drift. After mount, switch to relative "today / yesterday".
   if (nowMs === null) {
-    return new Date(iso).toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
+    return new Date(iso).toLocaleDateString(locale === "he" ? "he-IL" : "en-US", {
+      timeZone: "Asia/Jerusalem",
+    });
   }
   return formatRelativeDay(iso, nowMs, locale, { today: t.today, yesterday: t.yesterday });
 }

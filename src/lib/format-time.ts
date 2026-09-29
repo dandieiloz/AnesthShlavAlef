@@ -83,5 +83,5 @@ export function formatRelativeDay(
 
   if (diffDays <= 0) return labels.today;
   if (diffDays === 1) return labels.yesterday;
-  return new Date(target).toLocaleDateString(resolveBcp47(locale));
+  return new Date(target).toLocaleDateString(resolveBcp47(locale), { timeZone: "Asia/Jerusalem" });
 }

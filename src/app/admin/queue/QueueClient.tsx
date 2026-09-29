@@ -832,7 +832,7 @@ export function QueueClient({
                   </td>
 
                   <td className="px-3 py-2 text-center text-xs text-muted-foreground">
-                    {row.queuedAt ? new Date(row.queuedAt).toLocaleString("he-IL") : "—"}
+                    {row.queuedAt ? new Date(row.queuedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" }) : "—"}
                   </td>
 
                   <td className="px-3 py-2 text-center">

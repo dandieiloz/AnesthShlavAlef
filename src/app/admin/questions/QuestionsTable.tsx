@@ -53,6 +53,7 @@ type SortOrder = "asc" | "desc";
 const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Asia/Jerusalem",
 });
 
 const DEFAULT_SORT_ORDER: Record<SortField, SortOrder> = {

@@ -250,7 +250,7 @@ export function CandidatesClient({ rows }: { rows: CandidateRow[] }) {
                 <div className="text-xs text-muted-foreground">
                   שאלה #{r.questionId} · פרק {r.chapterNumber} — {r.chapterTitle}
                   {r.source && <span> · {r.source}</span>}
-                  <span> · נוצר {new Date(r.generatedAt).toLocaleString("he-IL")}</span>
+                  <span> · נוצר {new Date(r.generatedAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}</span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-sm">{r.stem}</div>
                 <div className="mt-1 flex flex-wrap gap-2 text-xs">

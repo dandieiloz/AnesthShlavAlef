@@ -5,12 +5,12 @@
  * and can be overridden via environment variables for recalibration.
  *
  * Pipeline per non-cached question (mirrors src/lib/rag/answer.ts):
- *   1. Embed Hebrew query              — gemini-embedding-001
- *   2. Translate stem → English         — gemini-2.5-flash  (skipped when stemEn exists)
- *   3. Embed English query             — gemini-embedding-001
- *   4. Flash judge rerank              — gemini-2.5-flash  (PER_QUERY_K candidates × ~800 chars)
- *   5. Primary generation              — gemini-2.5-pro    (TOP_K_GEN diversified chunks × AVG_CHUNK_CHARS)
- *   6. Insufficient-evidence retry     — re-rerank + gemini-2.5-pro on a wider, diversified set (rare)
+ *   1. Embed Hebrew query              — embedding model
+ *   2. Translate stem → English         — flash model (skipped when stemEn exists)
+ *   3. Embed English query             — embedding model
+ *   4. Flash judge rerank              — flash model (PER_QUERY_K candidates × ~800 chars)
+ *   5. Primary generation              — pro model (TOP_K_GEN diversified chunks × AVG_CHUNK_CHARS)
+ *   6. Insufficient-evidence retry     — re-rerank + pro model on a wider, diversified set (rare)
  *
  * Accuracy: ±25% due to Hebrew tokenisation heuristic and variable chunk sizes.
  */
@@ -38,15 +38,22 @@ export const COST_CONFIRM_THRESHOLD =
 // ─── Pricing table: USD per 1,000,000 tokens ─────────────────────────────────
 // Source: https://ai.google.dev/pricing (list prices, May 2025).
 // Override individual prices via env vars for custom billing agreements.
+
+// Kept in sync with src/lib/gemini.ts, but duplicated so this module stays free
+// of the server-only Gemini SDK import.
+const EMBED_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
+const FLASH_MODEL = process.env.GEMINI_FLASH_MODEL ?? "gemini-3.8-flash";
+const PRO_MODEL = process.env.GEMINI_GENERATION_MODEL ?? "gemini-3.1-pro-preview";
+
 export const MODEL_PRICES: Record<string, { inputPer1M: number; outputPer1M: number }> = {
-  "gemini-embedding-001": {
+  [EMBED_MODEL]: {
     inputPer1M:
       typeof process !== "undefined"
         ? parseFloat(process.env.PRICE_EMBED_IN ?? "0.15")
         : 0.15,
     outputPer1M: 0,
   },
-  "gemini-2.5-flash": {
+  [FLASH_MODEL]: {
     inputPer1M:
       typeof process !== "undefined"
         ? parseFloat(process.env.PRICE_FLASH_IN ?? "0.30")
@@ -56,7 +63,7 @@ export const MODEL_PRICES: Record<string, { inputPer1M: number; outputPer1M: num
         ? parseFloat(process.env.PRICE_FLASH_OUT ?? "2.50")
         : 2.50,
   },
-  "gemini-2.5-pro": {
+  [PRO_MODEL]: {
     inputPer1M:
       typeof process !== "undefined"
         ? parseFloat(process.env.PRICE_PRO_IN ?? "1.25")
@@ -145,9 +152,6 @@ export function estimateJobCost(opts: {
   }
 
   const ep = opts.escalationProb ?? ESCALATION_PROB;
-  const EMBED_MODEL = "gemini-embedding-001";
-  const FLASH_MODEL = "gemini-2.5-flash";
-  const PRO_MODEL = "gemini-2.5-pro";
 
   const questionText = [
     opts.stem,

@@ -7,9 +7,9 @@ if (!apiKey && process.env.NODE_ENV !== "test") {
 
 export const genai = new GoogleGenAI({ apiKey: apiKey ?? "" });
 
-export const GEN_MODEL = process.env.GEMINI_GENERATION_MODEL ?? "gemini-2.5-pro";
+export const GEN_MODEL = process.env.GEMINI_GENERATION_MODEL ?? "gemini-3.1-pro-preview";
 // Cheap model used for: pass-1 generation, query translation, and LLM-as-judge reranking.
-export const FLASH_MODEL = process.env.GEMINI_FLASH_MODEL ?? "gemini-2.5-flash";
+export const FLASH_MODEL = process.env.GEMINI_FLASH_MODEL ?? "gemini-3.8-flash";
 export const EMBED_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001";
 export const EMBED_DIM = 1536;
 
