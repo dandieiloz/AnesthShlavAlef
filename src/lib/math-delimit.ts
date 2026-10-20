@@ -13,8 +13,18 @@ const MATH_CHAR_RE = /[A-Za-z0-9_^+\-*/=.()<>:;,~ \t]/;
  */
 export function ensureMathDelimiters(input: string): string {
   if (!input) return input;
+  input = unwrapCodeSpanMath(input);
   const segments = input.split(/(```[\s\S]*?```|`[^`\n]*`|\$\$[\s\S]*?\$\$|\$[^$\n]*\$)/g);
   return segments.map((seg, i) => (i % 2 === 1 ? seg : wrapMathInSegment(seg))).join("");
+}
+
+// The model sometimes wraps delimited math in backticks (`$4 \text{ mL/kg}$`),
+// copying the code-span formatting of the prompt's delimiter instructions.
+// Markdown then renders it as a code span: raw LaTeX, scrambled by RTL bidi.
+// Strip the backticks when the span's whole content is $...$ or $$...$$.
+const CODE_SPAN_MATH_RE = /`(\$\$[^`]+?\$\$|\$[^`$\n]+\$)`/g;
+function unwrapCodeSpanMath(s: string): string {
+  return s.replace(CODE_SPAN_MATH_RE, "$1");
 }
 
 // A backslash at index `j` followed by n/t/r that is NOT continued by a
