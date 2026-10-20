@@ -291,7 +291,6 @@ export async function suggestGeminiFixAction(input: {
       properties: { corrected: { type: Type.STRING } },
       required: ["corrected"],
     },
-    0.1,
   );
 
   const suggestion = typeof result.corrected === "string" ? result.corrected : undefined;

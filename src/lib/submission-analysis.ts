@@ -82,7 +82,6 @@ export async function standardizeSubmission(rawText: string): Promise<Standardiz
     SYSTEM_PROMPT,
     userPrompt,
     SCHEMA,
-    0.1,
   );
 
   return (parsed.questions ?? []).map((q) => ({

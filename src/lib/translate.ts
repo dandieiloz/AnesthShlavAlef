@@ -100,7 +100,6 @@ export async function getTranslated(
       FLASH_MODEL,
       SYSTEM_PROMPT,
       `Translate the following Hebrew text to English:\n\n${sourceText}`,
-      0.1,
     );
     text = translated.trim();
   } catch (err) {
@@ -199,7 +198,6 @@ export async function getTranslatedFields<T extends string>(
         `Apply all translation rules to each value independently.\n\n` +
         JSON.stringify(inputObj, null, 2),
       schema,
-      0.1,
     );
   } catch (err) {
     console.error(

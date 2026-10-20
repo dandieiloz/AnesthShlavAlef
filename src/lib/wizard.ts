@@ -1,5 +1,5 @@
-import { genai, FLASH_MODEL, sanitizeLatexBackslashes } from "@/lib/gemini";
-import { Type } from "@google/genai";
+import { FLASH_MODEL, generateJson } from "@/lib/gemini";
+import { Type, type Schema } from "@google/genai";
 
 /**
  * Question fields extracted from raw pasted text.
@@ -27,6 +27,18 @@ const SYSTEM_PROMPT = [
   "- אל תוסיף פרשנות, מספרי פרקים, או כל שדה נוסף מעבר למבנה המבוקש.",
 ].join("\n");
 
+const QUESTION_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    stem: { type: Type.STRING, description: "גוף השאלה בלבד, ללא האפשרויות" },
+    optionA: { type: Type.STRING, description: "אפשרות א ללא הסימן" },
+    optionB: { type: Type.STRING, description: "אפשרות ב ללא הסימן" },
+    optionC: { type: Type.STRING, description: "אפשרות ג ללא הסימן" },
+    optionD: { type: Type.STRING, description: "אפשרות ד ללא הסימן" },
+  },
+  required: ["stem", "optionA", "optionB", "optionC", "optionD"],
+};
+
 export async function parseQuestion(rawText: string): Promise<ParsedQuestion> {
   const userPrompt = [
     "טקסט גולמי של השאלה לקליטה:",
@@ -36,35 +48,7 @@ export async function parseQuestion(rawText: string): Promise<ParsedQuestion> {
     "החזר תוצאה במבנה JSON.",
   ].join("\n");
 
-  const resp = await genai.models.generateContent({
-    model: FLASH_MODEL,
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      temperature: 0.1,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          stem: { type: Type.STRING, description: "גוף השאלה בלבד, ללא האפשרויות" },
-          optionA: { type: Type.STRING, description: "אפשרות א ללא הסימן" },
-          optionB: { type: Type.STRING, description: "אפשרות ב ללא הסימן" },
-          optionC: { type: Type.STRING, description: "אפשרות ג ללא הסימן" },
-          optionD: { type: Type.STRING, description: "אפשרות ד ללא הסימן" },
-        },
-        required: ["stem", "optionA", "optionB", "optionC", "optionD"],
-      },
-    },
-  });
-
-  const text = resp.text;
-  if (!text) throw new Error("Gemini returned empty response");
-
-  try {
-    return JSON.parse(sanitizeLatexBackslashes(text)) as ParsedQuestion;
-  } catch {
-    throw new Error("Failed to parse Gemini JSON response: " + text.slice(0, 200));
-  }
+  return generateJson<ParsedQuestion>(FLASH_MODEL, SYSTEM_PROMPT, userPrompt, QUESTION_SCHEMA);
 }
 
 /**
@@ -81,45 +65,12 @@ export async function parseMultipleQuestions(rawText: string): Promise<ParsedQue
     "החזר תוצאה במבנה JSON.",
   ].join("\n");
 
-  const resp = await genai.models.generateContent({
-    model: FLASH_MODEL,
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      temperature: 0.1,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          questions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                stem: { type: Type.STRING, description: "גוף השאלה בלבד, ללא האפשרויות" },
-                optionA: { type: Type.STRING, description: "אפשרות א ללא הסימן" },
-                optionB: { type: Type.STRING, description: "אפשרות ב ללא הסימן" },
-                optionC: { type: Type.STRING, description: "אפשרות ג ללא הסימן" },
-                optionD: { type: Type.STRING, description: "אפשרות ד ללא הסימן" },
-              },
-              required: ["stem", "optionA", "optionB", "optionC", "optionD"],
-            },
-          },
-        },
-        required: ["questions"],
-      },
-    },
+  const parsed = await generateJson<{ questions?: ParsedQuestion[] }>(FLASH_MODEL, SYSTEM_PROMPT, userPrompt, {
+    type: Type.OBJECT,
+    properties: { questions: { type: Type.ARRAY, items: QUESTION_SCHEMA } },
+    required: ["questions"],
   });
-
-  const text = resp.text;
-  if (!text) throw new Error("Gemini returned empty response");
-
-  try {
-    const parsed = JSON.parse(sanitizeLatexBackslashes(text)) as { questions: ParsedQuestion[] };
-    return parsed.questions ?? [];
-  } catch {
-    throw new Error("Failed to parse Gemini JSON response: " + text.slice(0, 200));
-  }
+  return parsed.questions ?? [];
 }
 
 /** @deprecated use parseQuestion — chapter classification removed from wizard */

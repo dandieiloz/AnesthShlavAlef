@@ -72,7 +72,7 @@ export async function rerankWithFlashJudge(
 
   let scores: JudgeResponse;
   try {
-    scores = await generateJson<JudgeResponse>(FLASH_MODEL, SYS, userPrompt, SCHEMA, 0);
+    scores = await generateJson<JudgeResponse>(FLASH_MODEL, SYS, userPrompt, SCHEMA);
   } catch (e) {
     // If the judge fails, fall back to vector-score ranking so we never block the pipeline.
     console.warn(`Reranker fell back to vector scores: ${(e as Error).message}`);

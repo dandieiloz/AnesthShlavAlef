@@ -18,6 +18,6 @@ export async function translateStemToEnglish(hebrewStem: string): Promise<string
   // If the text already looks predominantly latin/english, skip the round-trip.
   const hebrewChars = (trimmed.match(/[\u0590-\u05FF]/g) ?? []).length;
   if (hebrewChars < trimmed.length * 0.1) return trimmed;
-  const out = await generateText(FLASH_MODEL, SYS, trimmed, 0.1);
+  const out = await generateText(FLASH_MODEL, SYS, trimmed);
   return out.trim();
 }

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { GEN_MODEL, generateJson } from "@/lib/gemini";
+import { GEN_MODEL, fetchImageInput, generateJson, type ImageInput, type ThinkingLevel } from "@/lib/gemini";
 import { Type } from "@google/genai";
 import type { Choice, Prisma } from "@prisma/client";
 import { retrieveCandidates } from "./retrieve";
@@ -15,7 +15,9 @@ import type { CachedAnswerPayload, EvidenceCitation, RetrievedChunk, StructuredA
 //   v1 = legacy (no inline [N] citations / non-pro model)
 //   v2 = RAG pipeline with inline citations (stem-only reranker)
 //   v3 = options-aware reranker (stem+options judge, wider window, multi-choice rubric)
-export const CURRENT_ALGORITHM_VERSION = 3;
+//   v4 = Gemini 3 tuning on the Interactions API (no sampling params, thinking_level high,
+//        question image sent, explicit depth/citation requirements)
+export const CURRENT_ALGORITHM_VERSION = 4;
 
 // v2 system prompt: literal-evidence priority rules are HOISTED to the top
 // of the system instruction (before the role description) so the model
@@ -69,13 +71,19 @@ const SYSTEM_PROMPT = [
   "החזר JSON בלבד לפי הסכמה. אין להחזיר Markdown או טקסט חופשי מחוץ ל-JSON.",
   "",
   "שדות נדרשים:",
-  "- translation: תרגום קצר של השאלה והאפשרויות לעברית.",
+  "- translation: תרגום מלא של השאלה ושל ארבע האפשרויות לעברית (מונחים רפואיים, שמות תרופות וקיצורים נשארים באנגלית). כל אפשרות בשורה נפרדת עם האות שלה (א./ב./ג./ד.). אם השאלה כבר בעברית — העתק אותה כפי שהיא.",
   "- correctAnswer: A | B | C | D",
   "- confidence: מספר בין 0 ל-1, המבטא עד כמה אתה בטוח בתשובה על סמך הראיות.",
-  "- evidence: מערך ראיות מסודר לפי חוזק — הראיה החזקה ביותר ראשונה. כל ראיה כוללת: chapterNumber, chapterTitle, sectionPath (אם ידוע, אחרת null), pageStart ו- pageEnd (מספרי העמוד בהדפסה להם מופיע הציטוט — מתוך תוית ה-pages של ה-CHAPTER block, אחרת null), quote (ציטוט קצר מהקטע).",
+  "- evidence: מערך ראיות מסודר לפי חוזק — הראיה החזקה ביותר ראשונה. כל ראיה כוללת: chapterNumber, chapterTitle, sectionPath (אם ידוע, אחרת null), pageStart ו- pageEnd (מספרי העמוד בהדפסה להם מופיע הציטוט — מתוך תוית ה-pages של ה-CHAPTER block, אחרת null), quote (ציטוט מילולי מדויק מהקטע — משפט שלם אחד עד שלושה משפטים, באנגלית כפי שמופיע במקור, לא פרפרזה).",
   "- explanation: הסבר פיזיולוגי/פרמקולוגי/קליני בעברית. עטוף כל ביטוי מתמטי/נוסחה בתוך תוחמי LaTeX: `$...$` לנוסחה בתוך משפט, או `$$...$$` לנוסחה בשורה נפרדת. זה כולל כל שימוש בפקודות כמו \\Delta, \\times, \\approx, \\dot, \\text, וכן תחתיות/מעריכים (CMRO_2 -> $CMRO_2$). אל תכתוב פקודות LaTeX ללא תוחמים. צטט את הראיות בתוך הטקסט באמצעות סוגריים מרובעים עם מספר האינדקס של הראיה ב-evidence (החל מ-1), למשל [1], [2], [1][3]. שים את הסמן בסוף המשפט/הטענה שהראיה תומכת בו, ולא בתחילתו. כל ראיה ב-evidence חייבת להופיע לפחות פעם אחת כסמן ב-explanation או ב-whyOthersWrong; אם ראיה לא נדרשת — אל תכלול אותה ב-evidence מלכתחילה.",
   "- whyOthersWrong: אובייקט עם A/B/C/D — הסבר ספציפי מדוע כל אפשרות שגויה (לאפשרות הנכונה כתוב מחרוזת ריקה). אותה מוסכמת ציטוט כמו ב-explanation: סמני [N] בסוף המשפט שהראיה תומכת בו.",
   "- insufficientEvidence: boolean. true רק אם באמת אין במקור מידע שמכריע.",
+  "",
+  "*** דרישות עומק — התשובה משמשת ללמידה לבחינת שלב א', לא רק לסימון התשובה ***",
+  "- evidence: 3–6 ראיות כשהמקור מאפשר. כלול ראיה שמכריעה את התשובה הנכונה, וגם ראיות שמפריכות את המסיחים המרכזיים. אל תסתפק בציטוט יחיד כשיש בקטעים מידע רלוונטי נוסף.",
+  "- explanation: הסבר מעמיק של 2–4 פסקאות (בערך 150–350 מילים): (1) העיקרון/המנגנון הפיזיולוגי-פרמקולוגי הרלוונטי; (2) כיצד הנתונים בשאלה מתמפים לעיקרון; (3) מדוע זה מוביל לאפשרות הנכונה; (4) נקודת מפתח קלינית או ערך מספרי שכדאי לזכור — כל זה רק במידה שהמקור תומך. כל טענה עובדתית מסתיימת בסמן [N].",
+  "- whyOthersWrong: לכל אפשרות שגויה 2–4 משפטים: מה הטעות הספציפית באפשרות (כיוון, ערך, מנגנון, סיווג), מה נכון במקום זאת לפי המקור, עם סמן [N]. אל תכתוב נימוק כללי כמו 'האפשרות הנכונה מדויקת יותר'.",
+  "- עומק לא בא על חשבון חוקי ההכרעה: אל תוסיף ידע שאינו במקור כדי להאריך.",
 ].join("\n");
 
 const RESPONSE_SCHEMA = {
@@ -134,10 +142,11 @@ const RETRY_RERANK_POOL = 30;
 const RETRY_TOP_K_GEN = 18;
 const RETRY_MAX_CHUNKS_PER_CHAPTER = 6;
 const PER_QUERY_K = 30;
-// Minimum allowed Pro thinking budget. Caps overlong mechanistic-reasoning
-// chains that were observed to override literal textbook evidence (see
-// SYSTEM_PROMPT rules 1–3).
-const GEN_THINKING_BUDGET = 128;
+// A minimal thinking budget (tuned for 2.5 Pro) produced shallow, under-cited
+// answers on Gemini 3 — generation now thinks at "high". Literal-evidence
+// priority is enforced by SYSTEM_PROMPT rules 1–3 rather than by starving
+// reasoning. Override with GEMINI_GEN_THINKING_LEVEL=minimal|low|medium|high.
+const GEN_THINKING_LEVEL = (process.env.GEMINI_GEN_THINKING_LEVEL ?? "high").toLowerCase() as ThinkingLevel;
 
 // Reorder option text when the unit appears before the number, e.g.
 // "mmHg 80" -> "80 mmHg". Some questions were uploaded under RTL
@@ -161,6 +170,7 @@ function buildUserPrompt(opts: {
   optionD: string;
   chunks: RetrievedChunk[];
   hint?: string;
+  hasImage?: boolean;
 }): string {
   const sourceBlock = opts.chunks
     .map((c) => {
@@ -184,6 +194,14 @@ function buildUserPrompt(opts: {
     sourceBlock,
   ];
 
+  if (opts.hasImage) {
+    lines.push(
+      "",
+      "--- איור השאלה ---",
+      "התמונה המצורפת להודעה זו היא האיור/הגרף שהשאלה מתייחסת אליו ('האיור המצורף'). קרא ממנה את הנתונים (צירים, צבעים, תוויות, ערכים) כחלק מנתוני השאלה, ופרש אותם לפי קטעי המקור. האיור אינו ראיה מספר הלימוד — אל תצטט אותו ב-evidence.",
+    );
+  }
+
   if (opts.hint && opts.hint.trim()) {
     lines.push(
       "",
@@ -193,6 +211,12 @@ function buildUserPrompt(opts: {
       "הערה זו מסבירה למה התשובה הקודמת היתה שגויה או חלקית. התייחס אליה כרמז לכיוון, אך אל תסתמך עליה כראיה עצמאית — כל טענה חייבת להיתמך על קטעי המקור המצורפים.",
     );
   }
+
+  // Gemini 3 follows the task best when it is restated after long context.
+  lines.push(
+    "",
+    "על סמך קטעי המקור לעיל בלבד: ענה על השאלה לפי הסכמה, עם הסבר מעמיק, ראיות מרובות כשיש, ונימוק ספציפי לכל מסיח (ראה דרישות העומק).",
+  );
 
   return lines.join("\n");
 }
@@ -256,7 +280,7 @@ async function deriveChapterTags(
   return { chapterIds, primaryChapterId };
 }
 
-async function runGenerationPass(
+export async function runGenerationPass(
   model: string,
   chunks: RetrievedChunk[],
   question: {
@@ -265,18 +289,25 @@ async function runGenerationPass(
     optionB: string;
     optionC: string;
     optionD: string;
+    imageUrl?: string | null;
   },
   hint?: string,
 ): Promise<StructuredAnswer> {
-  const userPrompt = buildUserPrompt({ ...question, chunks, hint });
-  const parsed = await generateJson<StructuredAnswer>(
-    model,
-    SYSTEM_PROMPT,
-    userPrompt,
-    RESPONSE_SCHEMA,
-    0,
-    { thinkingBudget: GEN_THINKING_BUDGET },
-  );
+  // Figure-based questions ("לפי הגרף המצורף") are unanswerable without the
+  // figure itself — send it alongside the text. Non-fatal if the fetch fails.
+  const images: ImageInput[] = [];
+  if (question.imageUrl) {
+    try {
+      images.push(await fetchImageInput(question.imageUrl));
+    } catch (e) {
+      console.warn(`[rag.answer] question image not sent: ${(e as Error).message}`);
+    }
+  }
+  const userPrompt = buildUserPrompt({ ...question, chunks, hint, hasImage: images.length > 0 });
+  const parsed = await generateJson<StructuredAnswer>(model, SYSTEM_PROMPT, userPrompt, RESPONSE_SCHEMA, {
+    thinkingLevel: GEN_THINKING_LEVEL,
+    images,
+  });
   // Defensive coercion: ensure confidence is in [0,1] and whyOthersWrong has all keys
   parsed.confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
   parsed.evidence = parsed.evidence ?? [];
