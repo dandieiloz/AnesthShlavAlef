@@ -9,6 +9,14 @@ export interface QuizProgress {
   isComplete: boolean;
   accuracyPct: number;
   lastActivityAt: Date | null;
+  /** Correctness of each answer in the order it was given. */
+  results: boolean[];
+  /** Questions answered in this quiz (for comparing with other users). */
+  answeredQuestionIds: number[];
+}
+
+function resultsInOrder(rows: { isCorrect: boolean; createdAt: Date }[]): boolean[] {
+  return [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((r) => r.isCorrect);
 }
 
 /** Compute progress for a single quiz.  Counts only questions the user can
@@ -26,7 +34,7 @@ export async function getQuizProgress(user: PlanGatedUser, quiz: Quiz): Promise<
         }),
     db.attempt.findMany({
       where: { quizId: quiz.id },
-      select: { isCorrect: true, createdAt: true },
+      select: { questionId: true, isCorrect: true, createdAt: true },
     }),
   ]);
   const answered = answeredRows.length;
@@ -42,6 +50,8 @@ export async function getQuizProgress(user: PlanGatedUser, quiz: Quiz): Promise<
     isComplete: total > 0 && answered >= total,
     accuracyPct: answered === 0 ? 0 : Math.round((correctCount / answered) * 100),
     lastActivityAt,
+    results: resultsInOrder(answeredRows),
+    answeredQuestionIds: answeredRows.map((a) => a.questionId),
   };
 }
 
@@ -76,7 +86,7 @@ export async function getQuizProgressMany(
       : Promise.resolve([] as { id: number }[]),
     db.attempt.findMany({
       where: { quizId: { in: quizzes.map((q) => q.id) } },
-      select: { quizId: true, isCorrect: true, createdAt: true },
+      select: { quizId: true, questionId: true, isCorrect: true, createdAt: true },
     }),
   ]);
 
@@ -120,6 +130,8 @@ export async function getQuizProgressMany(
       isComplete: total > 0 && answered >= total,
       accuracyPct: answered === 0 ? 0 : Math.round((correct / answered) * 100),
       lastActivityAt,
+      results: resultsInOrder(quizAttempts),
+      answeredQuestionIds: quizAttempts.map((a) => a.questionId),
     });
   }
   return result;

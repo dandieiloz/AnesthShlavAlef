@@ -12,13 +12,30 @@ import { getMyQuestionCounts } from "@/lib/my-questions";
 import { getActivityHeatmap, getCurrentStreak } from "@/lib/activity";
 import { getHospitalActivity24h, summarizeCommunity } from "@/lib/community-stats";
 import { ForumPreview } from "@/app/forum/ForumPreview";
-import { ContinueQuizCard, PracticeList } from "@/components/quizzes/PracticeList";
-import { PlusCircle, RotateCcw, Bookmark, Calculator, Flame, CalendarClock, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ContinueQuizCard } from "@/components/quizzes/PracticeList";
+import { getPracticeOverview } from "@/lib/practice-diary";
+import { PlusCircle, RotateCcw, Bookmark, Calculator, Flame, CalendarClock, ChevronLeft, ChevronRight, Sparkles, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getUserProgress } from "@/lib/user-progress";
 import { LEVEL_ICONS } from "@/lib/progress-level";
 
-const RECENT_COUNT = 4;
+/** Chapters named per diary row before collapsing the rest into "+N". */
+const DIARY_NAMED_CHAPTERS = 2;
+
+/** "היום" / "אתמול" / "יום ג׳, 14.10" for an Israel calendar day ("YYYY-MM-DD"). */
+function diaryDayLabel(date: string, locale: Locale, t: { diaryToday: string; diaryYesterday: string }): string {
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" });
+  const today = key.format(new Date());
+  const yesterday = key.format(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  if (date === today) return t.diaryToday;
+  if (date === yesterday) return t.diaryYesterday;
+  return new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-US", {
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(date + "T12:00:00Z"));
+}
 
 function residencyLabel(year: number | null, t: { yearLabels: Record<number, string>; yearLabel: (n: number) => string }): string {
   if (!year) return "";
@@ -32,7 +49,7 @@ export default async function HomePage() {
   const t = dict.homePage;
   const tStudy = dict.study;
 
-  const [dbUser, quizData, plan, counts, heatmap, hospitalRows, level] = await Promise.all([
+  const [dbUser, quizData, plan, counts, heatmap, hospitalRows, level, practice] = await Promise.all([
     db.user.findUnique({ where: { id: me.id }, select: { residencyYear: true } }),
     getQuizRows(me),
     getExamPlanData(me),
@@ -40,12 +57,13 @@ export default async function HomePage() {
     getActivityHeatmap(me.id, 120),
     getHospitalActivity24h(),
     getUserProgress(me.id),
+    getPracticeOverview(me),
   ]);
 
   const { rows: quizRows, totalCount } = quizData;
-  // The quiz to pick up next: the most recently active one that isn't finished.
-  const nextQuiz = quizRows.find((q) => !q.isComplete) ?? null;
-  const recent = quizRows.filter((q) => q.id !== nextQuiz?.id).slice(0, RECENT_COUNT);
+  // Next up: the most recently active unfinished quiz, else the newest unstarted one.
+  const nextQuiz =
+    quizRows.find((q) => q.answered > 0 && !q.isComplete) ?? quizRows.find((q) => q.answered === 0) ?? null;
 
   const streak = getCurrentStreak(heatmap);
   const answeredToday = heatmap.at(-1)?.count ?? 0;
@@ -150,18 +168,81 @@ export default async function HomePage() {
         />
       </div>
 
-      {/* Recent practice */}
-      {recent.length > 0 && (
-        <section className="space-y-3">
+      {/* Practice diary + next step */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-semibold">{t.recentTitle}</h2>
-            <Link href="/quizzes" className="text-sm font-medium text-primary hover:underline">
-              {t.allQuizzes(totalCount)}
-            </Link>
+            <h2 className="font-display text-lg font-semibold">{t.diaryTitle}</h2>
+            {totalCount > 0 && (
+              <Link href="/quizzes" className="text-sm font-medium text-primary hover:underline">
+                {t.allQuizzes(totalCount)}
+              </Link>
+            )}
           </div>
-          <PracticeList quizzes={recent} locale={locale} />
+          <Card>
+            <CardContent className="p-0">
+              {practice.days.length === 0 ? (
+                <p className="p-5 text-sm text-muted-foreground">{t.diaryEmpty}</p>
+              ) : (
+                <ul className="divide-y">
+                  {practice.days.map((d) => {
+                    const pct = Math.round((d.correct / d.answered) * 100);
+                    const named = d.chapters.slice(0, DIARY_NAMED_CHAPTERS);
+                    const more = d.chapters.length - named.length;
+                    return (
+                      <li key={d.date} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-4 py-3">
+                        <span className="w-24 shrink-0 text-sm font-medium">{diaryDayLabel(d.date, locale, t)}</span>
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <p className="text-sm">
+                            {t.diaryQuestions(d.answered)}
+                            <span className="text-muted-foreground"> · </span>
+                            <span className={cn(pct >= 70 ? "text-success" : pct >= 50 ? "text-amber-500" : "text-destructive")}>
+                              {t.diaryCorrect(d.correct, pct)}
+                            </span>
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground" dir="auto">
+                            {named.map((c) => c.title).join(" · ")}
+                            {more > 0 && ` ${t.diaryMore(more)}`}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </section>
-      )}
+
+        {practice.next && (
+          <section className="space-y-3">
+            <h2 className="font-display text-lg font-semibold">{t.nextStepTitle}</h2>
+            <Card className={cn("border-2", practice.next.kind === "weak" ? "border-amber-500/40" : "border-primary/30")}>
+              <CardContent className="space-y-3 p-5">
+                <p className={cn("text-xs font-medium", practice.next.kind === "weak" ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
+                  {practice.next.kind === "weak" ? t.nextWeakLabel : t.nextNewLabel}
+                </p>
+                <div>
+                  <p className="font-display text-base font-bold leading-snug" dir="auto">{practice.next.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {dict.common.chapter} {practice.next.chapterNumber}
+                    {" · "}
+                    {practice.next.kind === "weak"
+                      ? t.nextWeakHint(practice.next.accuracyPct, practice.next.attempts)
+                      : t.nextNewHint}
+                  </p>
+                </div>
+                <Button asChild size="sm" className="gap-1.5">
+                  <Link href={`/study/new?chapter=${practice.next.chapterNumber}`}>
+                    <Target className="h-3.5 w-3.5" />
+                    {t.nextCta}
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+      </div>
 
       {/* Community */}
       <section className="space-y-4">

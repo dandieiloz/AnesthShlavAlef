@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { deleteQuizAction } from "@/app/(user)/actions";
-import { CheckCircle2, Trash2, Play, BookOpen, RotateCcw } from "lucide-react";
+import { deleteUnstartedQuizzesAction } from "@/app/(user)/quiz-list-actions";
+import { CheckCircle2, Trash2, Play, BookOpen, RotateCcw, ChevronDown, CircleDashed } from "lucide-react";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/locale";
-import { formatRelativeDay } from "@/lib/format-time";
+import { formatRelativeTime } from "@/lib/format-time";
 import { useRelativeNow } from "@/lib/use-relative-now";
 import { cn } from "@/lib/utils";
 
@@ -33,108 +34,131 @@ export interface QuizRow {
   wrong: number;
   isComplete: boolean;
   accuracyPct: number;
+  /** Correctness of each answer, oldest first. */
+  results: boolean[];
+  /** Estimated minutes to finish at the user's usual pace; null when done. */
+  minutesLeft: number | null;
+  /** Other residents' accuracy on the same questions; null when too few attempts. */
+  communityPct: number | null;
 }
 
 type QuizzesT = Dictionary["quizzes"];
 type Filter = "all" | "active" | "completed";
 
-const MAX_CHAPTER_CHIPS = 3;
+/** Quizzes up to this size get one dot per question; larger ones get a bar. */
+const MAX_DOTS = 20;
+/** Accuracy is only meaningful after a handful of answers. */
+const MIN_ANSWERS_FOR_ACCURACY = 5;
+/** Up to this many chapters are named individually in a quiz title. */
+const MAX_NAMED_CHAPTERS = 2;
 
-function relativeDate(iso: string, locale: Locale, t: QuizzesT, nowMs: number | null): string {
+// Names the builder generates automatically ("פרק 12", "פרקים 3, 4 · 21.10", "Chapter 5").
+const AUTO_CHAPTER_NAME = /^(פרק|פרקים|Chapter|Chapters)\s/;
+
+/** Topic-first title: the chapter title(s) for chapter quizzes, otherwise the quiz name. */
+function quizHeading(q: QuizRow, t: QuizzesT): { title: string; detail: string | null } {
+  const nums = q.chapters.map((c) => c.number);
+  const isAuto = AUTO_CHAPTER_NAME.test(q.name);
+  if (isAuto && q.chapters.length > 0) {
+    if (q.chapters.length <= MAX_NAMED_CHAPTERS) {
+      return { title: q.chapters.map((c) => c.title).join(" · "), detail: t.chapterNums(nums) };
+    }
+    return { title: t.mixedTopics(q.chapters.length), detail: null };
+  }
+  if (q.chapters.length === 0) return { title: q.name, detail: null };
+  return {
+    title: q.name,
+    detail: q.chapters.length <= 3 ? t.chapterNums(nums) : t.chaptersCount(q.chapters.length),
+  };
+}
+
+function relative(iso: string, locale: Locale, nowMs: number | null): string {
   // Before hydration, render a stable absolute date to avoid a mismatch.
   if (nowMs === null) {
-    return new Date(iso).toLocaleDateString(locale === "he" ? "he-IL" : "en-US", {
-      timeZone: "Asia/Jerusalem",
-    });
+    return new Date(iso).toLocaleDateString(locale === "he" ? "he-IL" : "en-US", { timeZone: "Asia/Jerusalem" });
   }
-  return formatRelativeDay(iso, nowMs, locale, { today: t.today, yesterday: t.yesterday });
+  return formatRelativeTime(iso, nowMs, locale);
 }
 
 function accuracyClass(pct: number) {
   return pct >= 70 ? "text-success" : pct >= 50 ? "text-amber-500" : "text-destructive";
 }
 
-/** One bar that shows correct, wrong and not-yet-answered as segments. */
-export function ResultBar({ q, className }: { q: QuizRow; className?: string }) {
-  const total = Math.max(q.total, q.answered, 1);
-  const pct = (n: number) => `${(n / total) * 100}%`;
+/** One dot per question (green, red, empty) for small quizzes; a split bar for big ones. */
+export function ResultStrip({ q, className }: { q: QuizRow; className?: string }) {
+  const total = Math.max(q.total, q.answered);
+  const label = `${q.correct} ✓ · ${q.wrong} ✗ · ${Math.max(0, total - q.answered)}`;
+  if (total > 0 && total <= MAX_DOTS) {
+    return (
+      <div className={cn("flex flex-wrap gap-1", className)} role="img" aria-label={label}>
+        {Array.from({ length: total }, (_, i) => {
+          const r = q.results[i];
+          return (
+            <span
+              key={i}
+              className={cn(
+                "h-2.5 w-2.5 rounded-full",
+                r === true ? "bg-success" : r === false ? "bg-destructive/80" : "border border-muted-foreground/30",
+              )}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+  const pct = (n: number) => `${(n / Math.max(total, 1)) * 100}%`;
   return (
-    <div
-      className={cn("flex h-2 w-full overflow-hidden rounded-full bg-muted", className)}
-      role="img"
-      aria-label={`${q.correct} / ${q.wrong} / ${Math.max(0, q.total - q.answered)}`}
-    >
-      <div className="h-full bg-success transition-all" style={{ width: pct(q.correct) }} />
-      <div className="h-full bg-destructive/80 transition-all" style={{ width: pct(q.wrong) }} />
+    <div className={cn("flex h-2 w-full overflow-hidden rounded-full bg-muted", className)} role="img" aria-label={label}>
+      <div className="h-full bg-success" style={{ width: pct(q.correct) }} />
+      <div className="h-full bg-destructive/80" style={{ width: pct(q.wrong) }} />
     </div>
   );
 }
 
+/** "Answered 1 of 10" until there's enough data, then correct / wrong / left. */
 function ResultLine({ q, t }: { q: QuizRow; t: QuizzesT }) {
-  if (q.answered === 0) {
-    return <p className="text-xs text-muted-foreground">{t.noAnswersYet}</p>;
-  }
   const remaining = Math.max(0, q.total - q.answered);
+  const time = q.minutesLeft !== null ? <span>{t.timeLeft(q.minutesLeft)}</span> : null;
+  if (q.answered < MIN_ANSWERS_FOR_ACCURACY) {
+    return (
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span>{t.answeredOf(q.answered, q.total)}</span>
+        {time}
+      </p>
+    );
+  }
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <span className="inline-flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-success" />
+      <span>
         {q.correct} {t.correctCount}
       </span>
-      <span className="inline-flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-destructive/80" />
+      <span>
         {q.wrong} {t.wrongCount}
       </span>
-      {remaining > 0 && (
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
-          {remaining} {t.remainingCount}
-        </span>
-      )}
+      {remaining > 0 && <span>{t.left(remaining)}</span>}
+      {time}
     </p>
   );
 }
 
-function ChapterChips({ q, t }: { q: QuizRow; t: QuizzesT }) {
-  const shown = q.chapters.slice(0, MAX_CHAPTER_CHIPS);
-  const extra = q.chapters.length - shown.length;
-  if (q.chapters.length === 0) return null;
+function Accuracy({ q, t, large = false }: { q: QuizRow; t: QuizzesT; large?: boolean }) {
+  if (q.answered < MIN_ANSWERS_FOR_ACCURACY) return null;
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      {shown.map((c) => (
-        <span
-          key={c.number}
-          title={c.title}
-          className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+    <div className="shrink-0 text-center">
+      <p className={cn("font-display font-bold leading-none", large ? "text-2xl" : "text-xl", accuracyClass(q.accuracyPct))}>
+        {q.accuracyPct}%
+      </p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">{t.accuracy}</p>
+      {q.communityPct !== null && (
+        <p
+          className="mt-1 whitespace-nowrap text-[11px] text-muted-foreground"
+          title={t.communityAvgHint}
         >
-          {t.chapter} {c.number}
-        </span>
-      ))}
-      {extra > 0 && (
-        <span
-          className="text-[11px] text-muted-foreground"
-          title={q.chapters.slice(MAX_CHAPTER_CHIPS).map((c) => `${c.number}. ${c.title}`).join("\n")}
-        >
-          +{extra}
-        </span>
+          {t.communityAvg(q.communityPct)}
+        </p>
       )}
-    </span>
+    </div>
   );
-}
-
-function StatusBadge({ q, t }: { q: QuizRow; t: QuizzesT }) {
-  if (q.isComplete) {
-    return (
-      <Badge className="gap-1 border-success/30 bg-success/15 text-xs text-success">
-        <CheckCircle2 className="h-3 w-3" />
-        {t.completed}
-      </Badge>
-    );
-  }
-  if (q.answered > 0) {
-    return <Badge variant="secondary" className="text-xs">{t.inProgress}</Badge>;
-  }
-  return <Badge variant="outline" className="text-xs text-muted-foreground">{t.notStarted}</Badge>;
 }
 
 function DeleteDialog({ quizId, quizName, t }: { quizId: number; quizName: string; t: QuizzesT }) {
@@ -213,44 +237,39 @@ function MistakesAction({ q, t, size = "sm" }: { q: QuizRow; t: QuizzesT; size?:
   );
 }
 
+function Heading({ q, t, when, large = false }: { q: QuizRow; t: QuizzesT; when: string; large?: boolean }) {
+  const { title, detail } = quizHeading(q, t);
+  return (
+    <div className="min-w-0 flex-1 space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <p dir="auto" className={cn("line-clamp-2 font-semibold leading-snug", large ? "font-display text-lg" : "text-sm")} title={q.name}>
+          {title}
+        </p>
+        {q.isComplete && (
+          <Badge className="gap-1 border-success/30 bg-success/15 text-xs text-success">
+            <CheckCircle2 className="h-3 w-3" />
+            {t.completed}
+          </Badge>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{[detail, when].filter(Boolean).join(" · ")}</p>
+    </div>
+  );
+}
+
 function QuizListItem({ q, locale, t, nowMs }: { q: QuizRow; locale: Locale; t: QuizzesT; nowMs: number | null }) {
-  const when = q.lastActivityAt
-    ? `${t.lastActivity}: ${relativeDate(q.lastActivityAt, locale, t, nowMs)}`
-    : `${t.created}: ${relativeDate(q.createdAt, locale, t, nowMs)}`;
+  const when = relative(q.lastActivityAt ?? q.createdAt, locale, nowMs);
   return (
     <Card className="transition-shadow hover:shadow-sm">
       <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="line-clamp-1 text-sm font-semibold">{q.name}</p>
-              <StatusBadge q={q} t={t} />
-            </div>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <ChapterChips q={q} t={t} />
-              <span>{when}</span>
-            </div>
-          </div>
-          {q.answered > 0 && (
-            <div className="shrink-0 text-center">
-              <p className={cn("font-display text-xl font-bold leading-none", accuracyClass(q.accuracyPct))}>
-                {q.accuracyPct}%
-              </p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{t.accuracy}</p>
-            </div>
-          )}
+          <Heading q={q} t={t} when={when} />
+          <Accuracy q={q} t={t} />
         </div>
-
         <div className="space-y-1.5">
-          <ResultBar q={q} />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <ResultLine q={q} t={t} />
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {q.answered}/{q.total} {t.questionsLabel}
-            </span>
-          </div>
+          <ResultStrip q={q} />
+          <ResultLine q={q} t={t} />
         </div>
-
         <div className="flex flex-wrap items-center gap-2">
           <PrimaryAction q={q} t={t} />
           <MistakesAction q={q} t={t} />
@@ -267,29 +286,20 @@ function QuizListItem({ q, locale, t, nowMs }: { q: QuizRow; locale: Locale; t: 
 export function ContinueQuizCard({ q, locale, title }: { q: QuizRow; locale: Locale; title: string }) {
   const t = getDictionary(locale).quizzes;
   const nowMs = useRelativeNow();
+  const when = relative(q.lastActivityAt ?? q.createdAt, locale, nowMs);
   return (
     <Card className="h-full border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
       <CardContent className="flex h-full flex-col gap-4 p-5">
         <div className="space-y-1">
           <p className="text-xs font-medium text-primary">{title}</p>
-          <p className="font-display text-lg font-bold leading-snug">{q.name}</p>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <ChapterChips q={q} t={t} />
-            {q.lastActivityAt && (
-              <span>
-                {t.lastActivity}: {relativeDate(q.lastActivityAt, locale, t, nowMs)}
-              </span>
-            )}
+          <div className="flex items-start justify-between gap-3">
+            <Heading q={q} t={t} when={when} large />
+            <Accuracy q={q} t={t} large />
           </div>
         </div>
         <div className="space-y-1.5">
-          <ResultBar q={q} className="h-2.5" />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <ResultLine q={q} t={t} />
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {q.answered}/{q.total} {t.questionsLabel}
-            </span>
-          </div>
+          <ResultStrip q={q} />
+          <ResultLine q={q} t={t} />
         </div>
         <div className="mt-auto flex flex-wrap items-center gap-2">
           <PrimaryAction q={q} t={t} size="default" />
@@ -297,6 +307,56 @@ export function ContinueQuizCard({ q, locale, title }: { q: QuizRow; locale: Loc
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Never-started quizzes, folded into one line with a bulk delete. */
+function UnstartedGroup({ quizzes, locale, t, nowMs }: { quizzes: QuizRow[]; locale: Locale; t: QuizzesT; nowMs: number | null }) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  if (quizzes.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-dashed bg-muted/20">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <CircleDashed className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">{t.notStartedGroup(quizzes.length)}</span>
+        <div className="ms-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1 text-xs"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+          >
+            {open ? t.hide : t.show}
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => {
+              if (!confirm(t.confirmDeleteEmpty(quizzes.length))) return;
+              startTransition(async () => {
+                await deleteUnstartedQuizzesAction();
+              });
+            }}
+          >
+            {t.deleteAllEmpty}
+          </Button>
+        </div>
+      </div>
+      {open && (
+        <div className="grid gap-3 border-t p-3 md:grid-cols-2">
+          {quizzes.map((q) => (
+            <QuizListItem key={q.id} q={q} locale={locale} t={t} nowMs={nowMs} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -313,19 +373,21 @@ export function PracticeList({
   const nowMs = useRelativeNow();
   const [filter, setFilter] = useState<Filter>("all");
 
-  const active = quizzes.filter((q) => !q.isComplete);
-  const completed = quizzes.filter((q) => q.isComplete);
-  const visible = filter === "active" ? active : filter === "completed" ? completed : quizzes;
+  const started = quizzes.filter((q) => q.answered > 0);
+  const unstarted = quizzes.filter((q) => q.answered === 0);
+  const active = started.filter((q) => !q.isComplete);
+  const completed = started.filter((q) => q.isComplete);
+  const visible = filter === "active" ? active : filter === "completed" ? completed : started;
 
   const chips: { key: Filter; label: string; count: number }[] = [
-    { key: "all", label: t.tabAll, count: quizzes.length },
+    { key: "all", label: t.tabAll, count: started.length },
     { key: "active", label: t.filterActive, count: active.length },
     { key: "completed", label: t.tabCompleted, count: completed.length },
   ];
 
   return (
     <div className="space-y-3">
-      {showFilters && (
+      {showFilters && started.length > 0 && (
         <div className="flex flex-wrap gap-2" role="tablist">
           {chips.map((c) => (
             <button
@@ -346,17 +408,20 @@ export function PracticeList({
           ))}
         </div>
       )}
-      {visible.length === 0 ? (
+      {visible.length === 0 && started.length > 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">{t.empty_filter}</CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {visible.map((q) => (
-            <QuizListItem key={q.id} q={q} locale={locale} t={t} nowMs={nowMs} />
-          ))}
-        </div>
+        visible.length > 0 && (
+          <div className="grid gap-3 md:grid-cols-2">
+            {visible.map((q) => (
+              <QuizListItem key={q.id} q={q} locale={locale} t={t} nowMs={nowMs} />
+            ))}
+          </div>
+        )
       )}
+      {showFilters && <UnstartedGroup quizzes={unstarted} locale={locale} t={t} nowMs={nowMs} />}
     </div>
   );
 }
