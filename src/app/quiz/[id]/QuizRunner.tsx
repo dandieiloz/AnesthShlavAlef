@@ -984,7 +984,9 @@ export function QuizRunner(props: Props) {
                         : isEliminated
                         ? "border-border bg-muted/40 text-muted-foreground line-through opacity-60"
                         : isChosen
-                        ? "border-primary bg-primary/5"
+                        ? // Selected but not yet submitted: thicker teal outline, stronger
+                          // tint and a filled letter so it stands out in light mode too.
+                          "border-primary bg-primary/10 ring-1 ring-primary font-medium text-foreground shadow-sm"
                         : "border-border bg-background",
                       // Keep the strike-through on eliminated options even when the
                       // correct/wrong color highlight takes precedence above.
@@ -1012,6 +1014,8 @@ export function QuizRunner(props: Props) {
                           ? "border-success bg-success text-white"
                           : isWrongChosen
                           ? "border-destructive bg-destructive text-white"
+                          : isChosen && !displayRevealed
+                          ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-muted",
                       ].join(" ")}
                     >
