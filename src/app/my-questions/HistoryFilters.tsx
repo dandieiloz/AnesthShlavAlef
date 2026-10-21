@@ -3,14 +3,33 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { Dictionary } from "@/lib/i18n";
 
 type Chapter = { number: number; title: string };
 const NULL_SOURCE_FILTER = "__NULL_SOURCE__";
 
-export function HistoryFilters({ chapters, isAdmin = false }: { chapters: Chapter[]; isAdmin?: boolean }) {
+export function HistoryFilters({
+  chapters,
+  isAdmin = false,
+  tab,
+  showResultFilter = true,
+  t,
+}: {
+  chapters: Chapter[];
+  isAdmin?: boolean;
+  tab: "all" | "wrong";
+  showResultFilter?: boolean;
+  t: Dictionary["myQuestions"];
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
+
+  function hrefFor(sp: URLSearchParams) {
+    if (tab !== "all") sp.set("tab", tab);
+    const qs = sp.toString();
+    return qs ? `/my-questions?${qs}` : "/my-questions";
+  }
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -19,104 +38,105 @@ export function HistoryFilters({ chapters, isAdmin = false }: { chapters: Chapte
     for (const [k, v] of fd.entries()) {
       if (typeof v === "string" && v.trim()) sp.set(k, v.trim());
     }
-    router.push(`/history?${sp.toString()}`);
+    router.push(hrefFor(sp));
   }
 
   function reset() {
     formRef.current?.reset();
-    router.push("/history");
+    router.push(hrefFor(new URLSearchParams()));
   }
+
+  const inputClass = "rounded-md border p-2 text-sm bg-background text-foreground placeholder:text-muted-foreground";
+  const labelClass = "block text-xs font-medium text-muted-foreground mb-1";
 
   return (
     <form
       ref={formRef}
       onSubmit={submit}
-      className="flex flex-wrap items-end gap-3 rounded border bg-card p-4"
+      className="grid grid-cols-2 items-end gap-3 rounded-lg border bg-card p-4 sm:flex sm:flex-wrap"
     >
-      <div className="flex-1 min-w-48">
-        <label className="block text-xs font-medium text-muted-foreground mb-1">חיפוש בשאלה</label>
+      <div className="col-span-2 sm:min-w-48 sm:flex-1">
+        <label className={labelClass}>{t.searchLabel}</label>
         <input
           name="q"
           defaultValue={params.get("q") ?? ""}
-          placeholder="טקסט מתוך השאלה..."
-          className="w-full rounded border p-2 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+          placeholder={t.searchPlaceholder}
+          className={`w-full ${inputClass}`}
         />
       </div>
 
-      <div className="min-w-[14rem]">
-        <label className="block text-xs font-medium text-muted-foreground mb-1">מוסד</label>
+      <div className="col-span-2 sm:min-w-[14rem]">
+        <label className={labelClass}>{t.sourceLabel}</label>
         <SearchableSelect
           name="source"
           defaultValue={params.get("source") ?? ""}
           options={[
-            { value: NULL_SOURCE_FILTER, label: "ללא מוסד" },
+            { value: NULL_SOURCE_FILTER, label: t.noSource },
             ...QUESTION_SOURCES.map((s) => ({ value: s, label: s })),
           ]}
           clearable
-          clearLabel="הכל"
-          placeholder="הכל"
-          searchPlaceholder="חיפוש מוסד..."
+          clearLabel={t.all}
+          placeholder={t.all}
+          searchPlaceholder={t.searchSource}
         />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">שנה</label>
+        <label className={labelClass}>{t.yearLabel}</label>
         <input
           name="year"
           type="number"
           min={1990}
           max={2030}
           defaultValue={params.get("year") ?? ""}
-          placeholder="כולל"
-          className="w-24 rounded border p-2 text-sm bg-background text-foreground placeholder:text-muted-foreground"
+          placeholder={t.yearPlaceholder}
+          className={`w-full sm:w-24 ${inputClass}`}
         />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">פרק</label>
+        <label className={labelClass}>{t.chapterLabel}</label>
         <select
           name="chapter"
           defaultValue={params.get("chapter") ?? ""}
-          className="rounded border p-2 text-sm bg-background text-foreground"
+          className={`w-full sm:w-auto sm:max-w-[16rem] ${inputClass}`}
         >
-          <option value="">כל הפרקים</option>
+          <option value="">{t.allChapters}</option>
           {chapters.map((c) => (
             <option key={c.number} value={c.number}>{c.number} — {c.title}</option>
           ))}
         </select>
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">תוצאה אחרונה</label>
-        <select
-          name="result"
-          defaultValue={params.get("result") ?? ""}
-          className="rounded border p-2 text-sm bg-background text-foreground"
-        >
-          <option value="">הכל</option>
-          <option value="correct">נכון</option>
-          <option value="wrong">שגוי</option>
-        </select>
-      </div>
+      {showResultFilter && (
+        <div>
+          <label className={labelClass}>{t.resultLabel}</label>
+          <select
+            name="result"
+            defaultValue={params.get("result") ?? ""}
+            className={`w-full sm:w-auto ${inputClass}`}
+          >
+            <option value="">{t.all}</option>
+            <option value="correct">{t.correct}</option>
+            <option value="wrong">{t.wrong}</option>
+          </select>
+        </div>
+      )}
 
-      <div className="flex gap-2">
+      <div className="col-span-2 flex gap-2">
         <button
           type="submit"
-          className="rounded bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white px-4 py-2 text-sm font-medium"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
-          חיפוש
+          {t.search}
         </button>
-        <button
-          type="button"
-          onClick={reset}
-          className="rounded border px-4 py-2 text-sm hover:bg-muted"
-        >
-          נקה
+        <button type="button" onClick={reset} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">
+          {t.clear}
         </button>
       </div>
 
       {isAdmin && (
-        <label className="flex items-center gap-2 text-sm text-muted-foreground basis-full">
+        <label className="col-span-2 flex basis-full items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
             name="all"
@@ -124,7 +144,7 @@ export function HistoryFilters({ chapters, isAdmin = false }: { chapters: Chapte
             defaultChecked={params.get("all") === "1"}
             className="h-4 w-4"
           />
-          <span>הצג גם שאלות שלא נראו (אדמין)</span>
+          <span>{t.adminShowAll}</span>
         </label>
       )}
     </form>

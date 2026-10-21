@@ -17,6 +17,7 @@ export async function resetQuestionHistoryAction(questionIds: number[]): Promise
     where: { userId: me.id, questionId: { in: ids } },
   });
 
-  revalidatePath("/history");
+  revalidatePath("/my-questions");
+  revalidatePath("/study");
   return count;
 }

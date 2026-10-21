@@ -16,26 +16,25 @@ import { getDictionary } from "@/lib/i18n";
 import { LanguageSettingsCard } from "@/components/LanguageSettingsCard";
 import { LocalPdfSettingsCard } from "@/components/LocalPdfSettingsCard";
 import { markAdminResponsesSeen } from "@/lib/notifications";
-import { getUserProgress } from "@/lib/user-progress";
-import { ProgressBarFull } from "@/components/progress/ProgressBarFull";
 
-const DATE_FMT = new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" });
+type MessagesT = ReturnType<typeof getDictionary>["profileMessages"];
 
-function statusPill(status: "OPEN" | "RESOLVED" | "REJECTED") {
+function statusPill(status: "OPEN" | "RESOLVED" | "REJECTED", tm: MessagesT) {
   if (status === "RESOLVED") {
-    return { label: "טופל", cls: "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-200" };
+    return { label: tm.statusResolved, cls: "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-200" };
   }
   if (status === "REJECTED") {
-    return { label: "נדחה", cls: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200" };
+    return { label: tm.statusRejected, cls: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200" };
   }
-  return { label: "ממתין", cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" };
+  return { label: tm.statusPending, cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" };
 }
 
-const KIND_LABEL: Record<string, string> = {
-  BUG: "באג",
-  FEEDBACK: "משוב",
-  TECHNICAL: "טכני",
-};
+function kindLabel(kind: string, tm: MessagesT): string {
+  if (kind === "BUG") return tm.kindBug;
+  if (kind === "FEEDBACK") return tm.kindFeedback;
+  if (kind === "TECHNICAL") return tm.kindTechnical;
+  return kind;
+}
 
 export default async function ProfilePage({
   searchParams,
@@ -51,8 +50,8 @@ export default async function ProfilePage({
 
   const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const t = getDictionary(locale).profile;
-  const progressDict = getDictionary(locale).progress;
-  const progress = await getUserProgress(session.user.id);
+  const tm = getDictionary(locale).profileMessages;
+  const DATE_FMT = new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-US", { dateStyle: "short", timeStyle: "short" });
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
@@ -118,7 +117,7 @@ export default async function ProfilePage({
     }`;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 py-8 animate-fade-in">
+    <div className="mx-auto max-w-3xl space-y-8 animate-fade-in">
       {/* Identity strip */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -133,21 +132,19 @@ export default async function ProfilePage({
         {user.role === "ADMIN" && <Badge variant="secondary">{t.adminBadge}</Badge>}
       </div>
 
-      {/* Career progress hero */}
-      {progress && <ProgressBarFull progress={progress} t={progressDict} />}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
         <Link href="/profile" className={tabBtn(activeTab === "profile")}>
-          פרטים אישיים
+          {tm.tabPersonal}
         </Link>
         <Link href="/profile?tab=settings" className={tabBtn(activeTab === "settings")}>
-          הגדרות
+          {tm.tabSettings}
         </Link>
         <Link href="/profile?tab=messages" className={tabBtn(activeTab === "messages")}>
           <span className="inline-flex items-center justify-center gap-1.5">
             <MessageSquare className="h-3.5 w-3.5" />
-            הודעות מהצוות
+            {tm.tabMessages}
             {unreadCount > 0 && activeTab !== "messages" && (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">
                 {unreadCount}
@@ -273,7 +270,7 @@ export default async function ProfilePage({
       {activeTab === "messages" && !hasMessages && (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            עוד לא שלחת דיווחים. כשתשלח/י דיווח על תשובה שגויה או באג, תגובות הצוות יופיעו כאן.
+            {tm.empty}
           </CardContent>
         </Card>
       )}
@@ -282,26 +279,26 @@ export default async function ProfilePage({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span>הדיווחים שלי</span>
+              <span>{tm.title}</span>
               {unreadCount > 0 && (
                 <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">
                   <MessageSquare className="h-3 w-3" />
-                  {unreadCount} תגובות חדשות מהצוות
+                  {tm.newResponses(unreadCount)}
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>דיווחים ששלחת על תשובות שגויות, באגים ומשוב, ותגובות הצוות.</CardDescription>
+            <CardDescription>{tm.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {answerReports.length > 0 && (
               <section className="space-y-2">
                 <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                   <Flag className="h-4 w-4" />
-                  דיווחים על תשובות שגויות
+                  {tm.answerReports}
                 </h3>
                 <ul className="space-y-3">
                   {answerReports.map((r) => {
-                    const pill = statusPill(r.status);
+                    const pill = statusPill(r.status, tm);
                     const unseen = !!r.adminResponse && !r.adminResponseSeenAt;
                     return (
                       <li key={`a-${r.id}`} className={`rounded-lg border bg-card p-3 text-sm ${unseen ? "ring-2 ring-emerald-400/60" : ""}`}>
@@ -310,25 +307,25 @@ export default async function ProfilePage({
                           {r.adminResponse && (
                             <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">
                               <MessageSquare className="h-3 w-3" />
-                              {unseen ? "תגובה חדשה מהצוות" : "תגובה מהצוות"}
+                              {unseen ? tm.newResponse : tm.response}
                             </Badge>
                           )}
-                          <span>פרק {r.question.chapter.number}</span>
+                          <span>{tm.chapter(r.question.chapter.number)}</span>
                           <span>· {DATE_FMT.format(r.createdAt)}</span>
                         </div>
                         <p className="mt-2 line-clamp-2 text-sm">
-                          <span className="font-medium">השאלה: </span>
+                          <span className="font-medium">{tm.questionLabel}</span>
                           {r.question.stem}
                         </p>
                         <p className="mt-1 whitespace-pre-wrap rounded bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                          <span className="font-semibold">הדיווח שלך: </span>
+                          <span className="font-semibold">{tm.yourReport}</span>
                           {r.explanation}
                         </p>
                         {r.adminResponse && (
                           <div className="mt-2 rounded border border-emerald-300 bg-emerald-50 p-2 text-xs dark:border-emerald-700 dark:bg-emerald-950/30">
                             <div className="flex items-center gap-1 font-semibold text-emerald-800 dark:text-emerald-200">
                               <MessageSquare className="h-3 w-3" />
-                              תגובת הצוות {r.adminResponseAt && `· ${DATE_FMT.format(r.adminResponseAt)}`}
+                              {tm.teamResponse} {r.adminResponseAt && `· ${DATE_FMT.format(r.adminResponseAt)}`}
                             </div>
                             <p className="mt-1 whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">{r.adminResponse}</p>
                           </div>
@@ -338,7 +335,7 @@ export default async function ProfilePage({
                             href={`/history/${r.questionId}`}
                             className="text-xs font-medium text-primary hover:underline"
                           >
-                            פתח את השאלה →
+                            {tm.openQuestion}
                           </Link>
                         </div>
                       </li>
@@ -352,11 +349,11 @@ export default async function ProfilePage({
               <section className="space-y-2">
                 <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                   <Bug className="h-4 w-4" />
-                  דיווחי באג ומשוב
+                  {tm.otherReports}
                 </h3>
                 <ul className="space-y-3">
                   {debugReports.map((r) => {
-                    const pill = statusPill(r.status);
+                    const pill = statusPill(r.status, tm);
                     const unseen = !!r.adminResponse && !r.adminResponseSeenAt;
                     return (
                       <li key={`d-${r.id}`} className={`rounded-lg border bg-card p-3 text-sm ${unseen ? "ring-2 ring-emerald-400/60" : ""}`}>
@@ -365,23 +362,23 @@ export default async function ProfilePage({
                           {r.adminResponse && (
                             <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200">
                               <MessageSquare className="h-3 w-3" />
-                              {unseen ? "תגובה חדשה מהצוות" : "תגובה מהצוות"}
+                              {unseen ? tm.newResponse : tm.response}
                             </Badge>
                           )}
-                          <span>{KIND_LABEL[r.kind] ?? r.kind}</span>
+                          <span>{kindLabel(r.kind, tm)}</span>
                           {r.category && <span>· {r.category}</span>}
-                          {r.chapterNumber && <span>· פרק {r.chapterNumber}</span>}
+                          {r.chapterNumber && <span>· {tm.chapter(r.chapterNumber)}</span>}
                           <span>· {DATE_FMT.format(r.createdAt)}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap rounded bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                          <span className="font-semibold">הדיווח שלך: </span>
+                          <span className="font-semibold">{tm.yourReport}</span>
                           {r.description}
                         </p>
                         {r.adminResponse && (
                           <div className="mt-2 rounded border border-emerald-300 bg-emerald-50 p-2 text-xs dark:border-emerald-700 dark:bg-emerald-950/30">
                             <div className="flex items-center gap-1 font-semibold text-emerald-800 dark:text-emerald-200">
                               <MessageSquare className="h-3 w-3" />
-                              תגובת הצוות {r.adminResponseAt && `· ${DATE_FMT.format(r.adminResponseAt)}`}
+                              {tm.teamResponse} {r.adminResponseAt && `· ${DATE_FMT.format(r.adminResponseAt)}`}
                             </div>
                             <p className="mt-1 whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">{r.adminResponse}</p>
                           </div>
@@ -392,7 +389,7 @@ export default async function ProfilePage({
                               href={`/history/${r.questionId}`}
                               className="text-xs font-medium text-primary hover:underline"
                             >
-                              פתח את השאלה →
+                              {tm.openQuestion}
                             </Link>
                           </div>
                         )}

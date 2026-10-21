@@ -48,7 +48,7 @@ export async function setHighlightAction(input: z.infer<typeof SetSchema>) {
     },
   });
 
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
 }
 
 const RemoveSchema = z.object({
@@ -72,7 +72,7 @@ export async function removeHighlightAction(input: z.infer<typeof RemoveSchema>)
     },
   });
 
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
 }
 
 // Default highlight color applied when a note is saved on a sentence that has
@@ -121,7 +121,7 @@ export async function setHighlightNoteAction(input: z.infer<typeof NoteSchema>) 
     update: { note },
   });
 
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
 }
 
 const RemoveByIdSchema = z.object({ id: z.coerce.number().int().positive() });
@@ -130,7 +130,7 @@ export async function removeHighlightByIdAction(formData: FormData) {
   const me = await requireUser();
   const { id } = RemoveByIdSchema.parse({ id: formData.get("id") });
   await db.sentenceHighlight.deleteMany({ where: { id, userId: me.id } });
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
 }
 
 const NoteByIdSchema = z.object({
@@ -146,5 +146,5 @@ export async function setHighlightNoteByIdAction(input: z.infer<typeof NoteByIdS
     where: { id: data.id, userId: me.id },
     data: { note },
   });
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
 }

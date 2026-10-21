@@ -1,11 +1,12 @@
 import { db } from "@/lib/db";
+import { BackLink } from "@/components/BackLink";
 import { requireCompletedProfile } from "@/lib/auth";
 import { createQuizAction } from "@/app/(user)/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuizConfigSection } from "./QuizConfigSection";
-import { ArrowRight, ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { getLocale } from "@/lib/locale";
+import { getLocale, getContentLocale } from "@/lib/locale";
+import { getMyQuestionCounts } from "@/lib/my-questions";
+import { shortDateLabel } from "@/lib/quiz-names";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
 import { questionAccessWhere, hasUsableAnswerWhere } from "@/lib/plan";
@@ -21,17 +22,21 @@ export default async function NewQuizPage({
     mode?: string;
     inst?: string;
     year?: string;
+    source?: string;
   }>;
 }) {
   const me = await requireCompletedProfile();
-  const { chapter, empty, mode, inst, year } = await searchParams;
+  const { chapter, empty, mode, inst, year, source } = await searchParams;
   const preselectedChapter = chapter ? Number(chapter) : null;
-  const initialMode: "chapters" | "exam" | "scores" =
-    mode === "exam" ? "exam" : mode === "scores" ? "scores" : "chapters";
+  const initialMode: "chapters" | "exam" | "scores" | "review" =
+    mode === "exam" ? "exam" : mode === "scores" ? "scores" : mode === "review" ? "review" : "chapters";
+  const initialReviewSource = source === "saved" ? "saved" : "wrong";
 
-  const locale = await getLocale();
+  const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const dict = getDictionary(locale);
   const t = dict.studyNew;
+
+  const reviewCounts = await getMyQuestionCounts(me, contentLocale);
 
   const scoreConfidence = await db.scoreConfidence.findMany({
     where: { userId: me.id },
@@ -154,18 +159,11 @@ export default async function NewQuizPage({
     if (found) preselected.push(found.id);
   }
 
-  const BackIcon = locale === "he" ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-3">
-        <Link
-          href="/study"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <BackIcon className="h-4 w-4" />
-          {t.backToStudy}
-        </Link>
+        <BackLink fallbackHref="/study" label={getDictionary(locale).common.back} dir={locale === "he" ? "rtl" : "ltr"} />
       </div>
 
       <div>
@@ -178,7 +176,9 @@ export default async function NewQuizPage({
           role="alert"
           className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
         >
-          {initialMode === "exam"
+          {initialMode === "review"
+            ? t.reviewEmpty
+            : initialMode === "exam"
             ? locale === "he"
               ? "כבר ענית על כל השאלות במבחן שבחרת. נסה לבחור מבחן אחר."
               : "You've already answered every question in that exam. Try a different one."
@@ -201,6 +201,9 @@ export default async function NewQuizPage({
               initialInstitute={inst ?? null}
               initialYear={year ?? null}
               confidence={confidenceMap}
+              reviewCounts={{ wrong: reviewCounts.wrong, saved: reviewCounts.saved }}
+              initialReviewSource={initialReviewSource}
+              dateLabel={shortDateLabel()}
             />
           </form>
         </CardContent>

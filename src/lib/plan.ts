@@ -2,7 +2,8 @@ import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { getPublishConfidenceThreshold } from "@/lib/publish-threshold";
-import { getAutoHideConfig, getAutoHiddenQuestionIds } from "@/lib/auto-hide-threshold";
+import { getAutoHiddenQuestionIds } from "@/lib/auto-hide-threshold";
+import { cached, invalidate } from "@/lib/ttl-cache";
 
 const NULL_SOURCE_SENTINEL = "__NULL__";
 
@@ -17,7 +18,13 @@ export type DemoAllowedConfig = {
   allowNullSource: boolean;
 };
 
+const DEMO_SOURCES_CACHE_KEY = "site:demoAllowedSources";
+
 export async function getDemoAllowedSources(): Promise<DemoAllowedConfig> {
+  return cached(DEMO_SOURCES_CACHE_KEY, 60_000, loadDemoAllowedSources);
+}
+
+async function loadDemoAllowedSources(): Promise<DemoAllowedConfig> {
   const rows = await db.demoAllowedSource.findMany({ select: { source: true } });
   let allowNullSource = false;
   const sources: string[] = [];
@@ -28,8 +35,10 @@ export async function getDemoAllowedSources(): Promise<DemoAllowedConfig> {
   return { sources, allowNullSource };
 }
 
-/** No-op kept for callers that mutate the allowlist; admin pages also call revalidatePath. */
-export function invalidateDemoAllowedSources() {}
+/** Called by admin actions that change the demo allowlist. */
+export function invalidateDemoAllowedSources() {
+  invalidate(DEMO_SOURCES_CACHE_KEY);
+}
 
 /**
  * Returns a Prisma `where` fragment to AND-merge into Question queries so that
@@ -43,7 +52,8 @@ export async function questionAccessWhere(user: PlanGatedUser) {
   // Non-admin users never see disabled questions.
   const baseGate: Record<string, unknown> = { disabled: false };
   // Publish gate: confidence >= configured threshold OR admin manually approved the answer.
-  const threshold = await getPublishConfidenceThreshold();
+  // Settings and the hidden list are cached, and loaded in parallel on a miss.
+  const [threshold, hiddenIds] = await Promise.all([getPublishConfidenceThreshold(), getAutoHiddenQuestionIds()]);
   const publishGate: Record<string, unknown> = {
     OR: [
       { adminApproved: true },
@@ -52,7 +62,6 @@ export async function questionAccessWhere(user: PlanGatedUser) {
   };
   // Auto-hide gate: questions with enough attempts AND a low correct-answer ratio
   // are hidden (likely a bad answer key), unless an admin manually approved them.
-  const hiddenIds = await getAutoHiddenQuestionIds();
   const gates: Array<Record<string, unknown>> = [publishGate];
   if (hiddenIds.length > 0) {
     gates.push({ OR: [{ adminApproved: true }, { id: { notIn: hiddenIds } }] });
@@ -92,41 +101,36 @@ export async function withQuestionAccess<T extends Record<string, unknown>>(
  */
 export async function assertCanAccessQuestion(user: PlanGatedUser, questionId: number): Promise<void> {
   if (user.role === "ADMIN") return;
-  const q = await db.question.findUnique({
-    where: { id: questionId },
-    select: {
-      source: true,
-      disabled: true,
-      adminApproved: true,
-      geminiAnswer: { select: { confidence: true } },
-    },
-  });
+  // One round trip: the question row plus cached site settings, in parallel.
+  const [q, threshold, hiddenIds, demo] = await Promise.all([
+    db.question.findUnique({
+      where: { id: questionId },
+      select: {
+        source: true,
+        disabled: true,
+        adminApproved: true,
+        geminiAnswer: { select: { confidence: true } },
+      },
+    }),
+    getPublishConfidenceThreshold(),
+    getAutoHiddenQuestionIds(),
+    user.plan === "PAID" ? Promise.resolve(null) : getDemoAllowedSources(),
+  ]);
   if (!q) notFound();
   if (q.disabled) notFound();
-  // Publish gate: must be admin-approved OR have an answer at/above threshold.
   if (!q.adminApproved) {
-    const threshold = await getPublishConfidenceThreshold();
+    // Publish gate: must be admin-approved OR have an answer at/above threshold.
     const conf = q.geminiAnswer?.confidence ?? null;
     if (conf === null || conf < threshold) notFound();
     // Auto-hide gate: enough attempts AND a low correct-answer ratio hides the question.
-    const autoHide = await getAutoHideConfig();
-    if (autoHide.minAttempts > 0) {
-      const [attempts, correct] = await Promise.all([
-        db.attempt.count({ where: { questionId } }),
-        db.attempt.count({ where: { questionId, isCorrect: true } }),
-      ]);
-      if (attempts >= autoHide.minAttempts && correct / attempts <= autoHide.maxCorrectPercent) {
-        notFound();
-      }
-    }
+    if (hiddenIds.includes(questionId)) notFound();
   }
-  if (user.plan === "PAID") return;
-  const { sources, allowNullSource } = await getDemoAllowedSources();
+  if (!demo) return;
   if (q.source === null) {
-    if (!allowNullSource) notFound();
+    if (!demo.allowNullSource) notFound();
     return;
   }
-  if (!sources.includes(q.source)) notFound();
+  if (!demo.sources.includes(q.source)) notFound();
 }
 
 /**

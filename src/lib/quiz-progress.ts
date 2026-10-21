@@ -59,34 +59,40 @@ export async function getQuizProgressMany(
   // quizzes' chapters (same plan/publish gate the quiz page uses). We keep the
   // per-question chapterIds so each quiz's total is a DISTINCT count — a
   // question that lists several of the quiz's chapters must only count once.
-  const eligibleQuestions = allChapterIds.length > 0
-    ? await db.question.findMany({
-        where: { chapterIds: { hasSome: allChapterIds }, AND: [planGate, hasUsableAnswerWhere] },
-        select: { id: true, chapterIds: true },
-      })
-    : [];
+  const allFixedIds = [...new Set(quizzes.flatMap((q) => q.questionIds))];
+  // The three lookups are independent, so they share one round trip.
+  const [eligibleQuestions, servableFixedRows, attempts] = await Promise.all([
+    allChapterIds.length > 0
+      ? db.question.findMany({
+          where: { chapterIds: { hasSome: allChapterIds }, AND: [planGate, hasUsableAnswerWhere] },
+          select: { id: true, chapterIds: true },
+        })
+      : Promise.resolve([] as { id: number; chapterIds: number[] }[]),
+    allFixedIds.length > 0
+      ? db.question.findMany({
+          where: { id: { in: allFixedIds }, AND: [planGate, hasUsableAnswerWhere] },
+          select: { id: true },
+        })
+      : Promise.resolve([] as { id: number }[]),
+    db.attempt.findMany({
+      where: { quizId: { in: quizzes.map((q) => q.id) } },
+      select: { quizId: true, isCorrect: true, createdAt: true },
+    }),
+  ]);
 
   // Fixed-set quizzes pin specific question ids. Some of those may since have
   // become unservable (disabled, lost a usable answer, or fell out of plan), so
   // the total must count only the ids that still pass the gate — otherwise the
   // card shows a larger total than the quiz can ever deliver.
-  const allFixedIds = [...new Set(quizzes.flatMap((q) => q.questionIds))];
-  const servableFixedIds = allFixedIds.length > 0
-    ? new Set(
-        (
-          await db.question.findMany({
-            where: { id: { in: allFixedIds }, AND: [planGate, hasUsableAnswerWhere] },
-            select: { id: true },
-          })
-        ).map((q) => q.id),
-      )
-    : new Set<number>();
+  const servableFixedIds = new Set(servableFixedRows.map((q) => q.id));
 
-  // All attempts for these quizzes
-  const attempts = await db.attempt.findMany({
-    where: { quizId: { in: quizzes.map((q) => q.id) } },
-    select: { quizId: true, isCorrect: true, createdAt: true },
-  });
+  const attemptsByQuiz = new Map<number, typeof attempts>();
+  for (const a of attempts) {
+    if (a.quizId === null) continue;
+    const arr = attemptsByQuiz.get(a.quizId) ?? [];
+    arr.push(a);
+    attemptsByQuiz.set(a.quizId, arr);
+  }
 
   const result = new Map<number, QuizProgress>();
   for (const quiz of quizzes) {
@@ -100,7 +106,7 @@ export async function getQuizProgressMany(
         q.chapterIds.some((cid) => quizChapterSet.has(cid)),
       ).length;
     }
-    const quizAttempts = attempts.filter((a) => a.quizId === quiz.id);
+    const quizAttempts = attemptsByQuiz.get(quiz.id) ?? [];
     const answered = quizAttempts.length;
     const correct = quizAttempts.filter((a) => a.isCorrect).length;
     const lastActivityAt =

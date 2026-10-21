@@ -1,9 +1,8 @@
 import { requireCompletedProfile } from "@/lib/auth";
+import { BackLink } from "@/components/BackLink";
 import { db } from "@/lib/db";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
-import Link from "next/link";
-import { ArrowRight, ArrowLeft } from "lucide-react";
 import { getScoreById, SCORE_SYSTEMS } from "@/lib/scores/registry";
 import type { ConfidenceLevel } from "@/lib/scores/types";
 import { ScoreDrillRunner } from "./ScoreDrillRunner";
@@ -38,18 +37,11 @@ export default async function ScoreDrillPage({
   const confidence: Record<string, ConfidenceLevel> = {};
   for (const r of rows) confidence[r.scoreId] = r.level;
 
-  const BackIcon = locale === "he" ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-3">
-        <Link
-          href="/study"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <BackIcon className="h-4 w-4" />
-          {t.backToStudy}
-        </Link>
+        <BackLink fallbackHref="/study" label={getDictionary(locale).common.back} dir={locale === "he" ? "rtl" : "ltr"} />
       </div>
 
       <div>

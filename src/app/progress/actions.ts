@@ -14,5 +14,6 @@ export async function saveScheduleAction(formData: FormData) {
     where: { id: me.id },
     data,
   });
-  revalidatePath("/schedule");
+  revalidatePath("/progress");
+  revalidatePath("/study");
 }

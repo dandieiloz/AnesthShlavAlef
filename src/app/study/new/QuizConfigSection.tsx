@@ -17,7 +17,8 @@ type StudyNewT = Dictionary["studyNew"];
 const MODE_STORAGE_KEY = "quizAnswerMode";
 const SETUP_MODE_STORAGE_KEY = "quizSetupMode";
 type AnswerMode = "immediate" | "full";
-type SetupMode = "chapters" | "exam" | "scores";
+type SetupMode = "chapters" | "exam" | "scores" | "review";
+type ReviewSource = "wrong" | "saved";
 
 interface ChapterRow {
   id: number;
@@ -63,6 +64,9 @@ export function QuizConfigSection({
   initialInstitute = null,
   initialYear = null,
   confidence = {},
+  reviewCounts = { wrong: 0, saved: 0 },
+  initialReviewSource = "wrong",
+  dateLabel = "",
 }: {
   chapters: ChapterRow[];
   preselected?: number[];
@@ -72,6 +76,10 @@ export function QuizConfigSection({
   initialInstitute?: string | null;
   initialYear?: string | null;
   confidence?: Record<string, ConfidenceLevel>;
+  reviewCounts?: { wrong: number; saved: number };
+  initialReviewSource?: ReviewSource;
+  /** "DD.MM" appended to automatic quiz names so repeats are distinguishable. */
+  dateLabel?: string;
 }) {
   const t = getDictionary(locale).studyNew;
   const tq = getDictionary(locale).quiz;
@@ -86,6 +94,7 @@ export function QuizConfigSection({
   const [includeSeen, setIncludeSeen] = useState(initialMode === "exam");
   const [excludeOfficial, setExcludeOfficial] = useState(false);
   const [setupMode, setSetupMode] = useState<SetupMode>(initialMode);
+  const [reviewSource, setReviewSource] = useState<ReviewSource>(initialReviewSource);
 
   // Exam-mode selections. Default to URL-provided values if valid, else first option.
   const initialInst = useMemo(() => {
@@ -143,7 +152,7 @@ export function QuizConfigSection({
         !initialInstitute &&
         !initialYear &&
         initialMode === "chapters" &&
-        (storedSetup === "chapters" || storedSetup === "exam" || storedSetup === "scores")
+        (storedSetup === "chapters" || storedSetup === "exam" || storedSetup === "scores" || storedSetup === "review")
       ) {
         setSetupMode(storedSetup);
         setIncludeSeen(storedSetup === "exam");
@@ -181,14 +190,26 @@ export function QuizConfigSection({
     : 0;
 
   const chaptersAvailableCount = displayedSelected.reduce((sum, c) => sum + c.questionCount, 0);
-  const availableCount = setupMode === "exam" ? examAvailableCount : chaptersAvailableCount;
+  const availableCount =
+    setupMode === "exam"
+      ? examAvailableCount
+      : setupMode === "review"
+        ? reviewCounts[reviewSource]
+        : chaptersAvailableCount;
 
+  const stamp = (base: string) => (dateLabel ? `${base} · ${dateLabel}` : base);
+  const reviewBaseName =
+    locale === "he" ? (reviewSource === "wrong" ? "טעויות" : "שמורות") : reviewSource === "wrong" ? "Mistakes" : "Saved";
   const autoName =
     setupMode === "exam"
       ? institute && yearKey
         ? `${institute} ${yearKey}`
         : t.defaultName
-      : buildAutoName(selectedChapters, t);
+      : setupMode === "review"
+        ? stamp(reviewBaseName)
+        : selectedChapters.length > 0
+          ? stamp(buildAutoName(selectedChapters, t))
+          : t.defaultName;
   const displayName = nameTouched ? nameValue : autoName;
 
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -248,6 +269,18 @@ export function QuizConfigSection({
             }`}
           >
             {tScores.modeScores}
+          </button>
+          <button
+            type="button"
+            onClick={() => changeSetupMode("review")}
+            aria-pressed={setupMode === "review"}
+            className={`rounded px-3 py-1.5 transition-colors ${
+              setupMode === "review"
+                ? "bg-background font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.modeReview}
           </button>
         </div>
       </div>
@@ -317,6 +350,7 @@ export function QuizConfigSection({
                 : "Include questions I've already seen"}
             </span>
           </label>
+          {!includeSeen && <p className="text-xs text-muted-foreground">{t.spacedHint}</p>}
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
             <input
               type="checkbox"
@@ -332,6 +366,33 @@ export function QuizConfigSection({
                 : "Exclude questions from official exams"}
             </span>
           </label>
+        </div>
+      ) : setupMode === "review" ? (
+        <div className="space-y-2">
+          <Label>{t.reviewSourceLabel}</Label>
+          <input type="hidden" name="reviewSource" value={reviewSource} />
+          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t.reviewSourceLabel}>
+            {(["wrong", "saved"] as const).map((src) => (
+              <button
+                key={src}
+                type="button"
+                role="radio"
+                aria-checked={reviewSource === src}
+                onClick={() => setReviewSource(src)}
+                className={`flex items-center justify-between rounded-lg border p-3 text-sm transition-colors ${
+                  reviewSource === src
+                    ? "border-primary bg-primary/5 font-medium"
+                    : "hover:border-primary/40 hover:bg-muted/40"
+                }`}
+              >
+                <span>{src === "wrong" ? t.reviewWrong : t.reviewSaved}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums">{reviewCounts[src]}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {reviewCounts[reviewSource] === 0 ? t.reviewEmpty : t.reviewHint}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -396,10 +457,10 @@ export function QuizConfigSection({
       <div className="space-y-2">
         <Label>{t.questionCount}</Label>
         <QuestionLimitPicker
-          key={setupMode}
+          key={setupMode === "review" ? `review-${reviewSource}` : setupMode}
           availableCount={availableCount}
           locale={locale}
-          defaultAll={setupMode === "exam"}
+          defaultAll={setupMode === "exam" || setupMode === "review"}
         />
       </div>
 

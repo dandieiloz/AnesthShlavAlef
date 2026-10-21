@@ -5,6 +5,8 @@ import { auth, signIn, signOut } from "@/lib/auth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeaderClient } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { HideInFocus } from "@/components/FocusGate";
+import { NavigationTracker } from "@/components/BackLink";
 import { BetaBanner } from "@/components/BetaBanner";
 import { DailyPopupGate } from "@/components/DailyPopupGate";
 import { HospitalReminderGate } from "@/components/HospitalReminderGate";
@@ -87,13 +89,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className="min-h-screen font-sans flex flex-col">
+      <body className={`min-h-screen font-sans flex flex-col ${user ? "pb-16 sm:pb-0" : ""}`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <PwaProvider>
             <SiteHeaderClient user={user} unseenResponseCount={unseenResponseCount} unreadForumCount={unreadForumCount} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} progressMini={progressMini} />
-            <BetaBanner t={dict.beta} locale={locale} />
+            <HideInFocus>
+              <BetaBanner t={dict.beta} locale={locale} />
+            </HideInFocus>
             <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-            <SiteFooter t={dict.footer} />
+            <HideInFocus>
+              <SiteFooter t={dict.footer} />
+            </HideInFocus>
+            <NavigationTracker />
             <Toaster />
             <DailyPopupGate />
             <HospitalReminderGate />

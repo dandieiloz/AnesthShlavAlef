@@ -1,4 +1,10 @@
 import { db } from "@/lib/db";
+import { cached, invalidate } from "@/lib/ttl-cache";
+
+const CONFIG_CACHE_KEY = "site:autoHideConfig";
+const HIDDEN_IDS_CACHE_KEY = "site:autoHiddenQuestionIds";
+/** Settings change rarely; the hidden list is recomputed from all attempts. */
+const CACHE_TTL_MS = 60_000;
 
 const MIN_ATTEMPTS_KEY = "autoHideMinAttempts";
 const MAX_CORRECT_PCT_KEY = "autoHideMaxCorrectPercent";
@@ -26,6 +32,10 @@ function clamp01(n: number): number {
 }
 
 export async function getAutoHideConfig(): Promise<AutoHideConfig> {
+  return cached(CONFIG_CACHE_KEY, CACHE_TTL_MS, loadAutoHideConfig);
+}
+
+async function loadAutoHideConfig(): Promise<AutoHideConfig> {
   const rows = await db.siteContent.findMany({
     where: { key: { in: [MIN_ATTEMPTS_KEY, MAX_CORRECT_PCT_KEY] } },
   });
@@ -57,6 +67,7 @@ export async function setAutoHideConfig(
       update: { value: String(pct) },
     }),
   ]);
+  invalidate(CONFIG_CACHE_KEY, HIDDEN_IDS_CACHE_KEY);
   return { minAttempts: min, maxCorrectPercent: pct };
 }
 
@@ -68,7 +79,13 @@ export async function setAutoHideConfig(
  * callers AND this with an `adminApproved` exemption.
  */
 export async function getAutoHiddenQuestionIds(config?: AutoHideConfig): Promise<number[]> {
-  const { minAttempts, maxCorrectPercent } = config ?? (await getAutoHideConfig());
+  // The default-config list is shared by every gated query, so cache it.
+  if (!config) return cached(HIDDEN_IDS_CACHE_KEY, CACHE_TTL_MS, async () => computeAutoHiddenQuestionIds(await getAutoHideConfig()));
+  return computeAutoHiddenQuestionIds(config);
+}
+
+async function computeAutoHiddenQuestionIds(config: AutoHideConfig): Promise<number[]> {
+  const { minAttempts, maxCorrectPercent } = config;
   if (minAttempts <= 0) return [];
   const rows = await db.$queryRaw<{ questionId: number }[]>`
     SELECT "questionId"

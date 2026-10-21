@@ -15,6 +15,8 @@ import { getScoreById } from "@/lib/scores/registry";
 import { loadQuizBatch, type QuizBatch, type QuestionPayload } from "@/app/quiz/[id]/quiz-session";
 import type { EvidenceCitationDisplay } from "@/components/AnswerExplanation";
 import { getAnswerDistribution, type AnswerDistribution } from "@/lib/answer-distribution";
+import { getLatestAttemptByQuestion } from "@/lib/my-questions";
+import { createReviewQuizAction } from "./review-quiz-actions";
 export async function updateProfileAction(formData: FormData) {
   const me = await requireUser();
   const data = ProfileSchema.parse({
@@ -135,6 +137,45 @@ async function samplePrioritizingUntested(poolIds: number[], limit: number): Pro
   return ranked.map((x) => x.id).slice(0, Math.min(limit, poolIds.length));
 }
 
+/** Share of a chapter quiz given to resurfaced mistakes, and a hard cap. */
+const REVIEW_MIX_RATIO = 0.2;
+const MAX_REVIEW_MIX = 10;
+/** A mistake becomes "due" this long after the user last answered it. */
+const REVIEW_AFTER_DAYS = 3;
+
+/**
+ * Questions in the given chapters whose latest answer was wrong and at least
+ * REVIEW_AFTER_DAYS old, oldest first, so the quiz resurfaces them.
+ */
+async function pickDueMistakes(
+  me: { id: string; role: "USER" | "ADMIN"; plan: "DEMO" | "PAID" },
+  opts: { chapterIds: number[]; excludeOfficial: boolean; max: number },
+): Promise<number[]> {
+  if (opts.max <= 0) return [];
+  const latest = await getLatestAttemptByQuestion(me, {
+    chapterIds: { hasSome: opts.chapterIds },
+    AND: [
+      hasUsableAnswerWhere,
+      ...(opts.excludeOfficial ? [{ NOT: { source: { startsWith: OFFICIAL_EXAM_SOURCE } } }] : []),
+    ],
+  });
+  const cutoff = Date.now() - REVIEW_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  return [...latest.entries()]
+    .filter(([, a]) => !a.isCorrect && a.createdAt.getTime() <= cutoff)
+    .sort(([, a], [, b]) => a.createdAt.getTime() - b.createdAt.getTime())
+    .slice(0, opts.max)
+    .map(([id]) => id);
+}
+
+/** Spread `extra` evenly through `base` so review questions aren't bunched. */
+function interleave(base: number[], extra: number[]): number[] {
+  if (extra.length === 0) return base;
+  const out = [...base];
+  const step = Math.max(1, Math.floor((base.length + extra.length) / (extra.length + 1)));
+  extra.forEach((id, i) => out.splice(Math.min(out.length, step * (i + 1) + i), 0, id));
+  return out;
+}
+
 async function resolveUniqueName(userId: string, baseName: string): Promise<string> {
   const existing = await db.quiz.findMany({ where: { userId }, select: { name: true } });
   const names = new Set(existing.map((q) => q.name));
@@ -145,6 +186,9 @@ async function resolveUniqueName(userId: string, baseName: string): Promise<stri
 }
 
 export async function createQuizAction(formData: FormData) {
+  if (formData.get("mode") === "review") {
+    return createReviewQuizAction(formData);
+  }
   const me = await requireUser();
   const raw = formData.get("questionLimit");
   const mode = formData.get("mode") === "exam" ? "exam" : "chapters";
@@ -239,10 +283,23 @@ export async function createQuizAction(formData: FormData) {
     redirect("/study/new?empty=1");
   }
 
-  const questionIds = await samplePrioritizingUntested(
+  const limit = data.questionLimit ?? pool.length;
+
+  // Light spaced repetition: when the quiz is unseen-only, mix in a few
+  // questions from the same chapters that the user last got wrong a while ago.
+  const reviewIds = data.includeSeen
+    ? []
+    : await pickDueMistakes(me, {
+        chapterIds: data.chapterIds,
+        excludeOfficial: data.excludeOfficial,
+        max: Math.min(MAX_REVIEW_MIX, Math.floor(limit * REVIEW_MIX_RATIO)),
+      });
+
+  const freshIds = await samplePrioritizingUntested(
     pool.map((q) => q.id),
-    data.questionLimit ?? pool.length,
+    limit - reviewIds.length,
   );
+  const questionIds = interleave(freshIds, reviewIds);
 
   const resolvedName = await resolveUniqueName(me.id, data.name);
 
@@ -272,33 +329,35 @@ export async function recordAttemptAction(input: {
 }): Promise<{ ok: true; isCorrect: boolean }> {
   const me = await requireUser();
   const data = RecordAttemptSchema.parse(input);
-  await assertCanAccessQuestion(me, data.questionId);
-  const q = await db.question.findUnique({
-    where: { id: data.questionId },
-    select: {
-      correctAnswer: true,
-      acceptedAnswers: true,
-      geminiAnswer: { select: { correctAnswer: true } },
-    },
-  });
+  // Access check, answer key and duplicate check are independent: one round trip.
+  const [, q, recent] = await Promise.all([
+    assertCanAccessQuestion(me, data.questionId),
+    db.question.findUnique({
+      where: { id: data.questionId },
+      select: {
+        correctAnswer: true,
+        acceptedAnswers: true,
+        geminiAnswer: { select: { correctAnswer: true } },
+      },
+    }),
+    // Dedupe rapid duplicate submissions (key-repeat, double-click, React state lag,
+    // server-action retries): same (quiz, question, chosen) within the last 10s.
+    db.attempt.findFirst({
+      where: {
+        userId: me.id,
+        quizId: data.quizId,
+        questionId: data.questionId,
+        chosen: data.chosen as Choice,
+        createdAt: { gte: new Date(Date.now() - 10_000) },
+      },
+      select: { id: true },
+    }),
+  ]);
   const correctAnswer = q?.geminiAnswer?.correctAnswer ?? q?.correctAnswer ?? null;
   if (!correctAnswer) throw new Error("No cached answer for question");
   const accepted: Choice[] = q?.acceptedAnswers ?? [];
   const isCorrect = data.chosen === correctAnswer || accepted.includes(data.chosen as Choice);
 
-  // Dedupe rapid duplicate submissions (key-repeat, double-click, React state lag,
-  // server-action retries). If the same user already recorded an attempt for this
-  // (quiz, question, chosen) within the last 10s, treat it as the same submission.
-  const recent = await db.attempt.findFirst({
-    where: {
-      userId: me.id,
-      quizId: data.quizId,
-      questionId: data.questionId,
-      chosen: data.chosen as Choice,
-      createdAt: { gte: new Date(Date.now() - 10_000) },
-    },
-    select: { id: true },
-  });
   if (!recent) {
     await db.attempt.create({
       data: {
@@ -566,7 +625,7 @@ export async function toggleBookmarkAction(formData: FormData) {
   } else {
     await db.bookmark.create({ data: { userId: me.id, questionId } });
   }
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
   revalidatePath("/study");
 }
 
@@ -583,12 +642,12 @@ export async function toggleBookmarkValueAction(questionId: number): Promise<{ b
   });
   if (existing) {
     await db.bookmark.delete({ where: { id: existing.id } });
-    revalidatePath("/bookmarks");
+    revalidatePath("/my-questions");
     revalidatePath("/study");
     return { bookmarked: false };
   }
   await db.bookmark.create({ data: { userId: me.id, questionId: id } });
-  revalidatePath("/bookmarks");
+  revalidatePath("/my-questions");
   revalidatePath("/study");
   return { bookmarked: true };
 }
@@ -622,8 +681,8 @@ export async function deleteQuizAction(formData: FormData) {
   }
   await db.quiz.delete({ where: { id: quizId } });
   revalidatePath("/study");
-  revalidatePath("/history");
-  revalidatePath("/dashboard");
+  revalidatePath("/my-questions");
+  revalidatePath("/progress");
 }
 
 /**

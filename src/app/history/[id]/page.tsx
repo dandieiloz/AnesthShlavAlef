@@ -15,7 +15,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRight, BookOpen, CheckCircle2, MessageSquare } from "lucide-react";
+import { ArrowRight, BookOpen, MessageSquare, MessagesSquare } from "lucide-react";
+import { BackLink } from "@/components/BackLink";
+import { RetestOptions } from "@/components/retest/RetestOptions";
+import { HideAnswersSwitch } from "@/components/retest/HideAnswersSwitch";
 import { getLocale, getContentLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
@@ -23,11 +26,6 @@ import { assertCanAccessQuestion } from "@/lib/plan";
 import { getAnswerDistribution } from "@/lib/answer-distribution";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
-const DATE_FORMATTER = new Intl.DateTimeFormat("he-IL", {
-  dateStyle: "short",
-  timeStyle: "short",
-  timeZone: "Asia/Jerusalem",
-});
 
 export default async function HistoryQuestionPage({
   params,
@@ -89,6 +87,16 @@ export default async function HistoryQuestionPage({
     }),
     getAnswerDistribution(questionId),
   ]);
+  const thread = await db.forumThread.findUnique({ where: { questionId }, select: { id: true } });
+  const tp = dict.questionPage;
+  const tm = dict.myQuestions;
+  const dateFormatter = new Intl.DateTimeFormat(uiLocale === "he" ? "he-IL" : "en-US", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Asia/Jerusalem",
+  });
+  const uiDir = uiLocale === "he" ? "rtl" : "ltr";
+  const contentDir = contentLocale === "he" ? "rtl" : "ltr";
 
   if (!question) notFound();
 
@@ -109,17 +117,14 @@ export default async function HistoryQuestionPage({
   const correctAnswer = question.geminiAnswer?.correctAnswer ?? question.correctAnswer;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-4">
-      <Link
-        href="/history"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-        חזרה לשאלות שראיתי
-      </Link>
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <BackLink fallbackHref="/my-questions" label={dict.common.back} dir={uiDir} />
+        <HideAnswersSwitch label={tm.hideAnswers} />
+      </div>
 
       <Card>
-        <CardContent className="p-4 space-y-3" dir={contentLocale === "he" ? "rtl" : "ltr"}>
+        <CardContent className="p-4 space-y-3" dir={contentDir}>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="text-xs shrink-0">
               {dict.common.chapter} {question.chapter.number}
@@ -151,65 +156,52 @@ export default async function HistoryQuestionPage({
           <QuestionImage url={question.imageUrl} alt={question.imageAlt} />
           <QuestionVideo url={question.videoUrl} />
 
-          <div className="space-y-1.5">
-            {OPTION_KEYS.map((k, idx) => {
-              const isCorrect =
-                correctAnswer === k || question.acceptedAnswers.includes(k);
-              const rowClass = isCorrect
-                ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
-                : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
-              const letterClass = isCorrect
-                ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-success text-white"
-                : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-muted text-muted-foreground";
-              return (
-                <div key={k} className={rowClass}>
-                  <span className={letterClass}>{letters[idx]}</span>
-                  <span dir="rtl" className="flex-1 leading-snug text-start">
-                    {optionTexts[idx]}
-                  </span>
-                  {isCorrect && (
-                    <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
-                  )}
+          <RetestOptions
+            questionId={question.id}
+            dir={contentDir}
+            correctKeys={[...new Set([correctAnswer, ...question.acceptedAnswers].filter((k): k is "A" | "B" | "C" | "D" => !!k))]}
+            options={OPTION_KEYS.map((k, idx) => ({ key: k, letter: letters[idx], text: optionTexts[idx] }))}
+            labels={{
+              pickAnswer: tm.pickAnswer,
+              tryAgain: tm.tryAgain,
+              correct: tm.retestCorrect,
+              wrong: tm.retestWrong,
+            }}
+          >
+            {question.geminiAnswer ? (
+              <>
+                <Separator className="opacity-40" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                  {t.detailedExplanation}
                 </div>
-              );
-            })}
-          </div>
-
-          {question.geminiAnswer ? (
-            <>
-              <Separator className="opacity-40" />
-              <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                <BookOpen className="h-3.5 w-3.5 shrink-0" />
-                {t.detailedExplanation}
-              </div>
-              <AnswerExplanation
-                explanation={question.geminiAnswer.explanation}
-                evidenceCitations={question.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
-                whyOthersWrong={question.geminiAnswer.whyOthersWrong}
-                correctAnswer={question.geminiAnswer.correctAnswer}
-                acceptedAnswers={question.acceptedAnswers}
-                userChoice={attempts[0]?.chosen ?? undefined}
-                options={[
-                  { key: "A", text: question.optionA },
-                  { key: "B", text: question.optionB },
-                  { key: "C", text: question.optionC },
-                  { key: "D", text: question.optionD },
-                ]}
-                insufficientEvidence={question.geminiAnswer.insufficientEvidence}
-                explanationImageUrl={question.geminiAnswer.explanationImageUrl}
-                explanationImageAlt={question.geminiAnswer.explanationImageAlt}
-                locale={contentLocale}
-                questionId={question.id}
-                highlights={highlightRows}
-                highlightT={dict.highlights}
-                answerDistribution={answerDistribution}
-              />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">
-              עדיין אין הסבר זמין לשאלה זו.
-            </p>
-          )}
+                <AnswerExplanation
+                  explanation={question.geminiAnswer.explanation}
+                  evidenceCitations={question.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
+                  whyOthersWrong={question.geminiAnswer.whyOthersWrong}
+                  correctAnswer={question.geminiAnswer.correctAnswer}
+                  acceptedAnswers={question.acceptedAnswers}
+                  userChoice={attempts[0]?.chosen ?? undefined}
+                  options={[
+                    { key: "A", text: question.optionA },
+                    { key: "B", text: question.optionB },
+                    { key: "C", text: question.optionC },
+                    { key: "D", text: question.optionD },
+                  ]}
+                  insufficientEvidence={question.geminiAnswer.insufficientEvidence}
+                  explanationImageUrl={question.geminiAnswer.explanationImageUrl}
+                  explanationImageAlt={question.geminiAnswer.explanationImageAlt}
+                  locale={contentLocale}
+                  questionId={question.id}
+                  highlights={highlightRows}
+                  highlightT={dict.highlights}
+                  answerDistribution={answerDistribution}
+                />
+              </>
+            ) : (
+              <p className="text-sm italic text-muted-foreground">{tp.noExplanation}</p>
+            )}
+          </RetestOptions>
 
           {question.geminiAnswer && (
             <ReportAnswerForm
@@ -244,6 +236,15 @@ export default async function HistoryQuestionPage({
               </span>
             )}
           </h2>
+          {thread && (
+            <Link
+              href={`/forum/${thread.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              <MessagesSquare className="h-3.5 w-3.5" />
+              {dict.quiz.viewInForum}
+            </Link>
+          )}
           {comments.length === 0 ? (
             <p className="text-xs text-muted-foreground">{dict.quiz.noComments}</p>
           ) : (
@@ -274,24 +275,24 @@ export default async function HistoryQuestionPage({
 
       <Card>
         <CardContent className="p-4 space-y-2">
-          <h2 className="text-sm font-semibold">הניסיונות שלי ({attempts.length})</h2>
+          <h2 className="text-sm font-semibold">{tp.myAttempts} ({attempts.length})</h2>
           {attempts.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">עדיין לא ניסית שאלה זו.</p>
+            <p className="text-xs text-muted-foreground italic">{tp.noAttempts}</p>
           ) : (
           <ul className="divide-y">
             {attempts.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span className="text-muted-foreground">
-                  {DATE_FORMATTER.format(a.createdAt)}
+                  {dateFormatter.format(a.createdAt)}
                 </span>
-                <span className="font-mono text-xs">בחרת: {a.chosen}</span>
+                <span className="font-mono text-xs">{tp.youChose}: {letters[OPTION_KEYS.indexOf(a.chosen)] ?? a.chosen}</span>
                 {a.isCorrect ? (
                   <span className="text-xs rounded px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
-                    ✓ נכון
+                    {tp.correct}
                   </span>
                 ) : (
                   <span className="text-xs rounded px-2 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300">
-                    ✗ שגוי
+                    {tp.wrong}
                   </span>
                 )}
                 {a.quizId !== null ? (
@@ -299,10 +300,10 @@ export default async function HistoryQuestionPage({
                     href={`/quiz/${a.quizId}/review`}
                     className="text-xs text-primary hover:underline"
                   >
-                    מבחן #{a.quizId}
+                    {tp.quizN(a.quizId)}
                   </Link>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-muted-foreground">{tp.outsideQuiz}</span>
                 )}
               </li>
             ))}

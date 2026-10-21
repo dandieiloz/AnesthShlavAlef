@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { BackLink } from "@/components/BackLink";
+import { CheckCircle2 } from "lucide-react";
 import { requireCompletedProfile } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
@@ -17,17 +18,10 @@ export default async function ReportPage({
   const dict = getDictionary(locale);
   const t = dict.report;
   const params = await searchParams;
-  const isRtl = locale === "he";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 animate-fade-in">
-      <Link
-        href="/study"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className={`h-4 w-4 ${isRtl ? "rotate-180" : ""}`} />
-        {t.backToStudy}
-      </Link>
+    <div className="mx-auto max-w-3xl space-y-6 animate-fade-in">
+      <BackLink fallbackHref="/study" label={getDictionary(locale).common.back} dir={locale === "he" ? "rtl" : "ltr"} />
 
       <div>
         <h1 className="font-display text-2xl font-bold">{t.title}</h1>

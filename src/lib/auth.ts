@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 /** Returns true if the given email is on the admin blocklist. */
 export async function isEmailBlocked(email: string | null | undefined): Promise<boolean> {
@@ -79,15 +80,29 @@ export async function requireUser() {
   };
 }
 
-export async function requireCompletedProfile() {
-  const me = await requireUser();
-  const dbUser = await db.user.findUnique({
-    where: { id: me.id },
-    select: { residencyYear: true },
-  });
+/**
+ * Signed-in user with a finished profile. The block check and the profile
+ * lookup run in parallel, and React's request cache dedupes repeat calls
+ * within one render.
+ */
+export const requireCompletedProfile = cache(async () => {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/");
+  const [blocked, dbUser] = await Promise.all([
+    isEmailBlocked(session.user.email),
+    db.user.findUnique({ where: { id: session.user.id }, select: { residencyYear: true } }),
+  ]);
+  if (blocked) redirect("/blocked");
   if (!dbUser?.residencyYear) redirect("/onboarding");
-  return me;
-}
+  return session.user as {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+    image?: string | null;
+    role: "USER" | "ADMIN";
+    plan: "DEMO" | "PAID";
+  };
+});
 
 export async function requireAdmin() {
   const user = await requireUser();

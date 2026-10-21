@@ -190,12 +190,12 @@ export default async function QuizReviewPage({
   const ArrowIcon = uiLocale === "he" ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="mx-auto max-w-3xl space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
-            <Link href="/study" className="hover:text-foreground transition-colors">
+            <Link href="/quizzes" className="hover:text-foreground transition-colors">
               {t.myQuizzes}
             </Link>
             <ChevronIcon className="h-3.5 w-3.5" />
@@ -475,6 +475,14 @@ export default async function QuizReviewPage({
                       )}
                     </summary>
                     <div className="mt-3 space-y-3">
+                      {q.forumThread && (
+                        <Link
+                          href={`/forum/${q.forumThread.id}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                        >
+                          {dict.quiz.viewInForum}
+                        </Link>
+                      )}
                       {comments.length === 0 ? (
                         <p className="text-xs text-muted-foreground">{dict.quiz.noComments}</p>
                       ) : (
@@ -512,7 +520,7 @@ export default async function QuizReviewPage({
       {/* Bottom nav */}
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button asChild variant="outline" size="sm">
-          <Link href="/study" className="gap-2">
+          <Link href="/quizzes" className="gap-2">
             <ArrowIcon className="h-3.5 w-3.5" />
             {t.allQuizzes}
           </Link>

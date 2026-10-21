@@ -37,28 +37,17 @@ export async function markAdminResponsesSeen(userId: string): Promise<void> {
  * user's first-ever visit (no baseline yet).
  */
 export async function countUnreadForumThreads(userId: string): Promise<number> {
-  const me = await db.user.findUnique({
-    where: { id: userId },
-    select: { forumLastVisitedAt: true },
-  });
-  const lastVisit = me?.forumLastVisitedAt ?? null;
-  if (!lastVisit) return 0;
-
-  const threads = await db.forumThread.findMany({
-    where: { lastReplyAt: { gt: lastVisit } },
-    select: {
-      authorId: true,
-      replies: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { authorId: true },
-      },
-    },
-    take: 200,
-  });
-
-  return threads.reduce((count, th) => {
-    const lastActivityAuthorId = th.replies[0]?.authorId ?? th.authorId;
-    return lastActivityAuthorId !== userId ? count + 1 : count;
-  }, 0);
+  // Single round trip: this runs in the root layout on every page load.
+  const rows = await db.$queryRaw<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n
+    FROM "ForumThread" t
+    JOIN "User" u ON u."id" = ${userId}
+    WHERE u."forumLastVisitedAt" IS NOT NULL
+      AND t."lastReplyAt" > u."forumLastVisitedAt"
+      AND COALESCE(
+        (SELECT r."authorId" FROM "ForumReply" r WHERE r."threadId" = t."id" ORDER BY r."createdAt" DESC LIMIT 1),
+        t."authorId"
+      ) IS DISTINCT FROM ${userId}
+  `;
+  return rows[0]?.n ?? 0;
 }

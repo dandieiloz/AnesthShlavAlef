@@ -12,7 +12,7 @@ import { SCORE_SYSTEMS } from "@/lib/scores/registry";
 /**
  * Compact summary of the user's self-rated confidence across all clinical
  * scores, with a shortcut into a targeted drill of the weak/unrated ones.
- * Rendered on /study.
+ * Rendered on /progress.
  */
 export async function ScoreConfidenceOverview({
   userId,

@@ -423,6 +423,7 @@ model Attempt {
 
   @@index([userId, createdAt])
   @@index([questionId])
+  @@index([quizId])
 }
 
 model ActivityPing {
@@ -446,6 +447,8 @@ model Quiz {
 
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   attempts    Attempt[]
+
+  @@index([userId, createdAt])
 }
 
 /// A discussion thread. Two flavours sharing one table:

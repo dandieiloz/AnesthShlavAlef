@@ -1,8 +1,12 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireCompletedProfile } from "@/lib/auth";
-import { questionAccessWhere } from "@/lib/plan";
+import { questionAccessWhere, type PlanGatedUser } from "@/lib/plan";
+import { getDictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/locale";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { HistoryFilters } from "./HistoryFilters";
 import { HistoryTable, type HistoryRow } from "./HistoryTable";
 
@@ -13,30 +17,42 @@ const SORT_FIELDS = ["stem", "source", "chapter", "attempts", "lastSeen", "lastR
 type SortField = (typeof SORT_FIELDS)[number];
 type SortOrder = "asc" | "desc";
 
+export type HistorySearchParams = {
+  q?: string;
+  source?: string;
+  year?: string;
+  chapter?: string;
+  result?: string;
+  sort?: string;
+  order?: string;
+  all?: string;
+};
+
 function isSortField(value: string | undefined): value is SortField {
   return value !== undefined && SORT_FIELDS.includes(value as SortField);
 }
 
-export default async function HistoryPage({
-  searchParams,
+/**
+ * Table of questions the user has attempted. In "wrong" mode it only lists
+ * questions whose latest attempt was wrong (the "Got wrong" tab).
+ */
+export async function HistoryView({
+  me,
+  sp,
+  mode,
+  locale,
 }: {
-  searchParams: Promise<{
-    q?: string;
-    source?: string;
-    year?: string;
-    chapter?: string;
-    result?: string;
-    sort?: string;
-    order?: string;
-    all?: string;
-  }>;
+  me: PlanGatedUser;
+  sp: HistorySearchParams;
+  mode: "all" | "wrong";
+  locale: Locale;
 }) {
-  const me = await requireCompletedProfile();
-  const sp = await searchParams;
+  const dict = getDictionary(locale);
+  const t = dict.myQuestions;
   const sort: SortField = isSortField(sp.sort) ? sp.sort : "lastSeen";
   const order: SortOrder = sp.order === "asc" ? "asc" : "desc";
   const isAdmin = me.role === "ADMIN";
-  const showAll = isAdmin && sp.all === "1";
+  const showAll = mode === "all" && isAdmin && sp.all === "1";
 
   const planGate = await questionAccessWhere(me);
 
@@ -72,16 +88,13 @@ export default async function HistoryPage({
     }
   }
 
-  // Fetch questions matching the filter. By default we restrict to questions
-  // the user has at least one attempt for; admins can opt into showing all.
+  // By default we restrict to questions the user has at least one attempt
+  // for; admins can opt into showing all.
   const attemptedQuestions = await db.question.findMany({
     where: showAll
       ? questionWhere
       : {
-          AND: [
-            questionWhere,
-            { attempts: { some: { userId: me.id } } },
-          ],
+          AND: [questionWhere, { attempts: { some: { userId: me.id } } }],
         },
     select: {
       id: true,
@@ -95,17 +108,13 @@ export default async function HistoryPage({
   const questionIds = attemptedQuestions.map((q) => q.id);
   const totalAttempted = questionIds.length;
 
-  // Per-question attempt count for this user.
-  const counts = await db.attempt.groupBy({
-    by: ["questionId"],
-    where: { userId: me.id, questionId: { in: questionIds } },
-    _count: { _all: true },
-  });
-  const countMap = new Map<number, number>();
-  for (const c of counts) countMap.set(c.questionId, c._count._all);
-
-  // Stats from other users (excluding current user) per question — total + correct.
-  const [communityTotalRows, communityCorrectRows] = await Promise.all([
+  const [counts, communityTotalRows, communityCorrectRows, bookmarks, allAttempts, chapters] = await Promise.all([
+    db.attempt.groupBy({
+      by: ["questionId"],
+      where: { userId: me.id, questionId: { in: questionIds } },
+      _count: { _all: true },
+    }),
+    // Stats from other users (excluding current user) per question.
     questionIds.length
       ? db.attempt.groupBy({
           by: ["questionId"],
@@ -120,35 +129,34 @@ export default async function HistoryPage({
           _count: { _all: true },
         })
       : Promise.resolve([] as { questionId: number; _count: { _all: number } }[]),
+    db.bookmark.findMany({
+      where: { userId: me.id, questionId: { in: questionIds } },
+      select: { questionId: true },
+    }),
+    // Newest first, so the first row per question is the latest attempt.
+    db.attempt.findMany({
+      where: { userId: me.id, questionId: { in: questionIds } },
+      select: { questionId: true, chosen: true, isCorrect: true, quizId: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.chapter.findMany({
+      select: { number: true, title: true },
+      orderBy: { number: "asc" },
+    }),
   ]);
-  const communityTotalMap = new Map<number, number>(
-    communityTotalRows.map((r) => [r.questionId, r._count._all]),
-  );
-  const communityCorrectMap = new Map<number, number>(
-    communityCorrectRows.map((r) => [r.questionId, r._count._all]),
-  );
 
-  // Bookmarks the user has on these questions.
-  const bookmarks = await db.bookmark.findMany({
-    where: { userId: me.id, questionId: { in: questionIds } },
-    select: { questionId: true },
-  });
+  const countMap = new Map<number, number>(counts.map((c) => [c.questionId, c._count._all]));
+  const communityTotalMap = new Map<number, number>(communityTotalRows.map((r) => [r.questionId, r._count._all]));
+  const communityCorrectMap = new Map<number, number>(communityCorrectRows.map((r) => [r.questionId, r._count._all]));
   const bookmarkSet = new Set<number>(bookmarks.map((b) => b.questionId));
-
-  // Latest attempt per question (chosen, isCorrect, quizId, createdAt).
-  // Postgres-friendly: order by createdAt desc, then keep first per questionId.
-  const allAttempts = await db.attempt.findMany({
-    where: { userId: me.id, questionId: { in: questionIds } },
-    select: { questionId: true, chosen: true, isCorrect: true, quizId: true, createdAt: true },
-    orderBy: { createdAt: "desc" },
-  });
   const latestMap = new Map<number, (typeof allAttempts)[number]>();
   for (const a of allAttempts) {
     if (!latestMap.has(a.questionId)) latestMap.set(a.questionId, a);
   }
 
-  // Apply latest-result filter (post-aggregation).
-  const resultFilter = sp.result === "correct" ? true : sp.result === "wrong" ? false : null;
+  // Latest-result filter (post-aggregation). The "wrong" tab forces it.
+  const resultFilter =
+    mode === "wrong" ? false : sp.result === "correct" ? true : sp.result === "wrong" ? false : null;
 
   let rows: HistoryRow[] = attemptedQuestions
     .map((q) => {
@@ -218,33 +226,41 @@ export default async function HistoryPage({
 
   rows = rows.slice(0, LIMIT);
 
-  const chapters = await db.chapter.findMany({
-    select: { number: true, title: true },
-    orderBy: { number: "asc" },
-  });
+  // Nothing attempted at all: point the user at a quiz instead of empty filters.
+  if (!showAll && totalAttempted === 0 && !sp.q && !sp.source && !sp.year && !sp.chapter) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 py-14 text-center">
+          <p className="text-sm text-muted-foreground">{t.empty}</p>
+          <Button asChild size="sm">
+            <Link href="/study/new">{dict.homePage.newQuiz}</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold">שאלות שראיתי</h1>
-        <p className="text-sm text-muted-foreground">
-          רשימת השאלות שכבר ניסית, עם התוצאה האחרונה ומספר הניסיונות.
-        </p>
-      </div>
+    <div className="space-y-4">
+      {mode === "wrong" && <p className="text-sm text-muted-foreground">{t.wrongHint}</p>}
 
       <Suspense>
-        <HistoryFilters chapters={chapters} isAdmin={isAdmin} />
+        <HistoryFilters chapters={chapters} isAdmin={isAdmin && mode === "all"} tab={mode} showResultFilter={mode === "all"} t={t} />
       </Suspense>
 
       <div className="text-sm text-muted-foreground">
-        {!showAll && totalAttempted === 0
-          ? "עדיין לא ניסית שאלות. גש/י ללימוד כדי להתחיל."
-          : filteredTotal > LIMIT
-            ? `מציג ${LIMIT} מתוך ${filteredTotal} שאלות`
-            : `${filteredTotal} שאלות`}
+        {filteredTotal > LIMIT
+          ? t.showingOf.replace("{shown}", String(LIMIT)).replace("{total}", String(filteredTotal))
+          : t.count.replace("{n}", String(filteredTotal))}
       </div>
 
-      <HistoryTable rows={rows} sort={sort} order={order} />
+      {mode === "wrong" && filteredTotal === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">{t.emptyWrong}</CardContent>
+        </Card>
+      ) : (
+        <HistoryTable rows={rows} sort={sort} order={order} t={t} locale={locale} />
+      )}
     </div>
   );
 }

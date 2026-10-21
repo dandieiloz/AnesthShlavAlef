@@ -354,7 +354,7 @@ export function QuizRunner(props: Props) {
 
     // Unified pre-finish summary: skipped + unsure + (full mode) all answers.
     return (
-      <div className="mx-auto max-w-2xl animate-fade-in py-10">
+      <div className="mx-auto max-w-3xl animate-fade-in py-2">
         <div className="text-center">
           <h1 className="font-display text-2xl font-bold">{t.summaryTitle}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{t.summaryIntro}</p>
@@ -807,11 +807,21 @@ export function QuizRunner(props: Props) {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="space-y-5">
-        {/* Progress */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{props.quizName}</span>
-            <div className="flex items-center gap-2">
+        {/* Focus bar: replaces the site header while answering questions */}
+        <div className="sticky top-0 z-30 -mx-4 -mt-8 space-y-1.5 border-b bg-background/95 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Link
+                href="/study"
+                aria-label={t.exitQuiz}
+                title={t.exitQuiz}
+                className="-ms-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </Link>
+              <span className="truncate font-medium text-foreground">{props.quizName}</span>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               <span>
                 {mode === "immediate"
                   ? t.progress(answered, props.totalQ, correct)

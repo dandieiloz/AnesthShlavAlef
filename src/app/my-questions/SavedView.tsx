@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { requireCompletedProfile } from "@/lib/auth";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,27 +11,44 @@ import { QuestionImage } from "@/components/QuestionImage";
 import { QuestionVideo } from "@/components/QuestionVideo";
 import { BookmarksSearch } from "@/components/BookmarksSearch";
 import { BookmarksSort, type BookmarksSortValue } from "@/components/BookmarksSort";
-import { Bookmark, BookmarkX, BookOpen, CheckCircle2 } from "lucide-react";
-import { getLocale, getContentLocale } from "@/lib/locale";
+import { Bookmark, BookmarkX, BookOpen } from "lucide-react";
+import { RetestOptions } from "@/components/retest/RetestOptions";
+import { HideAnswersSwitch } from "@/components/retest/HideAnswersSwitch";
+import type { Locale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { getTranslatedFields } from "@/lib/translate";
-import { questionAccessWhere } from "@/lib/plan";
+import { questionAccessWhere, type PlanGatedUser } from "@/lib/plan";
 import { getAnswerDistributions } from "@/lib/answer-distribution";
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
-export default async function BookmarksPage({
-  searchParams,
+/**
+ * The "Saved" tab: bookmarked questions plus questions with highlighted
+ * sentences, shown as full cards with the answer and explanation.
+ */
+export async function SavedView({
+  me,
+  sortParam,
+  locale,
+  contentLocale,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  me: PlanGatedUser;
+  sortParam?: string;
+  locale: Locale;
+  contentLocale: Locale;
 }) {
-  const me = await requireCompletedProfile();
-  const [locale, contentLocale] = await Promise.all([getLocale(), getContentLocale()]);
   const dict = getDictionary(locale);
   const t = dict.bookmarks;
   const letters = contentLocale === "he" ? ["א", "ב", "ג", "ד"] : ["A", "B", "C", "D"];
+  const contentDir = contentLocale === "he" ? "rtl" : "ltr";
+  const tq = dict.myQuestions;
+  const retestLabels = {
+    pickAnswer: tq.pickAnswer,
+    tryAgain: tq.tryAgain,
+    correct: tq.retestCorrect,
+    wrong: tq.retestWrong,
+  };
 
-  const sortParam = (await searchParams).sort;
   const sort: BookmarksSortValue =
     sortParam === "oldest" || sortParam === "chapter" ? sortParam : "newest";
 
@@ -159,17 +175,10 @@ export default async function BookmarksPage({
   const distributionMap = await getAnswerDistributions(entries.map((e) => e.question.id));
 
   return (
-    <div className="space-y-6 animate-fade-in text-right" dir="rtl">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-            <Bookmark className="h-6 w-6 text-amber-500" />
-            {t.title}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t.subtitle(entries.length)}
-          </p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">{t.subtitle(entries.length)}</p>
+        {entries.length > 0 && <HideAnswersSwitch label={tq.hideAnswers} className="ms-auto" />}
         {entries.length > 0 && (
           <BookmarksSort
             value={sort}
@@ -215,7 +224,7 @@ export default async function BookmarksPage({
               return (
               <li key={q.id} data-search-text={searchText}>
                 <Card className="transition-all hover:shadow-sm">
-                  <CardContent className="p-4 space-y-3 text-right" dir="rtl">
+                  <CardContent className="p-4 space-y-3 text-start" dir={contentDir}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -229,7 +238,7 @@ export default async function BookmarksPage({
                             <span className="text-xs text-muted-foreground shrink-0">· {q.source}</span>
                           )}
                         </div>
-                        <p dir="rtl" className="text-sm font-medium leading-relaxed text-right" data-search-highlight>
+                        <p className="text-sm font-medium leading-relaxed" data-search-highlight>
                           {qT.stem}
                         </p>
                       </div>
@@ -252,67 +261,49 @@ export default async function BookmarksPage({
                     <QuestionImage url={q.imageUrl} alt={q.imageAlt} />
                     <QuestionVideo url={q.videoUrl} />
 
-                    {/* Answer options */}
-                    <div className="space-y-1.5">
-                      {OPTION_KEYS.map((k, idx) => {
-                        const isCorrect =
-                          correctAnswer === k || q.acceptedAnswers.includes(k);
-                        const rowClass = isCorrect
-                          ? "flex items-start gap-2.5 rounded-lg border border-success/50 bg-success/10 p-2.5 text-sm"
-                          : "flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-sm text-muted-foreground";
-                        const letterClass = isCorrect
-                          ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-success text-white"
-                          : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold mt-0.5 bg-muted text-muted-foreground";
-                        return (
-                          <div key={k} className={rowClass}>
-                            <span className={letterClass}>{letters[idx]}</span>
-                            <span dir="rtl" className="flex-1 leading-snug text-right" data-search-highlight>
-                              {optionTexts[idx]}
-                            </span>
-                            {isCorrect && (
-                              <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Full answer / explanation */}
-                    {q.geminiAnswer && (
-                      <>
-                        <Separator className="opacity-40" />
-                        <details className="group" open={qHighlights.length > 0}>
-                          <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
-                            <BookOpen className="h-3.5 w-3.5 shrink-0" />
-                            {dict.review.detailedExplanation}
-                          </summary>
-                          <div className="mt-3">
-                            <AnswerExplanation
-                              explanation={q.geminiAnswer.explanation}
-                              evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
-                              whyOthersWrong={q.geminiAnswer.whyOthersWrong}
-                              correctAnswer={q.geminiAnswer.correctAnswer}
-                              acceptedAnswers={q.acceptedAnswers}
-                              options={[
-                                { key: "A", text: q.optionA },
-                                { key: "B", text: q.optionB },
-                                { key: "C", text: q.optionC },
-                                { key: "D", text: q.optionD },
-                              ]}
-                              insufficientEvidence={q.geminiAnswer.insufficientEvidence}
-                              explanationImageUrl={q.geminiAnswer.explanationImageUrl}
-                              explanationImageAlt={q.geminiAnswer.explanationImageAlt}
-                              locale={contentLocale}
-                              questionId={q.id}
-                              highlights={qHighlights}
-                              highlightT={dict.highlights}
-                              collapsibleSections={qHighlights.length > 0}
-                              answerDistribution={distributionMap.get(q.id) ?? null}
-                            />
-                          </div>
-                        </details>
-                      </>
-                    )}
+                    <RetestOptions
+                      questionId={q.id}
+                      dir={contentDir}
+                      correctKeys={[...new Set([correctAnswer, ...q.acceptedAnswers].filter((k): k is "A" | "B" | "C" | "D" => !!k))]}
+                      options={OPTION_KEYS.map((k, idx) => ({ key: k, letter: letters[idx], text: optionTexts[idx] }))}
+                      labels={retestLabels}
+                    >
+                      {q.geminiAnswer && (
+                        <>
+                          <Separator className="opacity-40" />
+                          <details className="group" open={qHighlights.length > 0}>
+                            <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80">
+                              <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                              {dict.review.detailedExplanation}
+                            </summary>
+                            <div className="mt-3">
+                              <AnswerExplanation
+                                explanation={q.geminiAnswer.explanation}
+                                evidenceCitations={q.geminiAnswer.evidenceCitations as EvidenceCitationDisplay[] | null}
+                                whyOthersWrong={q.geminiAnswer.whyOthersWrong}
+                                correctAnswer={q.geminiAnswer.correctAnswer}
+                                acceptedAnswers={q.acceptedAnswers}
+                                options={[
+                                  { key: "A", text: q.optionA },
+                                  { key: "B", text: q.optionB },
+                                  { key: "C", text: q.optionC },
+                                  { key: "D", text: q.optionD },
+                                ]}
+                                insufficientEvidence={q.geminiAnswer.insufficientEvidence}
+                                explanationImageUrl={q.geminiAnswer.explanationImageUrl}
+                                explanationImageAlt={q.geminiAnswer.explanationImageAlt}
+                                locale={contentLocale}
+                                questionId={q.id}
+                                highlights={qHighlights}
+                                highlightT={dict.highlights}
+                                collapsibleSections={qHighlights.length > 0}
+                                answerDistribution={distributionMap.get(q.id) ?? null}
+                              />
+                            </div>
+                          </details>
+                        </>
+                      )}
+                    </RetestOptions>
 
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">

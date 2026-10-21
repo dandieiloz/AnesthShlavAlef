@@ -89,7 +89,7 @@ export default async function ForumPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 animate-fade-in text-right" dir="rtl">
+    <div className="mx-auto max-w-3xl space-y-6 animate-fade-in" dir="rtl">
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2">

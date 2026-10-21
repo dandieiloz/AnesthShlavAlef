@@ -25,7 +25,7 @@ export function ProgressBarMini({ vm, className }: ProgressBarMiniProps) {
   const Icon = LEVEL_ICONS[vm.levelKey];
   return (
     <Link
-      href="/profile#progress"
+      href="/progress#progress"
       title={vm.tooltip}
       aria-label={vm.ariaLabel}
       className={cn(

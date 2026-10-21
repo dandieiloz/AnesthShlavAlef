@@ -13,6 +13,9 @@ import { Stethoscope } from "lucide-react";
 import { getLocale } from "@/lib/locale";
 import { getDictionary } from "@/lib/i18n";
 import { InterestModal } from "@/components/InterestModal";
+import { ExamPlanFields } from "./ExamPlanFields";
+import { questionAccessWhere, hasUsableAnswerWhere } from "@/lib/plan";
+import { requireUser } from "@/lib/auth";
 
 export default async function OnboardingPage() {
   const session = await auth();
@@ -27,6 +30,10 @@ export default async function OnboardingPage() {
   const locale = await getLocale();
   const dict = getDictionary(locale);
   const t = dict.onboarding;
+  const me = await requireUser();
+  const poolSize = await db.question.count({
+    where: { AND: [await questionAccessWhere(me), hasUsableAnswerWhere] },
+  });
 
   return (
     <div className="mx-auto max-w-lg py-12 animate-fade-in">
@@ -87,6 +94,8 @@ export default async function OnboardingPage() {
                 ))}
               </select>
             </div>
+
+            <ExamPlanFields poolSize={poolSize} t={dict.onboardingPlan} />
 
             <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-3">
               <input
