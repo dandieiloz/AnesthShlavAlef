@@ -808,7 +808,7 @@ export function QuizRunner(props: Props) {
     <div className="mx-auto max-w-3xl">
       <div className="space-y-5">
         {/* Focus bar: replaces the site header while answering questions */}
-        <div className="sticky top-0 z-30 -mx-4 -mt-8 space-y-1.5 border-b bg-background/95 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
+        <div className="sticky top-0 z-30 -mx-4 -mt-5 space-y-1.5 sm:-mt-8 border-b bg-background/95 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <div className="flex min-w-0 items-center gap-1.5">
               <Link
@@ -834,7 +834,7 @@ export function QuizRunner(props: Props) {
                 aria-label={t.progressSummaryTitle}
               >
                 <ListChecks className="h-3.5 w-3.5" />
-                {t.progressSummary}
+                <span className="hidden min-[400px]:inline">{t.progressSummary}</span>
               </button>
             </div>
           </div>

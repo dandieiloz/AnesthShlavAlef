@@ -1,6 +1,7 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { QUESTION_SOURCES } from "@/lib/hospitals";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { Dictionary } from "@/lib/i18n";
@@ -24,6 +25,10 @@ export function HistoryFilters({
   const router = useRouter();
   const params = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
+  // Phones show only the search box until the user opens the other filters.
+  const activeExtra = ["source", "year", "chapter", "result", "all"].filter((k) => params.get(k)).length;
+  const [showExtra, setShowExtra] = useState(activeExtra > 0);
+  const extra = showExtra ? "" : "hidden sm:block";
 
   function hrefFor(sp: URLSearchParams) {
     if (tab !== "all") sp.set("tab", tab);
@@ -53,7 +58,7 @@ export function HistoryFilters({
     <form
       ref={formRef}
       onSubmit={submit}
-      className="grid grid-cols-2 items-end gap-3 rounded-lg border bg-card p-4 sm:flex sm:flex-wrap"
+      className="grid grid-cols-2 items-end gap-3 rounded-lg border bg-card p-3 sm:flex sm:flex-wrap sm:p-4"
     >
       <div className="col-span-2 sm:min-w-48 sm:flex-1">
         <label className={labelClass}>{t.searchLabel}</label>
@@ -65,7 +70,7 @@ export function HistoryFilters({
         />
       </div>
 
-      <div className="col-span-2 sm:min-w-[14rem]">
+      <div className={`col-span-2 sm:min-w-[14rem] ${extra}`}>
         <label className={labelClass}>{t.sourceLabel}</label>
         <SearchableSelect
           name="source"
@@ -81,7 +86,7 @@ export function HistoryFilters({
         />
       </div>
 
-      <div>
+      <div className={extra}>
         <label className={labelClass}>{t.yearLabel}</label>
         <input
           name="year"
@@ -94,7 +99,7 @@ export function HistoryFilters({
         />
       </div>
 
-      <div>
+      <div className={extra}>
         <label className={labelClass}>{t.chapterLabel}</label>
         <select
           name="chapter"
@@ -109,7 +114,7 @@ export function HistoryFilters({
       </div>
 
       {showResultFilter && (
-        <div>
+        <div className={extra}>
           <label className={labelClass}>{t.resultLabel}</label>
           <select
             name="result"
@@ -133,10 +138,22 @@ export function HistoryFilters({
         <button type="button" onClick={reset} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">
           {t.clear}
         </button>
+        <button
+          type="button"
+          onClick={() => setShowExtra((v) => !v)}
+          aria-expanded={showExtra}
+          className="ms-auto inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm hover:bg-muted sm:hidden"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {showExtra ? t.fewerFilters : t.moreFilters}
+          {!showExtra && activeExtra > 0 && (
+            <span className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">{activeExtra}</span>
+          )}
+        </button>
       </div>
 
       {isAdmin && (
-        <label className="col-span-2 flex basis-full items-center gap-2 text-sm text-muted-foreground">
+        <label className={`col-span-2 basis-full items-center gap-2 text-sm text-muted-foreground ${showExtra ? "flex" : "hidden sm:flex"}`}>
           <input
             type="checkbox"
             name="all"

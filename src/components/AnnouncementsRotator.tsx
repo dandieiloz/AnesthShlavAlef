@@ -65,7 +65,7 @@ export function AnnouncementsRotator({
 
   return (
     <div
-      className="sticky top-14 z-30 w-full border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 backdrop-blur-md shadow-sm"
+      className="relative z-30 w-full sm:sticky sm:top-14 border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 backdrop-blur-md shadow-sm"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >

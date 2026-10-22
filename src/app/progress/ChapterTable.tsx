@@ -111,57 +111,93 @@ export function ChapterTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table className="min-w-[640px]">
-        <TableHeader>
-          <TableRow>
-            <SortHead field="chapter" label={t.chapterCol} className="w-12 text-center" />
-            <SortHead field="title" label={t.titleCol} />
-            <SortHead field="attempts" label={t.attemptsCol} className="w-20 text-center" />
-            <SortHead field="correct" label={t.correctCol} className="w-20 text-center" />
-            <SortHead field="accuracy" label={t.accuracyCol} className="w-28 text-center" />
-            <SortHead field="usefulness" label={t.usefulnessCol} className="w-32 text-center" />
-            <TableHead className="w-20 text-center" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((row) => {
-            const tone = usefulnessTone(row.usefulness);
-            return (
-              <TableRow key={row.chapterNumber} className={TONE_ROW_CLASS[tone]}>
-                <TableCell className="text-center font-mono text-sm font-medium">{row.chapterNumber}</TableCell>
-                <TableCell className="font-medium">{row.title}</TableCell>
-                <TableCell className="text-center text-muted-foreground">{row.attempts}</TableCell>
-                <TableCell className="text-center text-muted-foreground">{row.correct}</TableCell>
-                <TableCell className="text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          row.accuracy >= 70 ? "bg-success" : row.accuracy >= 50 ? "bg-warning" : "bg-destructive"
-                        }`}
-                        style={{ width: `${row.accuracy}%` }}
-                      />
-                    </div>
-                    <span className="text-xs tabular-nums">{row.accuracy}%</span>
+    <>
+      {/* Phones: one row per chapter, in the same order as the table */}
+      <ul className="divide-y rounded-lg border bg-card sm:hidden">
+        {sorted.map((row) => {
+          const tone = usefulnessTone(row.usefulness);
+          return (
+            <li key={row.chapterNumber} className={`flex items-center gap-3 p-3 ${TONE_ROW_CLASS[tone]}`}>
+              <span className="w-6 shrink-0 text-center font-mono text-sm font-medium text-muted-foreground">{row.chapterNumber}</span>
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <p className="line-clamp-2 text-sm font-medium leading-snug">{row.title}</p>
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full ${
+                        row.accuracy >= 70 ? "bg-success" : row.accuracy >= 50 ? "bg-warning" : "bg-destructive"
+                      }`}
+                      style={{ width: `${row.accuracy}%` }}
+                    />
                   </div>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge className={`text-xs ${TONE_BADGE_CLASS[tone]}`}>
-                    {toneLabel(tone, locale)}
-                    {row.usefulness !== null && <span className="ms-1 opacity-60">({row.usefulness})</span>}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Button asChild variant="ghost" size="sm" className="h-6 text-xs text-primary">
-                    <Link href={`/study/new?chapter=${row.chapterNumber}`}>{dict.common.practice}</Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                  <span className="text-xs tabular-nums">{row.accuracy}%</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {row.correct}/{row.attempts}
+                  </span>
+                  <Badge className={`ms-auto shrink-0 text-[10px] ${TONE_BADGE_CLASS[tone]}`}>{toneLabel(tone, locale)}</Badge>
+                </div>
+              </div>
+              <Button asChild variant="ghost" size="sm" className="h-8 shrink-0 px-2 text-xs text-primary">
+                <Link href={`/study/new?chapter=${row.chapterNumber}`}>{dict.common.practice}</Link>
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Tablet and up: full sortable table */}
+      <div className="hidden overflow-x-auto rounded-lg border sm:block">
+        <Table className="min-w-[640px]">
+          <TableHeader>
+            <TableRow>
+              <SortHead field="chapter" label={t.chapterCol} className="w-12 text-center" />
+              <SortHead field="title" label={t.titleCol} />
+              <SortHead field="attempts" label={t.attemptsCol} className="w-20 text-center" />
+              <SortHead field="correct" label={t.correctCol} className="w-20 text-center" />
+              <SortHead field="accuracy" label={t.accuracyCol} className="w-28 text-center" />
+              <SortHead field="usefulness" label={t.usefulnessCol} className="w-32 text-center" />
+              <TableHead className="w-20 text-center" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((row) => {
+              const tone = usefulnessTone(row.usefulness);
+              return (
+                <TableRow key={row.chapterNumber} className={TONE_ROW_CLASS[tone]}>
+                  <TableCell className="text-center font-mono text-sm font-medium">{row.chapterNumber}</TableCell>
+                  <TableCell className="font-medium">{row.title}</TableCell>
+                  <TableCell className="text-center text-muted-foreground">{row.attempts}</TableCell>
+                  <TableCell className="text-center text-muted-foreground">{row.correct}</TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            row.accuracy >= 70 ? "bg-success" : row.accuracy >= 50 ? "bg-warning" : "bg-destructive"
+                          }`}
+                          style={{ width: `${row.accuracy}%` }}
+                        />
+                      </div>
+                      <span className="text-xs tabular-nums">{row.accuracy}%</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge className={`text-xs ${TONE_BADGE_CLASS[tone]}`}>
+                      {toneLabel(tone, locale)}
+                      {row.usefulness !== null && <span className="ms-1 opacity-60">({row.usefulness})</span>}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button asChild variant="ghost" size="sm" className="h-6 text-xs text-primary">
+                      <Link href={`/study/new?chapter=${row.chapterNumber}`}>{dict.common.practice}</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }

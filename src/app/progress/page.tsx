@@ -88,7 +88,7 @@ export default async function ProgressPage({
   }
 
   return (
-    <div className="space-y-10 animate-fade-in">
+    <div className="space-y-8 animate-fade-in sm:space-y-10">
       <div>
         <h1 className="font-display text-2xl font-bold">{t.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>

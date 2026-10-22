@@ -89,14 +89,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className={`min-h-screen font-sans flex flex-col ${user ? "pb-16 sm:pb-0" : ""}`}>
+      <body className="min-h-screen font-sans flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <PwaProvider>
             <SiteHeaderClient user={user} unseenResponseCount={unseenResponseCount} unreadForumCount={unreadForumCount} signInAction={handleSignIn} signOutAction={handleSignOut} nav={dict.nav} progressMini={progressMini} />
             <HideInFocus>
               <BetaBanner t={dict.beta} locale={locale} />
             </HideInFocus>
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+            {/* overflow-x-clip: one over-wide child must never zoom the whole page out on phones (clip, unlike hidden, keeps sticky working). */}
+            <main className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 py-5 sm:py-8">{children}</main>
             <HideInFocus>
               <SiteFooter t={dict.footer} />
             </HideInFocus>

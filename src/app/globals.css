@@ -102,6 +102,13 @@
     @apply bg-background text-foreground antialiased;
   }
 
+  /* Room for the phone tab bar (and the home indicator under it), only while it's shown. */
+  @media (max-width: 639.98px) {
+    body:has([data-mobile-tabbar]) {
+      padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    }
+  }
+
   /* Focus ring for keyboard navigation */
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;

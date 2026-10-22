@@ -72,7 +72,7 @@ export default async function HomePage() {
   const LevelIcon = level ? LEVEL_ICONS[level.level.key] : Sparkles;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in sm:space-y-8">
       {/* Greeting + main action */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-2">
@@ -98,7 +98,7 @@ export default async function HomePage() {
             </Link>
           )}
         </div>
-        <Button asChild size="lg" className="gap-2">
+        <Button asChild size="lg" className="w-full gap-2 sm:w-auto">
           <Link href="/study/new">
             <PlusCircle className="h-4 w-4" />
             {t.newQuiz}
@@ -108,7 +108,7 @@ export default async function HomePage() {
 
       {/* Hero: next quiz + today */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="min-w-0 lg:col-span-2">
           {nextQuiz ? (
             <ContinueQuizCard
               q={nextQuiz}
@@ -141,13 +141,14 @@ export default async function HomePage() {
       </div>
 
       {/* Shortcuts */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Shortcut
           href="/my-questions?tab=wrong"
           icon={RotateCcw}
           iconClass="bg-destructive/10 text-destructive"
           title={t.quickMistakes}
           hint={t.quickMistakesHint(counts.wrong)}
+          count={counts.wrong}
           chevron={Chevron}
         />
         <Shortcut
@@ -156,6 +157,7 @@ export default async function HomePage() {
           iconClass="bg-amber-500/10 text-amber-500"
           title={t.quickSaved}
           hint={t.quickSavedHint(counts.saved)}
+          count={counts.saved}
           chevron={Chevron}
         />
         <Shortcut
@@ -170,7 +172,7 @@ export default async function HomePage() {
 
       {/* Practice diary + next step */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="space-y-3 lg:col-span-2">
+        <section className="min-w-0 space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-lg font-semibold">{t.diaryTitle}</h2>
             {totalCount > 0 && (
@@ -215,7 +217,7 @@ export default async function HomePage() {
         </section>
 
         {practice.next && (
-          <section className="space-y-3">
+          <section className="min-w-0 space-y-3">
             <h2 className="font-display text-lg font-semibold">{t.nextStepTitle}</h2>
             <Card className={cn("border-2", practice.next.kind === "weak" ? "border-amber-500/40" : "border-primary/30")}>
               <CardContent className="space-y-3 p-5">
@@ -322,6 +324,7 @@ function Shortcut({
   iconClass,
   title,
   hint,
+  count,
   chevron: Chevron,
 }: {
   href: string;
@@ -329,20 +332,28 @@ function Shortcut({
   iconClass: string;
   title: string;
   hint: string;
+  /** Shown as a badge on phones, where the hint is hidden. */
+  count?: number;
   chevron: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <Link href={href} className="group">
       <Card className="h-full transition-colors group-hover:border-primary/40 group-hover:bg-muted/30">
-        <CardContent className="flex items-center gap-3 p-4">
-          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", iconClass)}>
+        {/* Phones: icon over title, three across. Wider: icon, title + hint, chevron. */}
+        <CardContent className="flex flex-col items-center gap-2 p-3 text-center sm:flex-row sm:gap-3 sm:p-4 sm:text-start">
+          <div className={cn("relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full", iconClass)}>
             <Icon className="h-5 w-5" />
+            {count !== undefined && count > 0 && (
+              <span className="absolute -end-1.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold tabular-nums text-background ring-2 ring-card sm:hidden">
+                {count}
+              </span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{title}</p>
-            <p className="line-clamp-2 text-xs text-muted-foreground">{hint}</p>
+            <p className="text-xs font-semibold leading-tight sm:text-sm">{title}</p>
+            <p className="hidden text-xs text-muted-foreground sm:line-clamp-2">{hint}</p>
           </div>
-          <Chevron className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5" />
+          <Chevron className="hidden h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5 sm:block" />
         </CardContent>
       </Card>
     </Link>

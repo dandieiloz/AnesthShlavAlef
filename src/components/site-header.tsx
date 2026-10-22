@@ -106,6 +106,7 @@ function MobileTabBar({ items, pathname, forumBadge, forumTitle }: { items: NavI
   if (isFocusPath(pathname)) return null;
   return (
     <nav
+      data-mobile-tabbar
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
       aria-label="main"
     >

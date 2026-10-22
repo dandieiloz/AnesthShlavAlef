@@ -20,16 +20,16 @@ function CardBlock({ className = "h-28" }: { className?: string }) {
 
 export function HomeSkeleton() {
   return (
-    <div className="space-y-8" aria-busy="true">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-6 sm:space-y-8" aria-busy="true">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 w-full sm:w-32" />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <CardBlock className="h-48 lg:col-span-2" />
         <CardBlock className="h-48" />
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <CardBlock className="h-20" />
         <CardBlock className="h-20" />
         <CardBlock className="h-20" />

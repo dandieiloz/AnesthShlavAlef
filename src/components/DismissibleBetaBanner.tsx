@@ -44,7 +44,8 @@ export function DismissibleBetaBanner({
   }
 
   return (
-    <div className="sticky top-14 z-30 w-full border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 shadow-sm backdrop-blur-md">
+    // Pinned only on wider screens; on phones it would eat a third of the viewport.
+    <div className="relative z-30 w-full sm:sticky sm:top-14 border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 shadow-sm backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-2 pe-10 text-sm sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground">
